@@ -22,7 +22,7 @@ export function StoreCard({
 }: StoreCardProps) {
   return (
     <Link href="#" className="block">
-      <Card className="overflow-hidden transition-all hover:shadow-md">
+      <Card className="overflow-hidden py-0 transition-all hover:shadow-md">
         <CardContent className="p-0">
           <div className="relative">
             <Image

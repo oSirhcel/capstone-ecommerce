@@ -4,31 +4,29 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  BarChart3,
-  Users,
-  Package,
-  ShoppingCart,
-  Store,
-  Settings,
-  Menu,
-  X,
-  Home,
-  Bell,
-  CreditCard,
-  FileText,
+  BarChart3Icon,
+  UsersIcon,
+  PackageIcon,
+  ShoppingCartIcon,
+  StoreIcon,
+  SettingsIcon,
+  MenuIcon,
+  XIcon,
+  HomeIcon,
+  CreditCardIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const navigation = [
-  { name: "Home", href: "/admin", icon: Home },
-  { name: "Orders", href: "/admin/orders", icon: ShoppingCart },
-  { name: "Products", href: "/admin/products", icon: Package },
-  { name: "Customers", href: "/admin/users", icon: Users },
-  { name: "Payments", href: "/admin/payments", icon: CreditCard },
-  { name: "Analytics", href: "/admin/analytics", icon: BarChart3 },
-  { name: "Store Management", href: "/admin/stores", icon: Store },
-  { name: "Settings", href: "/admin/settings", icon: Settings },
+  { name: "Home", href: "/admin", icon: HomeIcon },
+  { name: "Orders", href: "/admin/orders", icon: ShoppingCartIcon },
+  { name: "Products", href: "/admin/products", icon: PackageIcon },
+  { name: "Customers", href: "/admin/customers", icon: UsersIcon },
+  { name: "Payments", href: "/admin/payments", icon: CreditCardIcon },
+  { name: "Analytics", href: "/admin/analytics", icon: BarChart3Icon },
+  { name: "Store Management", href: "/admin/stores", icon: StoreIcon },
+  { name: "Settings", href: "/admin/settings", icon: SettingsIcon },
 ];
 
 export function AdminSidebar() {
@@ -46,9 +44,9 @@ export function AdminSidebar() {
           className="bg-white shadow-md"
         >
           {isMobileMenuOpen ? (
-            <X className="h-4 w-4" />
+            <XIcon className="h-4 w-4" />
           ) : (
-            <Menu className="h-4 w-4" />
+            <MenuIcon className="h-4 w-4" />
           )}
         </Button>
       </div>

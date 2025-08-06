@@ -1,24 +1,14 @@
 //schemas
+import { integer, pgTable, timestamp, varchar, boolean, text, decimal, pgEnum } from "drizzle-orm/pg-core";
 
-import { integer, pgTable, timestamp, varchar, boolean, text, decimal } from "drizzle-orm/pg-core";
-
-// User types table to define different user roles
-// Note: The userTypes table should be seeded with the following values:
-// 1. customer - Regular customers who can browse and purchase products
-// 2. owner - Store owners who can manage their stores and products
-// 3. admin - System administrators with full access to all features
-export const userTypes = pgTable("user_types", {
-  id: integer().primaryKey().generatedAlwaysAsIdentity(),
-  name: varchar({ length: 50 }).notNull().unique(), // 'customer', 'owner', 'admin'
-  description: varchar({ length: 255 }),
-  createdAt: timestamp().defaultNow().notNull()
-});
+// User type enum to define different user roles
+export const userTypeEnum = pgEnum("user_type", ["customer", "owner", "admin"]);
 
 export const users = pgTable("users", {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),
   username: varchar({ length: 255 }).notNull(),
   password: varchar({ length: 255 }).notNull(),
-  userTypeId: integer().references(() => userTypes.id).notNull().default(1), // Default to customer
+  userType: userTypeEnum().notNull().default("customer"), // Default to customer
   createdAt: timestamp().defaultNow().notNull(),
   updatedAt: timestamp().defaultNow().notNull()
 });

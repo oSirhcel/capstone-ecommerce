@@ -13,6 +13,7 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
+    "@auth/drizzle-adapter": "^1.10.0",
     "@radix-ui/react-avatar": "^1.1.10",
     "@radix-ui/react-select": "^2.2.5",
     "@radix-ui/react-slot": "^1.2.3",
@@ -24,6 +25,7 @@
     "drizzle-orm": "^0.44.2",
     "lucide-react": "^0.515.0",
     "next": "15.3.3",
+    "next-auth": "^4.24.11",
     "nuqs": "^2.4.3",
     "pg": "^8.16.0",
     "react": "^19.0.0",

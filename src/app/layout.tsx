@@ -4,6 +4,8 @@ import "./globals.css";
 
 import { NuqsAdapter } from "nuqs/adapters/next/app";
 import QueryProvider from "@/providers/query-provider";
+import { AuthProvider } from "@/providers/auth-provider";
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -29,9 +31,11 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <QueryProvider>
-          <NuqsAdapter>{children}</NuqsAdapter>
-        </QueryProvider>
+        <AuthProvider>
+          <QueryProvider>
+            <NuqsAdapter>{children}</NuqsAdapter>
+          </QueryProvider>
+        </AuthProvider>
       </body>
     </html>
   );

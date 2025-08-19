@@ -74,7 +74,7 @@ This is a minimal OAuth implementation that adds Google authentication to your e
 
 ## Environment Variables
 
-Create a `.env.local` file with:
+Create a `.env` file with:
 
 ```bash
 NEXTAUTH_SECRET=your-secret-key-here
@@ -90,7 +90,7 @@ GOOGLE_CLIENT_SECRET=your-google-client-secret
 3. Enable Google+ API
 4. Create OAuth 2.0 credentials
 5. Set redirect URI: `http://localhost:3000/api/auth/callback/google`
-6. Copy Client ID and Secret to `.env.local`
+6. Copy Client ID and Secret to `.env`
 
 ## Generate NextAuth Secret
 

@@ -22,6 +22,7 @@
     "@tanstack/react-query": "^5.80.7",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "dotenv": "^17.2.1",
     "drizzle-kit": "^0.31.1",
     "drizzle-orm": "^0.44.2",
     "lucide-react": "^0.515.0",
@@ -31,6 +32,7 @@
     "pg": "^8.16.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-icons": "^5.5.0",
     "tailwind-merge": "^3.3.1",
     "zod": "^3.25.64"
   },

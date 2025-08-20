@@ -1,18 +1,71 @@
 import { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
+import CredentialsProvider from "next-auth/providers/credentials";
 import { db } from "@/server/db";
 import { users } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
 import { randomUUID } from "crypto";
+import bcrypt from "bcryptjs";
 
 export const authOptions: NextAuthOptions = {
   providers: [
+    CredentialsProvider({
+      name: "Credentials",
+      credentials: {
+        username: { label: "Username", type: "text" },
+        password: { label: "Password", type: "password" },
+      },
+      async authorize(credentials) {
+        if (!credentials?.username || !credentials?.password) {
+          return null;
+        }
+
+        // Find user by username
+        const [user] = await db
+          .select()
+          .from(users)
+          .where(eq(users.username, credentials.username))
+          .limit(1);
+
+        if (!user || !user.password) {
+          return null;
+        }
+
+        const isValid = await bcrypt.compare(
+          credentials.password,
+          user.password
+        );
+
+        if (!isValid) {
+          return null;
+        }
+
+        // NextAuth expects an object with at least an id
+        return {
+          id: user.id,
+          name: user.username,
+          // Provide an email-shaped value so existing callbacks that derive username from email continue to work
+          email: `${user.username}@local`,
+          // @ts-expect-error attach custom field for later callbacks
+          userType: user.userType,
+        };
+      },
+    }),
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     }),
   ],
   callbacks: {
+    async jwt({ token, user }) {
+      // On sign in, persist id and userType onto the token
+      if (user) {
+        token.sub = user.id as string;
+        // @ts-expect-error custom prop possibly present from authorize
+        if (user.userType) token.userType = user.userType;
+      }
+      return token;
+    },
     async signIn({ user, account, profile }) {
       // If user signs in with Google and doesn't exist in our users table, create them
       if (account?.provider === "google" && profile?.email) {
@@ -35,14 +88,19 @@ export const authOptions: NextAuthOptions = {
       return true;
     },
     async session({ session, token }) {
-      if (session.user?.email) {
-        // Get user from database to include userType
+      // Prefer values from token to avoid extra DB hit on every request
+      if (session.user) {
+        (session.user as any).id = token.sub;
+        // @ts-expect-error custom prop
+        (session.user as any).userType = token.userType;
+      }
+      // Fallback: if userType missing but we have an email, try to fetch once
+      if (session.user?.email && !(session.user as any).userType) {
         const username = session.user.email.split('@')[0];
         const [user] = await db
           .select()
           .from(users)
           .where(eq(users.username, username));
-        
         if (user) {
           (session.user as any).id = user.id;
           (session.user as any).userType = user.userType;

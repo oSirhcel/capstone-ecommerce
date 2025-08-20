@@ -37,13 +37,51 @@ export default function SignUpPage() {
       return;
     }
 
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters long");
+      setIsLoading(false);
+      return;
+    }
+
+    if (username.length < 3) {
+      setError("Username must be at least 3 characters long");
+      setIsLoading(false);
+      return;
+    }
+
     try {
-      // For now, just show a message that credentials auth needs to be implemented
-      setError(
-        "Username/password registration will be implemented soon. Please use Google OAuth for now.",
-      );
+      const response = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          username,
+          password,
+          userType: "customer",
+        }),
+      });
+
+      const data = (await response.json()) as {
+        error?: string;
+        message?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(data.error ?? "Registration failed");
+      }
+
+      // Registration successful
+      setError("");
+      // Redirect to sign in page or automatically sign in
+      window.location.href =
+        "/auth/signin?message=Account created successfully! Please sign in.";
     } catch (error) {
-      setError("An error occurred during registration");
+      setError(
+        error instanceof Error
+          ? error.message
+          : "An error occurred during registration",
+      );
     } finally {
       setIsLoading(false);
     }

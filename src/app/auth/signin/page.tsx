@@ -1,7 +1,8 @@
 "use client";
 
 import { signIn } from "next-auth/react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -20,6 +21,15 @@ export default function SignInPage() {
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const message = searchParams.get("message");
+    if (message) {
+      setSuccessMessage(message);
+    }
+  }, [searchParams]);
 
   const handleGoogleSignIn = () => {
     void signIn("google", { callbackUrl: "/" });
@@ -32,9 +42,20 @@ export default function SignInPage() {
 
     try {
       // For now, just show a message that credentials auth needs to be implemented
-      setError(
-        "Username/password authentication will be implemented soon. Please use Google OAuth for now.",
-      );
+      const result = await signIn("credentials", {
+        redirect: false,
+        username,
+        password,
+      });
+
+      if (result?.error) {
+        setError("Invalid credentials");
+      } else if (result?.ok) {
+        // Redirect to home page or wherever you want after successful sign in
+        window.location.href = "/";
+      } else {
+        setError("Invalid credentials");
+      }
     } catch (error) {
       setError("An error occurred during sign in");
     } finally {
@@ -83,6 +104,12 @@ export default function SignInPage() {
                 disabled={isLoading}
               />
             </div>
+
+            {successMessage && (
+              <div className="rounded-md bg-green-50 p-3 text-center text-sm text-green-600">
+                {successMessage}
+              </div>
+            )}
 
             {error && (
               <div className="text-center text-sm text-red-500">{error}</div>

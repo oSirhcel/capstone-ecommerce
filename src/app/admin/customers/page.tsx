@@ -11,13 +11,14 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Search, Plus, Filter } from "lucide-react";
+import Link from "next/link";
 
 const customers = [
   {
     id: "1",
     name: "John Doe",
     email: "john@example.com",
-    orders: 10,
+    role: "Customer",
     status: "Active",
     joinDate: "2024-01-15",
     avatar: "/placeholder.svg?height=32&width=32",
@@ -26,7 +27,7 @@ const customers = [
     id: "2",
     name: "Sarah Johnson",
     email: "sarah@example.com",
-    orders: 5,
+    role: "Seller",
     status: "Active",
     joinDate: "2024-01-10",
     avatar: "/placeholder.svg?height=32&width=32",
@@ -35,7 +36,7 @@ const customers = [
     id: "3",
     name: "Mike Chen",
     email: "mike@example.com",
-    orders: 2,
+    role: "Customer",
     status: "Inactive",
     joinDate: "2024-01-08",
     avatar: "/placeholder.svg?height=32&width=32",
@@ -44,7 +45,7 @@ const customers = [
     id: "4",
     name: "Emily Rodriguez",
     email: "emily@example.com",
-    orders: 1,
+    role: "Seller",
     status: "Active",
     joinDate: "2024-01-05",
     avatar: "/placeholder.svg?height=32&width=32",
@@ -53,13 +54,13 @@ const customers = [
 
 const columns = [
   {
-    header: "Customer Information",
+    header: "User",
     accessorKey: "name",
     cell: ({ row }: any) => (
       <div className="flex items-center gap-3">
         <Avatar className="h-8 w-8">
           <AvatarImage
-            src={row.original.avatar ?? "/placeholder.svg"}
+            src={row.original.avatar || "/placeholder.svg"}
             alt={row.original.name}
           />
           <AvatarFallback>{row.original.name.charAt(0)}</AvatarFallback>
@@ -74,25 +75,27 @@ const columns = [
     ),
   },
   {
-    header: "Orders",
-    accessorKey: "orders",
+    header: "Role",
+    accessorKey: "role",
     cell: ({ row }: any) => (
-      <div className="text-muted-foreground">{row.original.orders}</div>
+      <Badge variant={row.original.role === "Seller" ? "default" : "secondary"}>
+        {row.original.role}
+      </Badge>
     ),
   },
   {
-    header: "Account Status",
+    header: "Status",
     accessorKey: "status",
     cell: ({ row }: any) => (
       <Badge
-        variant={row.original.status === "Active" ? "success" : "destructive"}
+        variant={row.original.status === "Active" ? "default" : "secondary"}
       >
         {row.original.status}
       </Badge>
     ),
   },
   {
-    header: "Registration Date",
+    header: "Join Date",
     accessorKey: "joinDate",
   },
   {
@@ -102,8 +105,8 @@ const columns = [
         <Button variant="ghost" size="sm">
           Edit
         </Button>
-        <Button variant="ghost" size="sm">
-          View Orders
+        <Button variant="ghost" size="sm" asChild>
+          <Link href={`/admin/customers/${row.original.id}`}>View</Link>
         </Button>
       </div>
     ),
@@ -115,14 +118,14 @@ export default function CustomersPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Customers</h1>
+          <h1 className="text-3xl font-bold">User Management</h1>
           <p className="text-muted-foreground">
-            Manage all customers and their orders
+            Manage all customers and their permissions
           </p>
         </div>
         <Button>
           <Plus className="mr-2 h-4 w-4" />
-          Create Customer
+          Add User
         </Button>
       </div>
 

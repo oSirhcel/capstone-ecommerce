@@ -3,6 +3,8 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
 import { NuqsAdapter } from "nuqs/adapters/next/app";
+
+import { Toaster } from "sonner";
 import QueryProvider from "@/providers/query-provider";
 import { AuthProvider } from "@/providers/auth-provider";
 
@@ -34,6 +36,7 @@ export default function RootLayout({
         <AuthProvider>
           <QueryProvider>
             <NuqsAdapter>{children}</NuqsAdapter>
+            <Toaster />
           </QueryProvider>
         </AuthProvider>
       </body>

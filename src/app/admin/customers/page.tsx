@@ -54,7 +54,7 @@ const customers = [
 
 const columns = [
   {
-    header: "User",
+    header: "Customer",
     accessorKey: "name",
     cell: ({ row }: any) => (
       <div className="flex items-center gap-3">
@@ -118,14 +118,16 @@ export default function CustomersPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">User Management</h1>
+          <h1 className="text-3xl font-bold">Customer Management</h1>
           <p className="text-muted-foreground">
             Manage all customers and their permissions
           </p>
         </div>
-        <Button>
-          <Plus className="mr-2 h-4 w-4" />
-          Add User
+        <Button asChild>
+          <Link href="/admin/customers/add">
+            <Plus className="mr-2 h-4 w-4" />
+            Add Customer
+          </Link>
         </Button>
       </div>
 

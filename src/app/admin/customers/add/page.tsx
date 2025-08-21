@@ -26,7 +26,6 @@ export default function AddUserPage() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Centralized state management - no useEffect needed!
   const [personalDetails, setPersonalDetails] = useState<PersonalDetailsData>({
     firstName: "",
     lastName: "",
@@ -81,7 +80,7 @@ export default function AddUserPage() {
 
       toast.success("User created successfully");
 
-      router.push("/admin/users");
+      router.push("/admin/customers");
     } catch (error) {
       toast.error("Error creating user");
     } finally {
@@ -90,7 +89,7 @@ export default function AddUserPage() {
   };
 
   const handleCancel = () => {
-    router.push("/admin/users");
+    router.push("/admin/customers");
   };
 
   return (

@@ -9,7 +9,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Eye, Package } from "lucide-react";
-import { DataTable } from "@/components/admin/customers/data-table";
+import { DataTable } from "@/components/admin/data-table";
 
 interface CustomerOrdersProps {
   customerId: string;

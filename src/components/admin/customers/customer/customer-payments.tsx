@@ -38,7 +38,6 @@ const paymentMethods = [
 ];
 
 const getBrandIcon = (brand: string) => {
-  // In a real app, you'd use actual brand icons
   return brand.toUpperCase();
 };
 

@@ -123,7 +123,7 @@ export function OrderSummaryForm({ customer, orderItems, subtotal, shipping, tax
           <div className="text-xs text-muted-foreground p-3 bg-muted/30 rounded-lg">
             <p className="font-medium mb-1">Order Creation Notes:</p>
             <ul className="space-y-1">
-              <li>• Order will be created with "Processing" status</li>
+              <li>• Order will be created with &quot;Processing&quot; status</li>
               <li>• Customer will receive order confirmation email</li>
               <li>• Inventory will be automatically updated</li>
             </ul>

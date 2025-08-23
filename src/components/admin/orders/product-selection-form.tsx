@@ -1,13 +1,19 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import Image from "next/image"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import { Search, Package, Plus, Minus, Trash2 } from "lucide-react"
-import type { OrderItem } from "@/app/admin/orders/create/page"
+import { useState } from "react";
+import Image from "next/image";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Search, Package, Plus, Minus, Trash2 } from "lucide-react";
+import type { OrderItem } from "@/app/admin/orders/create/page";
 
 // Mock product data
 const mockProducts = [
@@ -43,27 +49,31 @@ const mockProducts = [
     sku: "HSE-001",
     stock: 8,
   },
-]
+];
 
 interface ProductSelectionFormProps {
-  orderItems: OrderItem[]
-  onOrderItemsChange: (items: OrderItem[]) => void
+  orderItems: OrderItem[];
+  onOrderItemsChange: (items: OrderItem[]) => void;
 }
 
-export function ProductSelectionForm({ orderItems, onOrderItemsChange }: ProductSelectionFormProps) {
-  const [searchTerm, setSearchTerm] = useState("")
-  const [showProductSearch, setShowProductSearch] = useState(false)
+export function ProductSelectionForm({
+  orderItems,
+  onOrderItemsChange,
+}: ProductSelectionFormProps) {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [showProductSearch, setShowProductSearch] = useState(false);
 
   const filteredProducts = mockProducts.filter(
     (p) =>
-      p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.sku.toLowerCase().includes(searchTerm.toLowerCase()),
-  )
+      p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.sku.toLowerCase().includes(searchTerm.toLowerCase()),
+  );
 
   const addProduct = (product: (typeof mockProducts)[0]) => {
-    const existingItem = orderItems.find((item) => item.id === product.id)
+    const existingItem = orderItems.find((item) => item.id === product.id);
 
     if (existingItem) {
-      updateQuantity(product.id, existingItem.quantity + 1)
+      updateQuantity(product.id, existingItem.quantity + 1);
     } else {
       const newItem: OrderItem = {
         id: product.id,
@@ -72,27 +82,29 @@ export function ProductSelectionForm({ orderItems, onOrderItemsChange }: Product
         quantity: 1,
         image: product.image,
         sku: product.sku,
-      }
-      onOrderItemsChange([...orderItems, newItem])
+      };
+      onOrderItemsChange([...orderItems, newItem]);
     }
-    setShowProductSearch(false)
-    setSearchTerm("")
-  }
+    setShowProductSearch(false);
+    setSearchTerm("");
+  };
 
   const updateQuantity = (productId: string, newQuantity: number) => {
     if (newQuantity <= 0) {
-      removeProduct(productId)
-      return
+      removeProduct(productId);
+      return;
     }
 
-    const updatedItems = orderItems.map((item) => (item.id === productId ? { ...item, quantity: newQuantity } : item))
-    onOrderItemsChange(updatedItems)
-  }
+    const updatedItems = orderItems.map((item) =>
+      item.id === productId ? { ...item, quantity: newQuantity } : item,
+    );
+    onOrderItemsChange(updatedItems);
+  };
 
   const removeProduct = (productId: string) => {
-    const updatedItems = orderItems.filter((item) => item.id !== productId)
-    onOrderItemsChange(updatedItems)
-  }
+    const updatedItems = orderItems.filter((item) => item.id !== productId);
+    onOrderItemsChange(updatedItems);
+  };
 
   return (
     <Card>
@@ -105,7 +117,11 @@ export function ProductSelectionForm({ orderItems, onOrderItemsChange }: Product
             </CardTitle>
             <CardDescription>Add products to this order</CardDescription>
           </div>
-          <Button variant="outline" size="sm" onClick={() => setShowProductSearch(true)}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowProductSearch(true)}
+          >
             <Plus className="mr-2 h-4 w-4" />
             Add Product
           </Button>
@@ -114,15 +130,15 @@ export function ProductSelectionForm({ orderItems, onOrderItemsChange }: Product
       <CardContent className="space-y-4">
         {/* Product Search */}
         {showProductSearch && (
-          <div className="space-y-4 p-4 border rounded-lg bg-muted/20">
+          <div className="bg-muted/20 space-y-4 rounded-lg border p-4">
             <div className="flex items-center justify-between">
               <h4 className="font-medium">Search Products</h4>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => {
-                  setShowProductSearch(false)
-                  setSearchTerm("")
+                  setShowProductSearch(false);
+                  setSearchTerm("");
                 }}
               >
                 Cancel
@@ -130,7 +146,7 @@ export function ProductSelectionForm({ orderItems, onOrderItemsChange }: Product
             </div>
 
             <div className="relative">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Search className="text-muted-foreground absolute top-2.5 left-2.5 h-4 w-4" />
               <Input
                 placeholder="Search products by name or SKU..."
                 className="pl-8"
@@ -139,11 +155,11 @@ export function ProductSelectionForm({ orderItems, onOrderItemsChange }: Product
               />
             </div>
 
-            <div className="space-y-2 max-h-60 overflow-y-auto">
+            <div className="max-h-60 space-y-2 overflow-y-auto">
               {filteredProducts.map((product) => (
                 <div
                   key={product.id}
-                  className="flex items-center gap-3 p-3 rounded-lg border cursor-pointer hover:bg-background"
+                  className="hover:bg-background flex cursor-pointer items-center gap-3 rounded-lg border p-3"
                   onClick={() => addProduct(product)}
                 >
                   <Image
@@ -155,9 +171,13 @@ export function ProductSelectionForm({ orderItems, onOrderItemsChange }: Product
                   />
                   <div className="flex-1">
                     <p className="font-medium">{product.name}</p>
-                    <p className="text-sm text-muted-foreground">SKU: {product.sku}</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="font-medium">${product.price.toFixed(2)}</span>
+                    <p className="text-muted-foreground text-sm">
+                      SKU: {product.sku}
+                    </p>
+                    <div className="mt-1 flex items-center gap-2">
+                      <span className="font-medium">
+                        ${product.price.toFixed(2)}
+                      </span>
                       <Badge variant="outline" className="text-xs">
                         {product.stock} in stock
                       </Badge>
@@ -173,7 +193,10 @@ export function ProductSelectionForm({ orderItems, onOrderItemsChange }: Product
         {orderItems.length > 0 ? (
           <div className="space-y-4">
             {orderItems.map((item) => (
-              <div key={item.id} className="flex items-center gap-4 p-4 border rounded-lg">
+              <div
+                key={item.id}
+                className="flex items-center gap-4 rounded-lg border p-4"
+              >
                 <Image
                   src={item.image || "/placeholder.svg"}
                   alt={item.name}
@@ -183,7 +206,9 @@ export function ProductSelectionForm({ orderItems, onOrderItemsChange }: Product
                 />
                 <div className="flex-1">
                   <p className="font-medium">{item.name}</p>
-                  <p className="text-sm text-muted-foreground">SKU: {item.sku}</p>
+                  <p className="text-muted-foreground text-sm">
+                    SKU: {item.sku}
+                  </p>
                   <p className="font-medium">${item.price.toFixed(2)} each</p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -195,7 +220,9 @@ export function ProductSelectionForm({ orderItems, onOrderItemsChange }: Product
                   >
                     <Minus className="h-3 w-3" />
                   </Button>
-                  <span className="w-8 text-center font-medium">{item.quantity}</span>
+                  <span className="w-8 text-center font-medium">
+                    {item.quantity}
+                  </span>
                   <Button
                     variant="outline"
                     size="icon"
@@ -206,7 +233,9 @@ export function ProductSelectionForm({ orderItems, onOrderItemsChange }: Product
                   </Button>
                 </div>
                 <div className="text-right">
-                  <p className="font-medium">${(item.price * item.quantity).toFixed(2)}</p>
+                  <p className="font-medium">
+                    ${(item.price * item.quantity).toFixed(2)}
+                  </p>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -220,13 +249,15 @@ export function ProductSelectionForm({ orderItems, onOrderItemsChange }: Product
             ))}
           </div>
         ) : (
-          <div className="text-center py-8 text-muted-foreground">
-            <Package className="mx-auto h-12 w-12 mb-4 opacity-50" />
+          <div className="text-muted-foreground py-8 text-center">
+            <Package className="mx-auto mb-4 h-12 w-12 opacity-50" />
             <p>No products added yet</p>
-            <p className="text-sm">Click "Add Product" to get started</p>
+            <p className="text-sm">
+              Click &quot;Add Product&quot; to get started
+            </p>
           </div>
         )}
       </CardContent>
     </Card>
-  )
+  );
 }

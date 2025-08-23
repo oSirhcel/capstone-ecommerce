@@ -85,19 +85,15 @@ export default function CreateOrderPage() {
   const handleSubmit = async () => {
     // Validation
     if (!customer) {
-      toast({
-        title: "Customer Required",
+      toast.error("Customer Required", {
         description: "Please select a customer for this order.",
-        variant: "destructive",
       });
       return;
     }
 
     if (orderItems.length === 0) {
-      toast({
-        title: "Products Required",
+      toast.error("Products Required", {
         description: "Please add at least one product to the order.",
-        variant: "destructive",
       });
       return;
     }
@@ -107,10 +103,8 @@ export default function CreateOrderPage() {
       !shippingAddress.lastName ||
       !shippingAddress.address1
     ) {
-      toast({
-        title: "Shipping Address Required",
+      toast.error("Shipping Address Required", {
         description: "Please fill in the shipping address details.",
-        variant: "destructive",
       });
       return;
     }
@@ -135,17 +129,14 @@ export default function CreateOrderPage() {
       // Simulate API call
       await new Promise((resolve) => setTimeout(resolve, 2000));
 
-      toast({
-        title: "Order Created Successfully",
+      toast.success("Order Created Successfully", {
         description: `Order has been created and assigned ID ORD-${Date.now()}`,
       });
 
       router.push("/admin/orders");
     } catch (error) {
-      toast({
-        title: "Error Creating Order",
+      toast.error("Error Creating Order", {
         description: "There was an error creating the order. Please try again.",
-        variant: "destructive",
       });
     } finally {
       setIsSubmitting(false);

@@ -1,0 +1,159 @@
+"use client";
+
+import { signIn } from "next-auth/react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { FcGoogle } from "react-icons/fc";
+import { ArrowLeft } from "lucide-react";
+import Link from "next/link";
+
+export default function SignInPage() {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const message = searchParams.get("message");
+    if (message) {
+      setSuccessMessage(message);
+    }
+  }, [searchParams]);
+
+  const handleGoogleSignIn = () => {
+    void signIn("google", { callbackUrl: "/" });
+  };
+
+  const handleCredentialsSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError("");
+
+    try {
+      // For now, just show a message that credentials auth needs to be implemented
+      const result = await signIn("credentials", {
+        redirect: false,
+        username,
+        password,
+      });
+
+      if (result?.error) {
+        setError("Invalid credentials");
+      } else if (result?.ok) {
+        // Redirect to home page or wherever you want after successful sign in
+        window.location.href = "/";
+      } else {
+        setError("Invalid credentials");
+      }
+    } catch (error) {
+      setError("An error occurred during sign in");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">
+      <Card className="w-full max-w-md">
+        <CardHeader className="text-center">
+          {/* Back Button */}
+          <div className="absolute top-4 left-4">
+            <Link href="/">
+              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            </Link>
+          </div>
+
+          <CardTitle className="text-2xl font-bold">Sign In</CardTitle>
+          <CardDescription>
+            Welcome back! Please sign in to your account
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Username and Password Form */}
+          <form onSubmit={handleCredentialsSignIn} className="space-y-4">
+            <div>
+              <Input
+                type="text"
+                placeholder="Username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                required
+                disabled={isLoading}
+              />
+            </div>
+            <div>
+              <Input
+                type="password"
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                disabled={isLoading}
+              />
+            </div>
+
+            {successMessage && (
+              <div className="rounded-md bg-green-50 p-3 text-center text-sm text-green-600">
+                {successMessage}
+              </div>
+            )}
+
+            {error && (
+              <div className="text-center text-sm text-red-500">{error}</div>
+            )}
+
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading ? "Signing in..." : "Sign In"}
+            </Button>
+          </form>
+
+          {/* Divider */}
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-white px-2 text-gray-500">
+                Or continue with
+              </span>
+            </div>
+          </div>
+
+          {/* Google OAuth */}
+          <Button
+            onClick={handleGoogleSignIn}
+            disabled={isLoading}
+            variant="outline"
+            className="w-full"
+          >
+            <FcGoogle className="mr-2 h-5 w-5" />
+            Continue with Google
+          </Button>
+
+          <div className="text-center text-sm">
+            <span className="text-gray-600">Don&apos;t have an account? </span>
+            <Link
+              href="/auth/signup"
+              className="text-blue-600 hover:text-blue-500"
+            >
+              Sign up
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

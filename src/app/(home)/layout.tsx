@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 
 import Image from "next/image";
 import Link from "next/link";
+import { AuthNav } from "@/components/auth-nav";
 
 const HomeLayout = ({ children }: { children: React.ReactNode }) => {
   return (
@@ -75,12 +76,7 @@ const Header = () => {
               className="bg-background w-full rounded-md border pl-8 md:w-[300px] lg:w-[400px]"
             />
           </div>
-          <Button variant="outline" size="sm" className="hidden md:flex">
-            Sign In
-          </Button>
-          <Button size="sm" className="hidden md:flex">
-            Start Selling
-          </Button>
+          <AuthNav />
           <Button variant="ghost" size="icon" className="md:hidden">
             <SearchIcon className="size-5" />
             <span className="sr-only">Search</span>

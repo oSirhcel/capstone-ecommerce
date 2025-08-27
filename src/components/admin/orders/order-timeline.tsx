@@ -1,34 +1,17 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { CheckCircle, Circle, Clock } from "lucide-react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CheckCircle, Clock } from "lucide-react";
 
 interface TimelineEvent {
-  id: string
-  status: string
-  title: string
-  description: string
-  timestamp: string
-  user: string
+  status: string;
+  date: string;
+  description: string;
 }
 
 interface OrderTimelineProps {
-  timeline: TimelineEvent[]
+  timeline: TimelineEvent[];
 }
 
 export function OrderTimeline({ timeline }: OrderTimelineProps) {
-  const getStatusIcon = (status: string, index: number) => {
-    const isCompleted = index < timeline.length - 1
-    const isCurrent = index === timeline.length - 1
-
-    if (isCompleted) {
-      return <CheckCircle className="h-5 w-5 text-green-500" />
-    } else if (isCurrent) {
-      return <Clock className="h-5 w-5 text-blue-500" />
-    } else {
-      return <Circle className="h-5 w-5 text-gray-300" />
-    }
-  }
-
   return (
     <Card>
       <CardHeader>
@@ -37,25 +20,37 @@ export function OrderTimeline({ timeline }: OrderTimelineProps) {
       <CardContent>
         <div className="space-y-4">
           {timeline.map((event, index) => (
-            <div key={event.id} className="flex gap-4">
-              <div className="flex flex-col items-center">
-                {getStatusIcon(event.status, index)}
-                {index < timeline.length - 1 && <div className="w-px h-8 bg-gray-200 mt-2" />}
+            <div key={index} className="flex items-start gap-3">
+              <div className="mt-1 flex-shrink-0">
+                <CheckCircle className="h-5 w-5 text-green-500" />
               </div>
-              <div className="flex-1 pb-4">
-                <div className="flex items-center justify-between mb-1">
-                  <h4 className="font-medium">{event.title}</h4>
-                  <span className="text-xs text-muted-foreground">{new Date(event.timestamp).toLocaleString()}</span>
+              <div className="flex-1">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-medium">{event.status}</h4>
+                  <span className="text-muted-foreground text-sm">
+                    {event.date}
+                  </span>
                 </div>
-                <p className="text-sm text-muted-foreground mb-2">{event.description}</p>
-                <Badge variant="outline" className="text-xs">
-                  {event.user}
-                </Badge>
+                <p className="text-muted-foreground mt-1 text-sm">
+                  {event.description}
+                </p>
               </div>
             </div>
           ))}
+
+          <div className="flex items-start gap-3 opacity-50">
+            <div className="mt-1 flex-shrink-0">
+              <Clock className="text-muted-foreground h-5 w-5" />
+            </div>
+            <div className="flex-1">
+              <h4 className="font-medium">Shipped</h4>
+              <p className="text-muted-foreground mt-1 text-sm">
+                Pending shipment
+              </p>
+            </div>
+          </div>
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }

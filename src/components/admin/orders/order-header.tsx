@@ -1,72 +1,68 @@
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { ArrowLeft, Download, MoreHorizontal, Printer } from "lucide-react"
-import Link from "next/link"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { ArrowLeft, Printer, Download } from "lucide-react";
+import Link from "next/link";
 
 interface OrderHeaderProps {
   order: {
-    id: string
-    status: string
-    date: string
-    total: number
-  }
-}
-
-const statusColors = {
-  pending: "bg-yellow-100 text-yellow-800",
-  processing: "bg-blue-100 text-blue-800",
-  shipped: "bg-purple-100 text-purple-800",
-  delivered: "bg-green-100 text-green-800",
-  cancelled: "bg-red-100 text-red-800",
-  refunded: "bg-gray-100 text-gray-800",
+    id: string;
+    status: string;
+    date: string;
+    total: number;
+  };
 }
 
 export function OrderHeader({ order }: OrderHeaderProps) {
+  const getStatusVariant = (status: string) => {
+    switch (status.toLowerCase()) {
+      case "pending":
+        return "secondary";
+      case "processing":
+        return "default";
+      case "shipped":
+        return "default";
+      case "delivered":
+        return "default";
+      case "cancelled":
+        return "destructive";
+      default:
+        return "default";
+    }
+  };
+
   return (
     <div className="flex items-center justify-between">
       <div className="flex items-center gap-4">
         <Link href="/admin/orders">
           <Button variant="ghost" size="sm">
-            <ArrowLeft className="h-4 w-4 mr-2" />
+            <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Orders
           </Button>
         </Link>
         <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold">{order.id}</h1>
-            <Badge className={statusColors[order.status as keyof typeof statusColors]} variant="secondary">
-              {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+          <h1 className="text-3xl font-bold">{order.id}</h1>
+          <div className="mt-2 flex items-center gap-4">
+            <Badge variant={getStatusVariant(order.status)}>
+              {order.status}
             </Badge>
+            <span className="text-muted-foreground">
+              Placed on {new Date(order.date).toLocaleDateString()}
+            </span>
+            <span className="font-semibold">${order.total.toFixed(2)}</span>
           </div>
-          <p className="text-muted-foreground">
-            Placed on {new Date(order.date).toLocaleDateString()} • ${order.total.toFixed(2)}
-          </p>
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex gap-2">
         <Button variant="outline" size="sm">
-          <Printer className="h-4 w-4 mr-2" />
+          <Printer className="mr-2 h-4 w-4" />
           Print
         </Button>
         <Button variant="outline" size="sm">
-          <Download className="h-4 w-4 mr-2" />
+          <Download className="mr-2 h-4 w-4" />
           Export
         </Button>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm">
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem>Send Invoice</DropdownMenuItem>
-            <DropdownMenuItem>Duplicate Order</DropdownMenuItem>
-            <DropdownMenuItem className="text-red-600">Cancel Order</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
       </div>
     </div>
-  )
+  );
 }

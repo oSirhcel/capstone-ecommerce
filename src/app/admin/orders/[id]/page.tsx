@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { OrderHeader } from "@/components/admin/orders/order-header";
 import { OrderItems } from "@/components/admin/orders/order-items";
 import { OrderCustomer } from "@/components/admin/orders/order-customer";
@@ -6,135 +7,100 @@ import { OrderPayment } from "@/components/admin/orders/order-payment";
 import { OrderTimeline } from "@/components/admin/orders/order-timeline";
 import { OrderActions } from "@/components/admin/orders/order-actions";
 
-const mockOrder = {
+const orderData = {
   id: "ORD-2024-001",
-  status: "processing",
-  date: "2024-01-15T10:30:00Z",
-  total: 299.97,
-  subtotal: 249.97,
-  tax: 25.0,
-  shippingCost: 25.0,
-  discount: 0,
+  status: "Processing",
+  date: "2024-01-15",
+  total: 156.97,
   customer: {
     id: "CUST-001",
-    name: "John Doe",
-    email: "john.doe@example.com",
-    phone: "+1 (555) 123-4567",
+    name: "Sarah Johnson",
+    email: "sarah.johnson@email.com",
+    phone: "+61 2 9123 4567",
     avatar: "/placeholder.svg?height=40&width=40",
   },
   items: [
     {
       id: "1",
-      name: "Wireless Bluetooth Headphones",
-      image: "/placeholder.svg?height=80&width=80",
-      price: 129.99,
-      quantity: 1,
-      total: 129.99,
-      sku: "WBH-001",
+      name: "Handcrafted Ceramic Mug",
+      image: "/placeholder.svg?height=60&width=60",
+      price: 24.99,
+      quantity: 2,
+      total: 49.98,
+      store: "Artisan Crafts",
     },
     {
       id: "2",
-      name: "Smart Fitness Watch",
-      image: "/placeholder.svg?height=80&width=80",
-      price: 199.99,
+      name: "Organic Cotton T-Shirt",
+      image: "/placeholder.svg?height=60&width=60",
+      price: 34.99,
       quantity: 1,
-      total: 199.99,
-      sku: "SFW-002",
+      total: 34.99,
+      store: "Eco Essentials",
     },
   ],
   shipping: {
     method: "Standard Shipping",
-    cost: 25.0,
+    cost: 12.0,
     estimatedDelivery: "2024-01-20",
     address: {
-      name: "John Doe",
-      street: "123 Main Street",
-      city: "New York",
-      state: "NY",
-      zip: "10001",
-      country: "United States",
-    },
-  },
-  billing: {
-    address: {
-      name: "John Doe",
-      street: "123 Main Street",
-      city: "New York",
-      state: "NY",
-      zip: "10001",
-      country: "United States",
+      street: "42 George Street",
+      city: "Sydney",
+      state: "NSW",
+      zip: "2000",
+      country: "Australia",
     },
   },
   payment: {
     method: "Credit Card",
     last4: "4242",
-    brand: "Visa",
-    status: "paid",
+    billingAddress: {
+      street: "42 George Street",
+      city: "Sydney",
+      state: "NSW",
+      zip: "2000",
+      country: "Australia",
+    },
   },
   timeline: [
     {
-      id: "1",
-      status: "placed",
-      title: "Order Placed",
+      status: "Order Placed",
+      date: "2024-01-15 10:30 AM",
       description: "Order was successfully placed",
-      timestamp: "2024-01-15T10:30:00Z",
-      user: "Customer",
     },
     {
-      id: "2",
-      status: "confirmed",
-      title: "Order Confirmed",
-      description: "Payment confirmed and order accepted",
-      timestamp: "2024-01-15T10:35:00Z",
-      user: "System",
+      status: "Payment Confirmed",
+      date: "2024-01-15 10:32 AM",
+      description: "Payment processed successfully",
     },
     {
-      id: "3",
-      status: "processing",
-      title: "Processing",
+      status: "Processing",
+      date: "2024-01-15 2:15 PM",
       description: "Order is being prepared for shipment",
-      timestamp: "2024-01-15T11:00:00Z",
-      user: "Admin",
     },
   ],
 };
 
-interface OrderViewPageProps {
-  params: {
-    id: string;
-  };
-}
-
-export default function OrderViewPage({ params }: OrderViewPageProps) {
-  const order = mockOrder; // In real app: await getOrder(params.id)
-
+export default function OrderViewPage({ params }: { params: { id: string } }) {
   return (
     <div className="space-y-6">
-      <OrderHeader order={order} />
+      <Suspense fallback={<div>Loading...</div>}>
+        <OrderHeader order={orderData} />
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="space-y-6 lg:col-span-2">
-          <OrderItems items={order.items} />
-          <OrderTimeline timeline={order.timeline} />
-        </div>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <div className="space-y-6 lg:col-span-2">
+            <OrderItems items={orderData.items} />
+            <OrderTimeline timeline={orderData.timeline} />
+          </div>
 
-        <div className="space-y-6">
-          <OrderActions order={order} />
-          <OrderCustomer customer={order.customer} />
-          <OrderShipping shipping={order.shipping} />
-          <OrderPayment
-            payment={order.payment}
-            billing={order.billing}
-            totals={{
-              subtotal: order.subtotal,
-              tax: order.tax,
-              shipping: order.shipping.cost,
-              discount: order.discount,
-              total: order.total,
-            }}
-          />
+          <div className="space-y-6">
+            <OrderActions orderId={orderData.id} />
+            <OrderCustomer customer={orderData.customer} />
+            <OrderShipping shipping={orderData.shipping} />
+            <OrderPayment payment={orderData.payment} total={orderData.total} />
+          </div>
         </div>
-      </div>
+      </Suspense>
     </div>
   );
 }

@@ -1,58 +1,67 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { MapPin, Truck } from "lucide-react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Truck, MapPin, Calendar } from "lucide-react";
+
+interface ShippingAddress {
+  street: string;
+  city: string;
+  state: string;
+  zip: string;
+  country: string;
+}
+
+interface Shipping {
+  method: string;
+  cost: number;
+  estimatedDelivery: string;
+  address: ShippingAddress;
+}
 
 interface OrderShippingProps {
-  shipping: {
-    method: string
-    cost: number
-    estimatedDelivery: string
-    address: {
-      name: string
-      street: string
-      city: string
-      state: string
-      zip: string
-      country: string
-    }
-  }
+  shipping: Shipping;
 }
 
 export function OrderShipping({ shipping }: OrderShippingProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Shipping</CardTitle>
+        <CardTitle>Shipping Information</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Truck className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm">{shipping.method}</span>
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 text-sm">
+            <Truck className="text-muted-foreground h-4 w-4" />
+            <span>{shipping.method}</span>
           </div>
-          <Badge variant="outline">${shipping.cost.toFixed(2)}</Badge>
+          <div className="flex items-center gap-2 text-sm">
+            <Calendar className="text-muted-foreground h-4 w-4" />
+            <span>
+              Est. delivery:{" "}
+              {new Date(shipping.estimatedDelivery).toLocaleDateString()}
+            </span>
+          </div>
         </div>
 
-        <div>
-          <p className="text-sm text-muted-foreground mb-1">Estimated Delivery</p>
-          <p className="font-medium">{new Date(shipping.estimatedDelivery).toLocaleDateString()}</p>
+        <div className="border-t pt-4">
+          <div className="flex items-start gap-2">
+            <MapPin className="text-muted-foreground mt-0.5 h-4 w-4" />
+            <div className="text-sm">
+              <p>{shipping.address.street}</p>
+              <p>
+                {shipping.address.city}, {shipping.address.state}{" "}
+                {shipping.address.zip}
+              </p>
+              <p>{shipping.address.country}</p>
+            </div>
+          </div>
         </div>
 
-        <div>
-          <div className="flex items-center gap-2 mb-2">
-            <MapPin className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-medium">Shipping Address</span>
-          </div>
-          <div className="text-sm text-muted-foreground space-y-1">
-            <p>{shipping.address.name}</p>
-            <p>{shipping.address.street}</p>
-            <p>
-              {shipping.address.city}, {shipping.address.state} {shipping.address.zip}
-            </p>
-            <p>{shipping.address.country}</p>
+        <div className="border-t pt-4">
+          <div className="flex items-center justify-between text-sm">
+            <span>Shipping Cost</span>
+            <span className="font-semibold">${shipping.cost.toFixed(2)}</span>
           </div>
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }

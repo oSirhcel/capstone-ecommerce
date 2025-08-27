@@ -1,106 +1,77 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
-import { CreditCard, MapPin } from "lucide-react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CreditCard, MapPin } from "lucide-react";
 
-interface OrderPaymentProps {
-  payment: {
-    method: string
-    last4: string
-    brand: string
-    status: string
-  }
-  billing: {
-    address: {
-      name: string
-      street: string
-      city: string
-      state: string
-      zip: string
-      country: string
-    }
-  }
-  totals: {
-    subtotal: number
-    tax: number
-    shipping: number
-    discount: number
-    total: number
-  }
+interface BillingAddress {
+  street: string;
+  city: string;
+  state: string;
+  zip: string;
+  country: string;
 }
 
-export function OrderPayment({ payment, billing, totals }: OrderPaymentProps) {
-  const paymentStatusColors = {
-    paid: "bg-green-100 text-green-800",
-    pending: "bg-yellow-100 text-yellow-800",
-    failed: "bg-red-100 text-red-800",
-    refunded: "bg-gray-100 text-gray-800",
-  }
+interface Payment {
+  method: string;
+  last4: string;
+  billingAddress: BillingAddress;
+}
+
+interface OrderPaymentProps {
+  payment: Payment;
+  total: number;
+}
+
+export function OrderPayment({ payment, total }: OrderPaymentProps) {
+  const subtotal = total - 12.0; // Assuming $12 shipping
+  const tax = subtotal * 0.08; // 8% tax
+  const shipping = 12.0;
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Payment</CardTitle>
+        <CardTitle>Payment Information</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <CreditCard className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm">
-              {payment.brand} •••• {payment.last4}
-            </span>
-          </div>
-          <Badge
-            className={paymentStatusColors[payment.status as keyof typeof paymentStatusColors]}
-            variant="secondary"
-          >
-            {payment.status.charAt(0).toUpperCase() + payment.status.slice(1)}
-          </Badge>
+        <div className="flex items-center gap-2 text-sm">
+          <CreditCard className="text-muted-foreground h-4 w-4" />
+          <span>
+            {payment.method} ending in {payment.last4}
+          </span>
         </div>
 
-        <div>
-          <div className="flex items-center gap-2 mb-2">
-            <MapPin className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-medium">Billing Address</span>
-          </div>
-          <div className="text-sm text-muted-foreground space-y-1">
-            <p>{billing.address.name}</p>
-            <p>{billing.address.street}</p>
-            <p>
-              {billing.address.city}, {billing.address.state} {billing.address.zip}
-            </p>
-            <p>{billing.address.country}</p>
+        <div className="border-t pt-4">
+          <h4 className="mb-2 font-medium">Billing Address</h4>
+          <div className="flex items-start gap-2">
+            <MapPin className="text-muted-foreground mt-0.5 h-4 w-4" />
+            <div className="text-sm">
+              <p>{payment.billingAddress.street}</p>
+              <p>
+                {payment.billingAddress.city}, {payment.billingAddress.state}{" "}
+                {payment.billingAddress.zip}
+              </p>
+              <p>{payment.billingAddress.country}</p>
+            </div>
           </div>
         </div>
 
-        <Separator />
-
-        <div className="space-y-2">
+        <div className="space-y-2 border-t pt-4">
           <div className="flex justify-between text-sm">
             <span>Subtotal</span>
-            <span>${totals.subtotal.toFixed(2)}</span>
+            <span>${subtotal.toFixed(2)}</span>
           </div>
           <div className="flex justify-between text-sm">
             <span>Shipping</span>
-            <span>${totals.shipping.toFixed(2)}</span>
+            <span>${shipping.toFixed(2)}</span>
           </div>
           <div className="flex justify-between text-sm">
             <span>Tax</span>
-            <span>${totals.tax.toFixed(2)}</span>
+            <span>${tax.toFixed(2)}</span>
           </div>
-          {totals.discount > 0 && (
-            <div className="flex justify-between text-sm text-green-600">
-              <span>Discount</span>
-              <span>-${totals.discount.toFixed(2)}</span>
-            </div>
-          )}
-          <Separator />
-          <div className="flex justify-between font-medium">
+          <div className="flex justify-between border-t pt-2 font-semibold">
             <span>Total</span>
-            <span>${totals.total.toFixed(2)}</span>
+            <span>${total.toFixed(2)}</span>
           </div>
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }

@@ -3,6 +3,16 @@
 import { useSession, signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuItem,
+  DropdownMenuGroup,
+} from "@/components/ui/dropdown-menu";
+import { UserCircle } from "lucide-react";
 
 export function AuthNav() {
   const { data: session, status } = useSession();
@@ -10,40 +20,51 @@ export function AuthNav() {
   if (status === "loading") {
     return (
       <div className="flex items-center space-x-4">
-        <div className="h-8 w-8 animate-pulse rounded-full bg-gray-200"></div>
-        <div className="h-4 w-20 animate-pulse rounded bg-gray-200"></div>
+        <div className="size-8 animate-pulse rounded-full bg-gray-200" />
       </div>
     );
   }
 
   if (session?.user) {
     return (
-      <div className="flex items-center space-x-4">
-        <span className="text-sm font-medium">
-          {session.user.name ?? session.user.email}
-        </span>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => signOut({ callbackUrl: "/" })}
-        >
-          Sign Out
-        </Button>
-      </div>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon" className="size-8 rounded-full">
+            <UserCircle className="size-8" />
+            <span className="sr-only">Open user menu</span>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-56" sideOffset={10}>
+          <DropdownMenuLabel className="font-normal">
+            <div className="flex flex-col space-y-1">
+              <p className="text-sm leading-none font-medium">
+                {session.user.name ?? session.user.email}
+              </p>
+            </div>
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuGroup>
+            <DropdownMenuItem asChild>
+              <Link href="/account">My Account</Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/account/orders">Orders</Link>
+            </DropdownMenuItem>
+          </DropdownMenuGroup>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onSelect={() => signOut({ callbackUrl: "/" })}>
+            Sign Out
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     );
   }
 
   return (
     <div className="flex items-center space-x-2">
       <Link href="/auth/signin">
-        <Button variant="outline" size="sm">
-          Sign In
-        </Button>
-      </Link>
-      <Link href="/auth/signup">
-        <Button size="sm">Sign Up</Button>
+        <Button size="sm">Sign In</Button>
       </Link>
     </div>
   );
 }
-

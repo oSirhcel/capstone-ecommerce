@@ -4,7 +4,9 @@ import { eq } from "drizzle-orm";
 
 export async function POST(request: Request) {
   try {
-    const { username, password } = await request.json();
+    const body = await request.json() as { username: string; password: string };
+    const { username, password } = body;
+    
     // TODO: Proper validation
     if (!username || !password) {
       return Response.json(
@@ -25,8 +27,12 @@ export async function POST(request: Request) {
     }
 
     const user = await db.insert(users).values({
+      id: crypto.randomUUID(),
       username,
       password,
+      userType: "customer",
+      createdAt: new Date(),
+      updatedAt: new Date(),
     });
 
     return Response.json({ message: "Registration successful", user });

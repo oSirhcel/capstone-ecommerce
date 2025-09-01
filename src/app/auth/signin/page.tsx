@@ -1,7 +1,6 @@
 "use client";
 
 import { signIn } from "next-auth/react";
-import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,53 +14,67 @@ import {
 import { FcGoogle } from "react-icons/fc";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
+import { z } from "zod";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormMessage,
+} from "@/components/ui/form";
+import { useMutation } from "@tanstack/react-query";
 
 export default function SignInPage() {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [successMessage, setSuccessMessage] = useState("");
   const searchParams = useSearchParams();
 
-  useEffect(() => {
-    const message = searchParams.get("message");
-    if (message) {
-      setSuccessMessage(message);
-    }
-  }, [searchParams]);
+  const successMessage = searchParams.get("message");
 
-  const handleGoogleSignIn = () => {
-    void signIn("google", { callbackUrl: "/" });
-  };
+  const SignInSchema = z.object({
+    username: z.string().min(1, "Username is required"),
+    password: z.string().min(1, "Password is required"),
+  });
 
-  const handleCredentialsSignIn = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError("");
+  type SignInValues = z.infer<typeof SignInSchema>;
 
-    try {
-      // For now, just show a message that credentials auth needs to be implemented
-      const result = await signIn("credentials", {
-        redirect: false,
-        username,
-        password,
-      });
+  const form = useForm<SignInValues>({
+    resolver: zodResolver(SignInSchema),
+    defaultValues: {
+      username: "",
+      password: "",
+    },
+  });
 
-      if (result?.error) {
-        setError("Invalid credentials");
-      } else if (result?.ok) {
-        // Redirect to home page or wherever you want after successful sign in
+  const credentialsMutation = useMutation<{ ok: boolean }, Error, SignInValues>(
+    {
+      mutationFn: async (values: SignInValues) => {
+        const result = await signIn("credentials", {
+          redirect: false,
+          username: values.username,
+          password: values.password,
+        });
+
+        if (!result || result.error || !result.ok) {
+          throw new Error("Invalid credentials");
+        }
+
+        return { ok: true };
+      },
+      onSuccess: () => {
         window.location.href = "/";
-      } else {
-        setError("Invalid credentials");
-      }
-    } catch (error) {
-      setError("An error occurred during sign in");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+      },
+    },
+  );
+
+  const googleMutation = useMutation({
+    mutationFn: async () => {
+      // This will redirect on success
+      await signIn("google", { callbackUrl: "/" });
+    },
+  });
+
+  const isLoading = credentialsMutation.isPending || googleMutation.isPending;
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">
@@ -83,42 +96,68 @@ export default function SignInPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Username and Password Form */}
-          <form onSubmit={handleCredentialsSignIn} className="space-y-4">
-            <div>
-              <Input
-                type="text"
-                placeholder="Username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                required
-                disabled={isLoading}
+          <Form {...form}>
+            <form
+              onSubmit={form.handleSubmit((values) =>
+                credentialsMutation.mutate(values),
+              )}
+              className="space-y-4"
+            >
+              <FormField
+                control={form.control}
+                name="username"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <Input
+                        type="text"
+                        placeholder="Username"
+                        autoComplete="username"
+                        disabled={isLoading}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-            <div>
-              <Input
-                type="password"
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                disabled={isLoading}
+
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <Input
+                        type="password"
+                        placeholder="Password"
+                        autoComplete="current-password"
+                        disabled={isLoading}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
 
-            {successMessage && (
-              <div className="rounded-md bg-green-50 p-3 text-center text-sm text-green-600">
-                {successMessage}
-              </div>
-            )}
+              {successMessage && (
+                <div className="rounded-md bg-green-50 p-3 text-center text-sm text-green-600">
+                  {successMessage}
+                </div>
+              )}
 
-            {error && (
-              <div className="text-center text-sm text-red-500">{error}</div>
-            )}
+              {credentialsMutation.isError && (
+                <div className="text-center text-sm text-red-500">
+                  {credentialsMutation.error?.message || "Sign in failed"}
+                </div>
+              )}
 
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? "Signing in..." : "Sign In"}
-            </Button>
-          </form>
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {credentialsMutation.isPending ? "Signing in..." : "Sign In"}
+              </Button>
+            </form>
+          </Form>
 
           {/* Divider */}
           <div className="relative">
@@ -134,7 +173,7 @@ export default function SignInPage() {
 
           {/* Google OAuth */}
           <Button
-            onClick={handleGoogleSignIn}
+            onClick={() => googleMutation.mutate()}
             disabled={isLoading}
             variant="outline"
             className="w-full"

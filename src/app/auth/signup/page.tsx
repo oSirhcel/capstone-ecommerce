@@ -1,7 +1,6 @@
 "use client";
 
 import { signIn } from "next-auth/react";
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -14,50 +13,53 @@ import {
 import { FcGoogle } from "react-icons/fc";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
+import { z } from "zod";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormMessage,
+} from "@/components/ui/form";
+import { useMutation } from "@tanstack/react-query";
 
 export default function SignUpPage() {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState("");
+  const SignUpSchema = z
+    .object({
+      username: z.string().min(3, "Username must be at least 3 characters"),
+      password: z.string().min(6, "Password must be at least 6 characters"),
+      confirmPassword: z
+        .string()
+        .min(6, "Confirm password must be at least 6 characters"),
+    })
+    .refine((data) => data.password === data.confirmPassword, {
+      path: ["confirmPassword"],
+      message: "Passwords do not match",
+    });
 
-  const handleGoogleSignUp = () => {
-    void signIn("google", { callbackUrl: "/" });
-  };
+  type SignUpValues = z.infer<typeof SignUpSchema>;
 
-  const handleCredentialsSignUp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError("");
+  const form = useForm<SignUpValues>({
+    resolver: zodResolver(SignUpSchema),
+    defaultValues: {
+      username: "",
+      password: "",
+      confirmPassword: "",
+    },
+  });
 
-    if (password !== confirmPassword) {
-      setError("Passwords do not match");
-      setIsLoading(false);
-      return;
-    }
-
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters long");
-      setIsLoading(false);
-      return;
-    }
-
-    if (username.length < 3) {
-      setError("Username must be at least 3 characters long");
-      setIsLoading(false);
-      return;
-    }
-
-    try {
+  const signupMutation = useMutation<{ ok: boolean }, Error, SignUpValues>({
+    mutationFn: async (values: SignUpValues) => {
       const response = await fetch("/api/auth/signup", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          username,
-          password,
+          username: values.username,
+          password: values.password,
           userType: "customer",
         }),
       });
@@ -68,24 +70,24 @@ export default function SignUpPage() {
       };
 
       if (!response.ok) {
-        throw new Error(data.error ?? "Registration failed");
+        throw new Error(data?.error ?? "Registration failed");
       }
 
-      // Registration successful
-      setError("");
-      // Redirect to sign in page or automatically sign in
+      return { ok: true };
+    },
+    onSuccess: () => {
       window.location.href =
         "/auth/signin?message=Account created successfully! Please sign in.";
-    } catch (error) {
-      setError(
-        error instanceof Error
-          ? error.message
-          : "An error occurred during registration",
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    },
+  });
+
+  const googleMutation = useMutation({
+    mutationFn: async () => {
+      await signIn("google", { callbackUrl: "/" });
+    },
+  });
+
+  const isLoading = signupMutation.isPending || googleMutation.isPending;
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">
@@ -107,46 +109,83 @@ export default function SignUpPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Username and Password Form */}
-          <form onSubmit={handleCredentialsSignUp} className="space-y-4">
-            <div>
-              <Input
-                type="text"
-                placeholder="Username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                required
-                disabled={isLoading}
+          <Form {...form}>
+            <form
+              onSubmit={form.handleSubmit((values) =>
+                signupMutation.mutate(values),
+              )}
+              className="space-y-4"
+            >
+              <FormField
+                control={form.control}
+                name="username"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <Input
+                        type="text"
+                        placeholder="Username"
+                        autoComplete="username"
+                        disabled={isLoading}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-            <div>
-              <Input
-                type="password"
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                disabled={isLoading}
-              />
-            </div>
-            <div>
-              <Input
-                type="password"
-                placeholder="Confirm password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-                disabled={isLoading}
-              />
-            </div>
 
-            {error && (
-              <div className="text-center text-sm text-red-500">{error}</div>
-            )}
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <Input
+                        type="password"
+                        placeholder="Password"
+                        autoComplete="new-password"
+                        disabled={isLoading}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? "Creating account..." : "Create Account"}
-            </Button>
-          </form>
+              <FormField
+                control={form.control}
+                name="confirmPassword"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <Input
+                        type="password"
+                        placeholder="Confirm password"
+                        autoComplete="new-password"
+                        disabled={isLoading}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {signupMutation.isError && (
+                <div className="text-center text-sm text-red-500">
+                  {signupMutation.error?.message || "Registration failed"}
+                </div>
+              )}
+
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {signupMutation.isPending
+                  ? "Creating account..."
+                  : "Create Account"}
+              </Button>
+            </form>
+          </Form>
 
           {/* Divider */}
           <div className="relative">
@@ -162,7 +201,7 @@ export default function SignUpPage() {
 
           {/* Google OAuth */}
           <Button
-            onClick={handleGoogleSignUp}
+            onClick={() => googleMutation.mutate()}
             disabled={isLoading}
             variant="outline"
             className="w-full"

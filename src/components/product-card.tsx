@@ -24,7 +24,7 @@ export function ProductCard({
 }: ProductCardProps) {
   return (
     <Link href={`/product/1`}>
-      <Card className="overflow-hidden transition-all hover:shadow-md">
+      <Card className="overflow-hidden py-0 transition-all hover:shadow-md">
         <CardContent className="p-0">
           <div className="relative">
             <Image

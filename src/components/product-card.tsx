@@ -6,6 +6,7 @@ import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
 interface ProductCardProps {
+  id: number;
   name: string;
   price: number;
   image: string;
@@ -15,6 +16,7 @@ interface ProductCardProps {
 }
 
 export function ProductCard({
+  id,
   name,
   price,
   image,
@@ -23,7 +25,7 @@ export function ProductCard({
   category,
 }: ProductCardProps) {
   return (
-    <Link href={`/product/1`}>
+    <Link href={`/product/${id}`}>
       <Card className="overflow-hidden transition-all hover:shadow-md">
         <CardContent className="p-0">
           <div className="relative">

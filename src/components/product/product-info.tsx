@@ -19,6 +19,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { parseAsStringLiteral, useQueryStates } from "nuqs";
+import { toast } from "sonner";
+import { useCart } from "@/contexts/cart-context";
 
 interface ProductInfoProps {
   product: {
@@ -41,6 +43,25 @@ interface ProductInfoProps {
 
 export function ProductInfo({ product }: ProductInfoProps) {
   const [quantity, setQuantity] = useState(1);
+  const { addItem } = useCart();
+
+  const handleAddToCart = () => {
+    const price = product.discountPrice ?? product.price;
+
+    addItem({
+      id: product.id,
+      name: product.name,
+      price: price,
+      image: "/placeholder.svg?height=300&width=300",
+      quantity: quantity,
+      storeId: "1",
+      storeName: "Store 1",
+    });
+
+    toast("Added to cart", {
+      description: `${quantity} × ${product.name} has been added to your cart.`,
+    });
+  };
 
   const optionsQueryConfig = product.options.reduce(
     (acc, option) => {
@@ -196,7 +217,12 @@ export function ProductInfo({ product }: ProductInfoProps) {
       </div>
 
       <div className="flex flex-col gap-4 sm:flex-row">
-        <Button className="flex-1" size="lg" disabled={product.stock <= 0}>
+        <Button
+          className="flex-1"
+          size="lg"
+          disabled={product.stock <= 0}
+          onClick={handleAddToCart}
+        >
           Add to Cart
         </Button>
         <Button variant="outline" size="icon" className="h-11 w-11">

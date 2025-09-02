@@ -12,7 +12,7 @@ import {
   DropdownMenuItem,
   DropdownMenuGroup,
 } from "@/components/ui/dropdown-menu";
-import { UserCircle } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 
 export function AuthNav() {
   const { data: session, status } = useSession();
@@ -30,7 +30,12 @@ export function AuthNav() {
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" size="icon" className="size-8 rounded-full">
-            <UserCircle className="size-8" />
+            <Avatar>
+              <AvatarImage src={session.user.image ?? ""} />
+              <AvatarFallback>
+                {session.user.name?.charAt(0) ?? session.user.email?.charAt(0)}
+              </AvatarFallback>
+            </Avatar>
             <span className="sr-only">Open user menu</span>
           </Button>
         </DropdownMenuTrigger>

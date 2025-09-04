@@ -1,22 +1,15 @@
-import { ProductCard } from "@/components/product-card";
 import { StoreCard } from "@/components/store-card";
 import { TrendingProducts } from "@/components/trending-products";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CheckIcon } from "lucide-react";
 import Image from "next/image";
-import { AuthNav } from "@/components/auth-nav";
+
+import { NewArrivals } from "@/components/new-arrivals";
 
 export default function Home() {
-  type StoreCardMockData = {
-    name: string;
-    image: string;
-    category: string;
-    productCount: number;
-    rating: number;
-  };
-
-  const storeCardMockData: StoreCardMockData[] = [
+  // Mock store data for now (can be replaced with real API later)
+  const storeCardMockData = [
     {
       name: "Artisan Crafts",
       image: "/logo1.svg",
@@ -37,72 +30,6 @@ export default function Home() {
       category: "Sustainable",
       productCount: 56,
       rating: 4.7,
-    },
-  ];
-
-  type ProductCardMockData = {
-    name: string;
-    price: number;
-    image: string;
-    rating: number;
-    store: string;
-    category: string;
-  };
-
-  const productCardMockData: ProductCardMockData[] = [
-    {
-      name: "Palm Tree Girls Pink Top",
-      price: 699,
-      image:
-        "http://assets.myntassets.com/v1/images/style/properties/83f4ab34db71459ba1f80bb8992cf9d5_images.jpg",
-      rating: 4.3,
-      store: "Palm Tree",
-      category: "Apparel",
-    },
-    {
-      name: "Gini and Jony Girls Red Top",
-      price: 749,
-      image:
-        "http://assets.myntassets.com/v1/images/style/properties/1e3b40d501f5fbbceeab3879db474932_images.jpg",
-      rating: 4.6,
-      store: "Gini and Jony",
-      category: "Apparel",
-    },
-    {
-      name: "Do u speak Green Girls Olive 3/4 Pant",
-      price: 899,
-      image:
-        "http://assets.myntassets.com/v1/images/style/properties/Do-u-speak-Green-Girls-Olive-34-Pant_62311570aeebd7385030de554584a065_images.jpg",
-      rating: 4.1,
-      store: "Do u speak Green",
-      category: "Apparel",
-    },
-    {
-      name: "Gini and Jony Girls Black Dress",
-      price: 1299,
-      image:
-        "http://assets.myntassets.com/v1/images/style/properties/1f7c87ee0ac12c35df8c1dd28e2cd692_images.jpg",
-      rating: 4.7,
-      store: "Gini and Jony",
-      category: "Apparel",
-    },
-    {
-      name: "Gini and Jony Girls Pink Capris",
-      price: 799,
-      image:
-        "http://assets.myntassets.com/v1/images/style/properties/87321ab7962a30b2e9b01fa16997029c_images.jpg",
-      rating: 4.4,
-      store: "Gini and Jony",
-      category: "Apparel",
-    },
-    {
-      name: "Palm Tree Girls Pink Top",
-      price: 699,
-      image:
-        "http://assets.myntassets.com/v1/images/style/properties/83f4ab34db71459ba1f80bb8992cf9d5_images.jpg",
-      rating: 4.3,
-      store: "Palm Tree",
-      category: "Apparel",
     },
   ];
 
@@ -266,19 +193,7 @@ export default function Home() {
               </p>
             </div>
           </div>
-          <div className="mx-auto grid max-w-5xl grid-cols-1 gap-6 py-12 md:grid-cols-2 lg:grid-cols-3">
-            {productCardMockData.map((product, index) => (
-              <ProductCard
-                key={index}
-                name={product.name}
-                price={product.price}
-                image={product.image}
-                rating={product.rating}
-                store={product.store}
-                category={product.category}
-              />
-            ))}
-          </div>
+          <NewArrivals limit={6} />
           <div className="flex justify-center">
             <Button variant="outline" size="lg">
               View All New Arrivals

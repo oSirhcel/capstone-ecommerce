@@ -1,161 +1,78 @@
+"use client";
+
+import { useQuery } from "@tanstack/react-query";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ProductCard } from "@/components/product-card";
+import { ProductCard, ProductCardSkeleton } from "@/components/product-card";
+import {
+  fetchProducts,
+  type Product,
+  getPrimaryImageUrl,
+} from "@/lib/api/products";
+
+// Transform API Product to ProductCard props
+function transformProductToCardProps(product: Product) {
+  return {
+    id: product.id,
+    name: product.name,
+    price: product.price / 100, // Convert from cents to dollars
+    image: getPrimaryImageUrl(product),
+    rating: 4.5, // TODO: Add rating calculation when reviews are implemented
+    store: product.store?.name ?? "Unknown Store",
+    category: product.category?.name ?? "Uncategorized",
+  };
+}
 
 export function TrendingProducts() {
+  const {
+    data: allProducts = [],
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ["products", { limit: 50 }],
+    queryFn: () => fetchProducts({ limit: 50 }),
+    select: (response) =>
+      response.products.map((p) => transformProductToCardProps(p)),
+  });
+
+  // Filter products by category for different tabs
   const trendingProducts = {
-    all: [
-      {
-        name: "Smart Home Assistant",
-        price: 129.99,
-        image: "/placeholder.svg?height=300&width=300",
-        rating: 4.8,
-        store: "Tech Innovations",
-        category: "Electronics",
-      },
-      {
-        name: "Sustainable Bamboo Cutlery Set",
-        price: 24.99,
-        image: "/placeholder.svg?height=300&width=300",
-        rating: 4.9,
-        store: "Eco Essentials",
-        category: "Home & Living",
-      },
-      {
-        name: "Productivity Planner",
-        price: 19.99,
-        image: "/placeholder.svg?height=300&width=300",
-        rating: 4.7,
-        store: "Organized Life",
-        category: "Stationery",
-      },
-      {
-        name: "Handcrafted Ceramic Planter",
-        price: 34.99,
-        image: "/placeholder.svg?height=300&width=300",
-        rating: 4.8,
-        store: "Artisan Crafts",
-        category: "Home & Living",
-      },
-      {
-        name: "Fitness Tracking Watch",
-        price: 89.99,
-        image: "/placeholder.svg?height=300&width=300",
-        rating: 4.6,
-        store: "Active Lifestyle",
-        category: "Electronics",
-      },
-      {
-        name: "Vegan Leather Backpack",
-        price: 59.99,
-        image: "/placeholder.svg?height=300&width=300",
-        rating: 4.7,
-        store: "Ethical Fashion",
-        category: "Accessories",
-      },
-    ],
-    digital: [
-      {
-        name: "Social Media Marketing Guide",
-        price: 49.99,
-        image: "/placeholder.svg?height=300&width=300",
-        rating: 4.8,
-        store: "Digital Academy",
-        category: "Digital Products",
-      },
-      {
-        name: "Productivity App Lifetime Access",
-        price: 79.99,
-        image: "/placeholder.svg?height=300&width=300",
-        rating: 4.9,
-        store: "Tech Solutions",
-        category: "Digital Products",
-      },
-      {
-        name: "Photography Presets Bundle",
-        price: 29.99,
-        image: "/placeholder.svg?height=300&width=300",
-        rating: 4.7,
-        store: "Creative Studio",
-        category: "Digital Products",
-      },
-      {
-        name: "Financial Planning Spreadsheet",
-        price: 19.99,
-        image: "/placeholder.svg?height=300&width=300",
-        rating: 4.6,
-        store: "Money Matters",
-        category: "Digital Products",
-      },
-    ],
-    handmade: [
-      {
-        name: "Hand-Knitted Wool Scarf",
-        price: 45.99,
-        image: "/placeholder.svg?height=300&width=300",
-        rating: 4.9,
-        store: "Cozy Crafts",
-        category: "Handmade",
-      },
-      {
-        name: "Artisanal Soap Collection",
-        price: 32.99,
-        image: "/placeholder.svg?height=300&width=300",
-        rating: 4.8,
-        store: "Natural Beauty",
-        category: "Handmade",
-      },
-      {
-        name: "Handcrafted Wooden Cutting Board",
-        price: 54.99,
-        image: "/placeholder.svg?height=300&width=300",
-        rating: 4.7,
-        store: "Woodworks",
-        category: "Handmade",
-      },
-      {
-        name: "Custom Embroidered Pillow",
-        price: 39.99,
-        image: "/placeholder.svg?height=300&width=300",
-        rating: 4.8,
-        store: "Stitch & Style",
-        category: "Handmade",
-      },
-    ],
-    home: [
-      {
-        name: "Minimalist Desk Lamp",
-        price: 49.99,
-        image: "/placeholder.svg?height=300&width=300",
-        rating: 4.7,
-        store: "Modern Decor",
-        category: "Home & Living",
-      },
-      {
-        name: "Organic Cotton Bedding Set",
-        price: 89.99,
-        image: "/placeholder.svg?height=300&width=300",
-        rating: 4.9,
-        store: "Eco Home",
-        category: "Home & Living",
-      },
-      {
-        name: "Handcrafted Ceramic Dinnerware",
-        price: 129.99,
-        image: "/placeholder.svg?height=300&width=300",
-        rating: 4.8,
-        store: "Artisan Crafts",
-        category: "Home & Living",
-      },
-      {
-        name: "Sustainable Bamboo Organizer",
-        price: 34.99,
-        image: "/placeholder.svg?height=300&width=300",
-        rating: 4.6,
-        store: "Eco Essentials",
-        category: "Home & Living",
-      },
-    ],
+    all: allProducts,
+    digital: allProducts.filter(
+      (p) =>
+        p.category.toLowerCase().includes("electronic") ||
+        p.category.toLowerCase().includes("digital"),
+    ),
+    handmade: allProducts.filter(
+      (p) =>
+        p.category.toLowerCase().includes("handmade") ||
+        p.category.toLowerCase().includes("craft"),
+    ),
+    home: allProducts.filter(
+      (p) =>
+        p.category.toLowerCase().includes("home") ||
+        p.category.toLowerCase().includes("garden"),
+    ),
   };
+
+  if (isLoading) {
+    return (
+      <div className="grid grid-cols-1 gap-6 py-12 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        {Array.from({ length: 6 }).map((_, idx) => (
+          <ProductCardSkeleton key={`trending-skel-${idx}`} />
+        ))}
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-lg text-red-600">
+          Error: {error instanceof Error ? error.message : String(error)}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <Tabs defaultValue="all">
@@ -169,29 +86,29 @@ export function TrendingProducts() {
       </div>
       <TabsContent value="all" className="mt-0">
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-          {trendingProducts.all.map((product, index) => (
-            <ProductCard key={index} {...product} />
+          {trendingProducts.all.map((product) => (
+            <ProductCard key={product.id} {...product} />
           ))}
         </div>
       </TabsContent>
       <TabsContent value="digital" className="mt-0">
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          {trendingProducts.digital.map((product, index) => (
-            <ProductCard key={index} {...product} />
+          {trendingProducts.digital.map((product) => (
+            <ProductCard key={product.id} {...product} />
           ))}
         </div>
       </TabsContent>
       <TabsContent value="handmade" className="mt-0">
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          {trendingProducts.handmade.map((product, index) => (
-            <ProductCard key={index} {...product} />
+          {trendingProducts.handmade.map((product) => (
+            <ProductCard key={product.id} {...product} />
           ))}
         </div>
       </TabsContent>
       <TabsContent value="home" className="mt-0">
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          {trendingProducts.home.map((product, index) => (
-            <ProductCard key={index} {...product} />
+          {trendingProducts.home.map((product) => (
+            <ProductCard key={product.id} {...product} />
           ))}
         </div>
       </TabsContent>

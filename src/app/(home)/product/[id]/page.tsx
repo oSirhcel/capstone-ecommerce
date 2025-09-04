@@ -4,6 +4,8 @@ import { ProductInfo } from "@/components/product/product-info";
 import { ProductTabs } from "@/components/product/product-tabs";
 import { RelatedProducts } from "@/components/product/related-products";
 import { StoreInfo } from "@/components/product/store-info";
+import { fetchProduct } from "@/lib/api/products";
+import { notFound } from "next/navigation";
 
 interface ProductPageProps {
   params: Promise<{ id: string }>;
@@ -11,85 +13,65 @@ interface ProductPageProps {
 
 export default async function ProductPage({ params }: ProductPageProps) {
   const { id } = await params;
+  const productId = parseInt(id);
 
-  type Product = {
-    id: string;
-    name: string;
-    price: number;
-    discountPrice: number;
-    rating: number;
-    reviewCount: number;
-    stock: number;
-    sku: string;
-    description: string;
-    features: string[];
-    specifications: { name: string; value: string }[];
-    images: string[];
-    options: {
-      id: string;
-      name: string;
-      values: string[];
-    }[];
-    category: string;
-    tags: string[];
-    store: {
-      id: string;
-      name: string;
-      logo: string;
-      rating: number;
-      productCount: number;
-      joinedDate: string;
-    };
-  };
+  if (isNaN(productId)) {
+    notFound();
+  }
 
-  const product: Product = {
-    id: id,
-    name: "Girls' Casual Knit Tops",
-    price: 799,
-    discountPrice: 649,
-    rating: 4.5,
-    reviewCount: 58,
-    stock: 150,
-    sku: "GJT-KNT-CSL-001",
-    description:
-      "Comfortable and stylish knit tops for girls, perfect for casual wear. Available in a range of vibrant colors.",
+  // Fetch product data from API
+  let product;
+  try {
+    product = await fetchProduct(productId);
+    console.log(product);
+  } catch (error) {
+    console.error("Failed to fetch product:", error);
+    notFound();
+  }
+
+  // Transform the API data to match the component expectations
+  const transformedProduct = {
+    id: product.id.toString(),
+    name: product.name,
+    price: product.price / 100, // Convert from cents to dollars
+    discountPrice: product.price / 100, // No discount for now
+    rating: 4.0, // Default rating
+    reviewCount: 0, // Default review count
+    stock: product.stock,
+    sku: `${product.id.toString().padStart(6, "0")}`,
+    description: product.description ?? "No description available",
     features: [
-      "Soft knit fabric",
-      "Comfortable fit",
-      "Easy care",
-      "Variety of colors",
-      "Ideal for everyday wear",
+      "High quality product",
+      "Fast shipping",
+      "Customer satisfaction guaranteed",
     ],
     specifications: [
-      { name: "Material", value: "Cotton Blend Knit" },
-      { name: "Sleeve Style", value: "Short Sleeve" },
-      { name: "Neckline", value: "Round Neck" },
-      { name: "Occasion", value: "Casual" },
-      { name: "Care Instructions", value: "Machine Wash" },
+      { name: "Product ID", value: product.id.toString() },
+      { name: "Category", value: product.category?.name ?? "Uncategorized" },
+      { name: "Store", value: product.store?.name ?? "Unknown Store" },
+      { name: "Stock", value: product.stock.toString() },
+      { name: "Added", value: product.createdAt.toLocaleString() },
     ],
-    images: [
-      "http://assets.myntassets.com/v1/images/style/properties/f3964f76c78edd85f4512d98b26d52e9_images.jpg",
-      "http://assets.myntassets.com/v1/images/style/properties/dce310e4c15223a6c964631190263284_images.jpg",
-      "http://assets.myntassets.com/v1/images/style/properties/fc3c1b46906d5c148c45f532d0b3ffb5_images.jpg",
-      "http://assets.myntassets.com/v1/images/style/properties/ef9685293a987f515492addd034006bf_images.jpg",
-    ],
+    images: product.images.map((img) => img.imageUrl),
     options: [
       {
-        id: "color",
-        name: "Color",
-        values: ["White", "Black", "Blue", "Pink"],
+        id: "size",
+        name: "Size",
+        values: ["S", "M", "L", "XL"],
       },
-      { id: "size", name: "Size", values: ["S", "M", "L", "XL"] },
     ],
-    category: "Apparel",
-    tags: ["girls", "topwear", "tops", "casual", "knit"],
+    category: product.category?.name ?? "Uncategorized",
+    tags: [
+      "product",
+      product.category?.name?.toLowerCase() ?? "general",
+    ].filter(Boolean),
     store: {
-      id: "store-gini-doodle",
-      name: "Gini and Jony / Doodle Kids",
+      id: product.store?.id ?? "unknown",
+      name: product.store?.name ?? "Unknown Store",
       logo: "/placeholder.svg",
-      rating: 4.2,
-      productCount: 120,
-      joinedDate: "2020-05-15",
+      rating: 4.0, // Default rating
+      productCount: 0, // Will be updated when store API is integrated
+      joinedDate: "Unknown", // Store creation date not available in current schema
     },
   };
 
@@ -99,27 +81,27 @@ export default async function ProductPage({ params }: ProductPageProps) {
         <Breadcrumb
           items={[
             { label: "Home", href: "/" },
-            { label: product.category, href: `#` },
-            { label: product.name, href: `#`, current: true },
+            { label: transformedProduct.category, href: `#` },
+            { label: transformedProduct.name, href: `#`, current: true },
           ]}
         />
 
         <div className="mt-6 grid gap-8 lg:grid-cols-2">
-          <ProductGallery images={product.images} />
+          <ProductGallery images={transformedProduct.images} />
 
           <div className="space-y-8">
-            <ProductInfo product={product} />
-            <StoreInfo store={product.store} />
+            <ProductInfo product={transformedProduct} />
+            <StoreInfo store={transformedProduct.store} />
           </div>
         </div>
 
-        <ProductTabs product={product} />
+        <ProductTabs product={transformedProduct} />
 
         <section className="mt-16">
           <h2 className="mb-8 text-2xl font-bold">Related Products</h2>
           <RelatedProducts
-            category={product.category}
-            currentProductId={product.id}
+            category={transformedProduct.category}
+            currentProductId={transformedProduct.id}
           />
         </section>
       </div>

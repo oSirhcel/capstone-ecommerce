@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ProductCard } from "@/components/product-card";
+import { ProductCard, ProductCardSkeleton } from "@/components/product-card";
 import {
   fetchProducts,
   type Product,
@@ -23,35 +23,16 @@ function transformProductToCardProps(product: Product) {
 }
 
 export function TrendingProducts() {
-  const [allProducts, setAllProducts] = useState<
-    ReturnType<typeof transformProductToCardProps>[]
-  >([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const loadProducts = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        // Fetch all products
-        const response = await fetchProducts({ limit: 50 });
-        const transformedProducts = response.products.map(
-          transformProductToCardProps,
-        );
-        setAllProducts(transformedProducts);
-      } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "Failed to load products",
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    void loadProducts();
-  }, []);
+  const {
+    data: allProducts = [],
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ["products", { limit: 50 }],
+    queryFn: () => fetchProducts({ limit: 50 }),
+    select: (response) =>
+      response.products.map((p) => transformProductToCardProps(p)),
+  });
 
   // Filter products by category for different tabs
   const trendingProducts = {
@@ -73,10 +54,12 @@ export function TrendingProducts() {
     ),
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="text-lg">Loading products...</div>
+      <div className="grid grid-cols-1 gap-6 py-12 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        {Array.from({ length: 6 }).map((_, idx) => (
+          <ProductCardSkeleton key={`trending-skel-${idx}`} />
+        ))}
       </div>
     );
   }
@@ -84,7 +67,9 @@ export function TrendingProducts() {
   if (error) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="text-lg text-red-600">Error: {error}</div>
+        <div className="text-lg text-red-600">
+          Error: {error instanceof Error ? error.message : String(error)}
+        </div>
       </div>
     );
   }

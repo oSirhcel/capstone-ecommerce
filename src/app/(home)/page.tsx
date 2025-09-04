@@ -1,24 +1,13 @@
-import { ProductCard } from "@/components/product-card";
 import { StoreCard } from "@/components/store-card";
 import { TrendingProducts } from "@/components/trending-products";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CheckIcon } from "lucide-react";
 import Image from "next/image";
-import { AuthNav } from "@/components/auth-nav";
-import { fetchProducts } from "@/lib/api/products";
 
-export default async function Home() {
-  // Fetch real products from API
-  let products: any[] = [];
-  try {
-    const response = await fetchProducts({ limit: 6 });
-    products = response.products;
-  } catch (error) {
-    console.error("Failed to fetch products:", error);
-    // Fallback to empty array if API fails
-  }
+import { NewArrivals } from "@/components/new-arrivals";
 
+export default function Home() {
   // Mock store data for now (can be replaced with real API later)
   const storeCardMockData = [
     {
@@ -204,25 +193,7 @@ export default async function Home() {
               </p>
             </div>
           </div>
-          <div className="mx-auto grid max-w-5xl grid-cols-1 gap-6 py-12 md:grid-cols-2 lg:grid-cols-3">
-            {products.length > 0 ? (
-              products.map((product) => (
-                <ProductCard
-                  key={product.id}
-                  name={product.name}
-                  price={product.price / 100} // Convert from cents to dollars
-                  image={product.images[0]?.imageUrl || "/placeholder.svg"}
-                  rating={4.0} // Default rating for now
-                  store={product.store?.name || "Unknown Store"}
-                  category={product.category?.name || "Uncategorized"}
-                />
-              ))
-            ) : (
-              <div className="text-muted-foreground col-span-full py-8 text-center">
-                No products available at the moment.
-              </div>
-            )}
-          </div>
+          <NewArrivals limit={6} />
           <div className="flex justify-center">
             <Button variant="outline" size="lg">
               View All New Arrivals

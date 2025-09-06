@@ -13,7 +13,8 @@ import {
 } from "@/components/ui/sheet";
 
 export function CartDrawer() {
-  const { items, isOpen, closeCart, itemCount } = useCart();
+  const { items, isOpen, closeCart, itemCount, storeGroups, getStoreCount } =
+    useCart();
 
   return (
     <Sheet open={isOpen} onOpenChange={(open) => !open && closeCart()}>
@@ -21,6 +22,11 @@ export function CartDrawer() {
         <SheetHeader className="space-y-2.5 pr-6">
           <SheetTitle className="flex items-center justify-between">
             Your Cart ({itemCount} {itemCount === 1 ? "item" : "items"})
+            {getStoreCount() > 1 && (
+              <span className="text-muted-foreground text-sm font-normal">
+                from {getStoreCount()} stores
+              </span>
+            )}
           </SheetTitle>
         </SheetHeader>
 
@@ -28,8 +34,29 @@ export function CartDrawer() {
           <>
             <ScrollArea className="flex-1 py-6">
               <div className="space-y-6">
-                {items.map((item) => (
-                  <CartItem key={`${item.id}-${item.color}`} item={item} />
+                {storeGroups.map((storeGroup) => (
+                  <div key={storeGroup.storeId} className="space-y-4">
+                    {getStoreCount() > 1 && (
+                      <div className="border-b pb-2">
+                        <h3 className="text-muted-foreground text-sm font-medium">
+                          {storeGroup.storeName}
+                        </h3>
+                        <p className="text-muted-foreground text-xs">
+                          {storeGroup.itemCount}{" "}
+                          {storeGroup.itemCount === 1 ? "item" : "items"} • $
+                          {storeGroup.subtotal.toFixed(2)}
+                        </p>
+                      </div>
+                    )}
+                    <div className="space-y-4">
+                      {storeGroup.items.map((item) => (
+                        <CartItem
+                          key={`${item.id}-${item.color}`}
+                          item={item}
+                        />
+                      ))}
+                    </div>
+                  </div>
                 ))}
               </div>
             </ScrollArea>

@@ -1,12 +1,24 @@
 "use client";
 
+import { createContext, useContext, useReducer, type ReactNode } from "react";
+import { useSession } from "next-auth/react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  createContext,
-  useContext,
-  useReducer,
-  useEffect,
-  type ReactNode,
-} from "react";
+  fetchCart,
+  addToCart,
+  updateCartItem,
+  removeFromCart,
+  clearCart as clearCartAPI,
+} from "@/lib/api/cart";
+
+// Extend the session user type to include our custom fields
+interface SessionUser {
+  id: string;
+  name?: string | null;
+  email?: string | null;
+  image?: string | null;
+  userType?: string;
+}
 
 export type CartItem = {
   id: string;
@@ -20,65 +32,17 @@ export type CartItem = {
 };
 
 type CartState = {
-  items: CartItem[];
   isOpen: boolean;
 };
 
-type CartAction =
-  | { type: "ADD_ITEM"; payload: CartItem }
-  | { type: "REMOVE_ITEM"; payload: string }
-  | { type: "UPDATE_QUANTITY"; payload: { id: string; quantity: number } }
-  | { type: "CLEAR_CART" }
-  | { type: "OPEN_CART" }
-  | { type: "CLOSE_CART" };
+type CartAction = { type: "OPEN_CART" } | { type: "CLOSE_CART" };
 
 const initialState: CartState = {
-  items: [],
   isOpen: false,
 };
 
 const cartReducer = (state: CartState, action: CartAction): CartState => {
   switch (action.type) {
-    case "ADD_ITEM": {
-      const existingItemIndex = state.items.findIndex(
-        (item) =>
-          item.id === action.payload.id && item.color === action.payload.color,
-      );
-
-      if (existingItemIndex > -1) {
-        const updatedItems = [...state.items];
-        updatedItems[existingItemIndex].quantity += action.payload.quantity;
-        return { ...state, items: updatedItems, isOpen: true };
-      }
-
-      return {
-        ...state,
-        items: [...state.items, action.payload],
-        isOpen: true,
-      };
-    }
-    case "REMOVE_ITEM":
-      return {
-        ...state,
-        items: state.items.filter((item) => item.id !== action.payload),
-      };
-    case "UPDATE_QUANTITY": {
-      const { id, quantity } = action.payload;
-      if (quantity <= 0) {
-        return {
-          ...state,
-          items: state.items.filter((item) => item.id !== id),
-        };
-      }
-      return {
-        ...state,
-        items: state.items.map((item) =>
-          item.id === id ? { ...item, quantity } : item,
-        ),
-      };
-    }
-    case "CLEAR_CART":
-      return { ...state, items: [] };
     case "OPEN_CART":
       return { ...state, isOpen: true };
     case "CLOSE_CART":
@@ -87,6 +51,14 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
       return state;
   }
 };
+
+export interface StoreGroup {
+  storeId: string;
+  storeName: string;
+  items: CartItem[];
+  subtotal: number;
+  itemCount: number;
+}
 
 type CartContextType = {
   items: CartItem[];
@@ -99,44 +71,105 @@ type CartContextType = {
   closeCart: () => void;
   itemCount: number;
   subtotal: number;
+  isLoading: boolean;
+  error: Error | null;
+  // Multi-store functionality
+  storeGroups: StoreGroup[];
+  getStoreGroup: (storeId: string) => StoreGroup | undefined;
+  getStoreCount: () => number;
 };
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export const CartProvider = ({ children }: { children: ReactNode }) => {
   const [state, dispatch] = useReducer(cartReducer, initialState);
+  const { data: session } = useSession();
+  const queryClient = useQueryClient();
 
-  // Load cart from localStorage on initial render
-  useEffect(() => {
-    const savedCart = localStorage.getItem("cart");
-    if (savedCart) {
-      const { items } = JSON.parse(savedCart) as { items: CartItem[] };
-      items.forEach((item: CartItem) => {
-        dispatch({ type: "ADD_ITEM", payload: item });
-      });
-    }
-  }, []);
+  // Fetch cart data from API
+  const {
+    data: cartData,
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ["cart"],
+    queryFn: fetchCart,
+    enabled: !!(session?.user as SessionUser)?.id,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
 
-  // Save cart to localStorage whenever it changes
-  //TODO: API call to save cart
-  useEffect(() => {
-    localStorage.setItem("cart", JSON.stringify({ items: state.items }));
-  }, [state.items]);
+  // Mutations for cart operations
+  const addItemMutation = useMutation({
+    mutationFn: ({
+      productId,
+      quantity,
+    }: {
+      productId: string;
+      quantity: number;
+    }) => addToCart(productId, quantity),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["cart"] });
+    },
+  });
+
+  const updateQuantityMutation = useMutation({
+    mutationFn: ({
+      productId,
+      quantity,
+    }: {
+      productId: string;
+      quantity: number;
+    }) => updateCartItem(productId, quantity),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["cart"] });
+    },
+  });
+
+  const removeItemMutation = useMutation({
+    mutationFn: (productId: string) => removeFromCart(productId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["cart"] });
+    },
+  });
+
+  const clearCartMutation = useMutation({
+    mutationFn: clearCartAPI,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["cart"] });
+    },
+  });
 
   const addItem = (item: CartItem) => {
-    dispatch({ type: "ADD_ITEM", payload: item });
+    if (!(session?.user as SessionUser)?.id) {
+      console.error("User must be logged in to add items to cart");
+      return;
+    }
+    addItemMutation.mutate({ productId: item.id, quantity: item.quantity });
+    dispatch({ type: "OPEN_CART" });
   };
 
   const removeItem = (id: string) => {
-    dispatch({ type: "REMOVE_ITEM", payload: id });
+    if (!(session?.user as SessionUser)?.id) {
+      console.error("User must be logged in to remove items from cart");
+      return;
+    }
+    removeItemMutation.mutate(id);
   };
 
   const updateQuantity = (id: string, quantity: number) => {
-    dispatch({ type: "UPDATE_QUANTITY", payload: { id, quantity } });
+    if (!(session?.user as SessionUser)?.id) {
+      console.error("User must be logged in to update cart");
+      return;
+    }
+    updateQuantityMutation.mutate({ productId: id, quantity });
   };
 
   const clearCart = () => {
-    dispatch({ type: "CLEAR_CART" });
+    if (!(session?.user as SessionUser)?.id) {
+      console.error("User must be logged in to clear cart");
+      return;
+    }
+    clearCartMutation.mutate();
   };
 
   const openCart = () => {
@@ -147,20 +180,48 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     dispatch({ type: "CLOSE_CART" });
   };
 
-  const itemCount = state.items.reduce(
-    (count, item) => count + item.quantity,
-    0,
+  const items = cartData?.items ?? [];
+  const itemCount = cartData?.itemCount ?? 0;
+  const subtotal = cartData?.subtotal ?? 0;
+
+  // Multi-store functionality
+  const storeGroups: StoreGroup[] = items.reduce(
+    (groups: StoreGroup[], item) => {
+      const existingGroup = groups.find(
+        (group) => group.storeId === item.storeId,
+      );
+
+      if (existingGroup) {
+        existingGroup.items.push(item);
+        existingGroup.subtotal += item.price * item.quantity;
+        existingGroup.itemCount += item.quantity;
+      } else {
+        groups.push({
+          storeId: item.storeId,
+          storeName: item.storeName,
+          items: [item],
+          subtotal: item.price * item.quantity,
+          itemCount: item.quantity,
+        });
+      }
+
+      return groups;
+    },
+    [],
   );
 
-  const subtotal = state.items.reduce(
-    (total, item) => total + item.price * item.quantity,
-    0,
-  );
+  const getStoreGroup = (storeId: string): StoreGroup | undefined => {
+    return storeGroups.find((group) => group.storeId === storeId);
+  };
+
+  const getStoreCount = (): number => {
+    return storeGroups.length;
+  };
 
   return (
     <CartContext.Provider
       value={{
-        items: state.items,
+        items,
         isOpen: state.isOpen,
         addItem,
         removeItem,
@@ -170,6 +231,22 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
         closeCart,
         itemCount,
         subtotal,
+        isLoading:
+          isLoading ??
+          addItemMutation.isPending ??
+          updateQuantityMutation.isPending ??
+          removeItemMutation.isPending ??
+          clearCartMutation.isPending,
+        error:
+          error ??
+          addItemMutation.error ??
+          updateQuantityMutation.error ??
+          removeItemMutation.error ??
+          clearCartMutation.error,
+        // Multi-store functionality
+        storeGroups,
+        getStoreGroup,
+        getStoreCount,
       }}
     >
       {children}

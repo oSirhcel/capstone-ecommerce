@@ -38,6 +38,10 @@ interface ProductInfoProps {
       values: string[];
     }[];
     tags: string[];
+    store?: {
+      id: string;
+      name: string;
+    };
   };
 }
 
@@ -54,11 +58,11 @@ export function ProductInfo({ product }: ProductInfoProps) {
       price: price,
       image: "/placeholder.svg?height=300&width=300",
       quantity: quantity,
-      storeId: "1",
-      storeName: "Store 1",
+      storeId: product.store?.id ?? "unknown",
+      storeName: product.store?.name ?? "Unknown Store",
     });
 
-    toast("Added to cart", {
+    toast.success("Added to cart", {
       description: `${quantity} × ${product.name} has been added to your cart.`,
     });
   };
@@ -100,7 +104,7 @@ export function ProductInfo({ product }: ProductInfoProps) {
         <h1 className="text-3xl font-bold">{product.name}</h1>
         <div className="mt-2 flex items-center gap-4">
           <div className="flex items-center">
-            {[...Array(5)].map((_, i) => (
+            {Array.from({ length: 5 }).map((_, i) => (
               <StarIcon
                 key={i}
                 className={`h-4 w-4 ${
@@ -148,11 +152,11 @@ export function ProductInfo({ product }: ProductInfoProps) {
             <Select
               // The value for this select is determined by the option's name in the selectedOptions object.
               // nuqs ensures this value is either from the URL or the default specified in parseAsStringLiteral.
-              value={selectedOptions[option.name] || ""} // Fallback to empty string if somehow undefined, though nuqs should provide a default.
+              value={selectedOptions[option.name] ?? ""} // Fallback to empty string if somehow undefined, though nuqs should provide a default.
               onValueChange={(value) => {
                 // Update only the specific option that changed.
                 // e.g., if Color changes, call setSelectedOptions({ Color: "NewColor" })
-                setSelectedOptions({ [option.name]: value });
+                void setSelectedOptions({ [option.name]: value });
               }}
             >
               <SelectTrigger className="w-[180px]">

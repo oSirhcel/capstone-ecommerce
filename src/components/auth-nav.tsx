@@ -39,7 +39,7 @@ export function AuthNav() {
             <span className="sr-only">Open user menu</span>
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-56" sideOffset={10}>
+        <DropdownMenuContent align="end" className="w-56" sideOffset={10}>
           <DropdownMenuLabel className="font-normal">
             <div className="flex flex-col space-y-1">
               <p className="text-sm leading-none font-medium">

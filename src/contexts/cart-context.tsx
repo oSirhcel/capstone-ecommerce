@@ -29,6 +29,7 @@ export type CartItem = {
   color?: string;
   storeId: string;
   storeName: string;
+  stock: number;
 };
 
 type CartState = {

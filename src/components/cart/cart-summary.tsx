@@ -67,8 +67,8 @@ export function CartSummary() {
       )}
 
       <Button asChild className="w-full" size="lg">
-        <Link href="/checkout" onClick={closeCart}>
-          Proceed to Checkout
+        <Link href="/cart" onClick={closeCart}>
+          View Cart
         </Link>
       </Button>
       <Button variant="outline" className="w-full" onClick={closeCart}>

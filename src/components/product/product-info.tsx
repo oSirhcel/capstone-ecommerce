@@ -19,6 +19,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { parseAsStringLiteral, useQueryStates } from "nuqs";
+import { toast } from "sonner";
+import { useCart } from "@/contexts/cart-context";
 
 interface ProductInfoProps {
   product: {
@@ -36,11 +38,34 @@ interface ProductInfoProps {
       values: string[];
     }[];
     tags: string[];
+    store?: {
+      id: string;
+      name: string;
+    };
   };
 }
 
 export function ProductInfo({ product }: ProductInfoProps) {
   const [quantity, setQuantity] = useState(1);
+  const { addItem } = useCart();
+
+  const handleAddToCart = () => {
+    const price = product.discountPrice ?? product.price;
+
+    addItem({
+      id: product.id,
+      name: product.name,
+      price: price,
+      image: "/placeholder.svg?height=300&width=300",
+      quantity: quantity,
+      storeId: product.store?.id ?? "unknown",
+      storeName: product.store?.name ?? "Unknown Store",
+    });
+
+    toast.success("Added to cart", {
+      description: `${quantity} × ${product.name} has been added to your cart.`,
+    });
+  };
 
   const optionsQueryConfig = product.options.reduce(
     (acc, option) => {
@@ -79,7 +104,7 @@ export function ProductInfo({ product }: ProductInfoProps) {
         <h1 className="text-3xl font-bold">{product.name}</h1>
         <div className="mt-2 flex items-center gap-4">
           <div className="flex items-center">
-            {[...Array(5)].map((_, i) => (
+            {Array.from({ length: 5 }).map((_, i) => (
               <StarIcon
                 key={i}
                 className={`h-4 w-4 ${
@@ -127,11 +152,11 @@ export function ProductInfo({ product }: ProductInfoProps) {
             <Select
               // The value for this select is determined by the option's name in the selectedOptions object.
               // nuqs ensures this value is either from the URL or the default specified in parseAsStringLiteral.
-              value={selectedOptions[option.name] || ""} // Fallback to empty string if somehow undefined, though nuqs should provide a default.
+              value={selectedOptions[option.name] ?? ""} // Fallback to empty string if somehow undefined, though nuqs should provide a default.
               onValueChange={(value) => {
                 // Update only the specific option that changed.
                 // e.g., if Color changes, call setSelectedOptions({ Color: "NewColor" })
-                setSelectedOptions({ [option.name]: value });
+                void setSelectedOptions({ [option.name]: value });
               }}
             >
               <SelectTrigger className="w-[180px]">
@@ -196,7 +221,12 @@ export function ProductInfo({ product }: ProductInfoProps) {
       </div>
 
       <div className="flex flex-col gap-4 sm:flex-row">
-        <Button className="flex-1" size="lg" disabled={product.stock <= 0}>
+        <Button
+          className="flex-1"
+          size="lg"
+          disabled={product.stock <= 0}
+          onClick={handleAddToCart}
+        >
           Add to Cart
         </Button>
         <Button variant="outline" size="icon" className="h-11 w-11">

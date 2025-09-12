@@ -12,14 +12,20 @@ import { Input } from "@/components/ui/input";
 import Image from "next/image";
 import Link from "next/link";
 import { AuthNav } from "@/components/auth-nav";
+import { CartButton } from "@/components/cart/cart-button";
+import { CartProvider } from "@/contexts/cart-context";
+import { CartDrawer } from "@/components/cart/cart-drawer";
 
 const HomeLayout = ({ children }: { children: React.ReactNode }) => {
   return (
-    <div className="flex min-h-screen flex-col">
-      <Header />
-      <main className="flex-1">{children}</main>
-      <Footer />
-    </div>
+    <CartProvider>
+      <div className="flex min-h-screen flex-col">
+        <Header />
+        <main className="flex-1">{children}</main>
+        <Footer />
+      </div>
+      <CartDrawer />
+    </CartProvider>
   );
 };
 
@@ -76,6 +82,7 @@ const Header = () => {
               className="bg-background w-full rounded-md border pl-8 md:w-[300px] lg:w-[400px]"
             />
           </div>
+          <CartButton />
           <AuthNav />
           <Button variant="ghost" size="icon" className="md:hidden">
             <SearchIcon className="size-5" />

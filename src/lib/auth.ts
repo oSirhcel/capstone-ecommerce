@@ -46,7 +46,6 @@ export const authOptions: NextAuthOptions = {
           name: user.username,
           // Provide an email-shaped value so existing callbacks that derive username from email continue to work
           email: `${user.username}@local`,
-          // @ts-expect-error attach custom field for later callbacks
           userType: user.userType,
         };
       },
@@ -61,7 +60,6 @@ export const authOptions: NextAuthOptions = {
       // On sign in, persist id and userType onto the token
       if (user) {
         token.sub = user.id as string;
-        // @ts-expect-error custom prop possibly present from authorize
         if (user.userType) token.userType = user.userType;
       }
       return token;
@@ -90,20 +88,19 @@ export const authOptions: NextAuthOptions = {
     async session({ session, token }) {
       // Prefer values from token to avoid extra DB hit on every request
       if (session.user) {
-        (session.user as any).id = token.sub;
-        // @ts-expect-error custom prop
-        (session.user as any).userType = token.userType;
+        session.user.id = token.sub!;
+        session.user.userType = token.userType;
       }
       // Fallback: if userType missing but we have an email, try to fetch once
-      if (session.user?.email && !(session.user as any).userType) {
+      if (session.user?.email && !session.user.userType) {
         const username = session.user.email.split('@')[0];
         const [user] = await db
           .select()
           .from(users)
           .where(eq(users.username, username));
         if (user) {
-          (session.user as any).id = user.id;
-          (session.user as any).userType = user.userType;
+          session.user.id = user.id;
+          session.user.userType = user.userType;
         }
       }
       return session;

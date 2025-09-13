@@ -21,12 +21,6 @@ export default function StoreManagementPage() {
             Manage store settings, inventory, and vendor relationships.
           </p>
         </div>
-        <Button asChild variant="outline">
-          <Link href="/" className="flex items-center">
-            <HomeIcon className="mr-2 h-4 w-4" />
-            Back to Store
-          </Link>
-        </Button>
       </div>
 
       <Card>

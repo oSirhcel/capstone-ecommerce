@@ -21,12 +21,6 @@ export default function PaymentsPage() {
             Manage payment methods, transactions, and financial reports.
           </p>
         </div>
-        <Button asChild variant="outline">
-          <Link href="/" className="flex items-center">
-            <HomeIcon className="mr-2 h-4 w-4" />
-            Back to Store
-          </Link>
-        </Button>
       </div>
 
       <Card>

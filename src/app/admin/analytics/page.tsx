@@ -21,12 +21,6 @@ export default function AnalyticsPage() {
             Detailed insights and performance metrics for your marketplace.
           </p>
         </div>
-        <Button asChild variant="outline">
-          <Link href="/" className="flex items-center">
-            <HomeIcon className="mr-2 h-4 w-4" />
-            Back to Store
-          </Link>
-        </Button>
       </div>
 
       <Card>

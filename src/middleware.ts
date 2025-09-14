@@ -1,3 +1,43 @@
-export { default } from "next-auth/middleware";
+import { withAuth } from "next-auth/middleware";
+import { NextResponse } from "next/server";
 
-export const config = { matcher: ["/account(.*)", "/admin(.*)"] };
+export default withAuth(
+  function middleware(req) {
+    const token = req.nextauth.token;
+    const pathname = req.nextUrl.pathname;
+
+    // Admin routes protection
+    if (pathname.startsWith("/admin")) {
+      if (!token) {
+        // Redirect to sign in if not authenticated
+        return NextResponse.redirect(new URL("/auth/signin", req.url));
+      }
+      
+      if (token.userType !== "admin") {
+        // Redirect to unauthorized page if not admin
+        return NextResponse.redirect(new URL("/unauthorized", req.url));
+      }
+    }
+
+    return NextResponse.next();
+  },
+  {
+    callbacks: {
+      authorized: ({ token, req }) => {
+        const pathname = req.nextUrl.pathname;
+        
+        // Allow access to non-protected routes
+        if (!pathname.startsWith("/admin") && !pathname.startsWith("/account")) {
+          return true;
+        }
+        
+        // Require authentication for protected routes
+        return !!token;
+      },
+    },
+  }
+);
+
+export const config = { 
+  matcher: ["/account(.*)", "/admin(.*)"] 
+};

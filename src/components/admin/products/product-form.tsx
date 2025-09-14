@@ -33,9 +33,10 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Upload, X, Save, ArrowLeft } from "lucide-react";
+import { Upload, X, Save } from "lucide-react";
 import Image from "next/image";
-import Link from "next/link";
+import { useCreateProduct } from "@/hooks/use-product-mutations";
+import { useRouter } from "next/navigation";
 
 const productFormSchema = z.object({
   name: z
@@ -50,10 +51,6 @@ const productFormSchema = z.object({
     .string()
     .min(10, "Description must be at least 10 characters")
     .max(1000, "Description must be less than 1000 characters"),
-  shortDescription: z
-    .string()
-    .max(200, "Short description must be less than 200 characters")
-    .optional(),
   price: z.number().min(0.01, "Price must be greater than 0"),
   compareAtPrice: z
     .number()
@@ -105,7 +102,8 @@ export function ProductForm({
     "/headphones-side.png",
     "/headphones-back.png",
   ]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const router = useRouter();
+  const createProductMutation = useCreateProduct();
 
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productFormSchema),
@@ -113,7 +111,6 @@ export function ProductForm({
       name: "",
       sku: "",
       description: "",
-      shortDescription: "",
       price: 0,
       compareAtPrice: 0,
       costPerItem: 0,
@@ -138,17 +135,38 @@ export function ProductForm({
   });
 
   const onSubmit = async (data: ProductFormValues) => {
-    setIsSubmitting(true);
-    try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      console.log("Form data:", data);
-      // Handle form submission here
-    } catch (error) {
-      console.error("Error submitting form:", error);
-    } finally {
-      setIsSubmitting(false);
-    }
+    //hardcoded storeId for now, will be change to use context later
+    const storeId = "default-store-id";
+
+    const productData = {
+      name: data.name,
+      sku: data.sku,
+      description: data.description,
+      price: data.price,
+      compareAtPrice: data.compareAtPrice,
+      costPerItem: data.costPerItem,
+      stock: data.quantity,
+      trackQuantity: data.trackQuantity,
+      allowBackorders: data.allowBackorders,
+      weight: data.weight,
+      dimensions: data.dimensions,
+      seoTitle: data.seoTitle,
+      seoDescription: data.seoDescription,
+      slug: data.slug,
+      status: data.status,
+      featured: data.featured,
+      tags: data.tags,
+      storeId,
+      categoryId: data.category ? parseInt(data.category) : undefined,
+      images,
+    };
+
+    createProductMutation.mutate(productData, {
+      onSuccess: () => {
+        // Redirect to products list on success
+        router.push("/admin/products");
+      },
+    });
   };
 
   const removeImage = (index: number) => {
@@ -156,37 +174,38 @@ export function ProductForm({
   };
 
   const addImage = () => {
-    // In a real app, this would open a file picker
+    //TODO: Upload File
     setImages([...images, "/placeholder.svg?height=200&width=200"]);
   };
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="mx-auto flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/admin/products">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Products
-            </Link>
-          </Button>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">
-              {isEditing ? "Edit Product" : "Add New Product"}
+            <h1 className="text-2xl font-bold tracking-tight">
+              {isEditing ? "Edit Product" : "Add Product"}
             </h1>
-            <p className="text-muted-foreground">
-              {isEditing
-                ? "Update product information"
-                : "Create a new product for your store"}
-            </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" disabled={isSubmitting}>
+          <Button
+            variant="outline"
+            disabled={createProductMutation.isPending}
+            onClick={() => {
+              const formData = form.getValues();
+              formData.status = "draft";
+              void onSubmit(formData);
+            }}
+          >
             Save as Draft
           </Button>
-          <Button form="product-form" type="submit" disabled={isSubmitting}>
-            {isSubmitting ? (
+          <Button
+            form="product-form"
+            type="submit"
+            disabled={createProductMutation.isPending}
+          >
+            {createProductMutation.isPending ? (
               <>
                 <div className="mr-2 h-4 w-4 animate-spin rounded-full border-b-2 border-white" />
                 Saving...
@@ -205,17 +224,16 @@ export function ProductForm({
         <form
           id="product-form"
           onSubmit={form.handleSubmit(onSubmit)}
-          className="space-y-6"
+          className="mx-auto max-w-6xl space-y-6"
         >
-          <Tabs defaultValue="basic" className="space-y-6">
+          <Tabs defaultValue="information" className="space-y-6">
             <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="basic">Basic Info</TabsTrigger>
+              <TabsTrigger value="information"> Info</TabsTrigger>
               <TabsTrigger value="inventory">Inventory</TabsTrigger>
               <TabsTrigger value="seo">SEO</TabsTrigger>
               <TabsTrigger value="images">Images</TabsTrigger>
             </TabsList>
-
-            <TabsContent value="basic" className="space-y-6">
+            <TabsContent value="information" className="space-y-6">
               <Card>
                 <CardHeader>
                   <CardTitle>Product Information</CardTitle>
@@ -237,6 +255,7 @@ export function ProductForm({
                               {...field}
                             />
                           </FormControl>
+                          <div className="h-5" />
                           <FormMessage />
                         </FormItem>
                       )}
@@ -281,27 +300,6 @@ export function ProductForm({
                       </FormItem>
                     )}
                   />
-
-                  <FormField
-                    control={form.control}
-                    name="shortDescription"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Short Description</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            placeholder="Enter short description for product listings"
-                            className="min-h-[80px]"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          {field.value?.length ?? 0}/200 characters
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
                 </CardContent>
               </Card>
 
@@ -331,6 +329,7 @@ export function ProductForm({
                               }
                             />
                           </FormControl>
+                          <div className="h-5" />
                           <FormMessage />
                         </FormItem>
                       )}

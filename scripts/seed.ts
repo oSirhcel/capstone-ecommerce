@@ -37,7 +37,7 @@ async function main() {
     // Create two store owners
     const passwordHash = bcrypt.hashSync("password123", 10);
     const ownerA: NewUser = {
-      id: uuidv4(),
+      id: "default-store-id",
       username: "owner_alpha",
       password: passwordHash,
       userType: "owner",
@@ -87,7 +87,7 @@ async function main() {
 
     // Stores
     const storeA: NewStore = {
-      id: uuidv4(),
+      id: "default-store-id",
       name: "Alpha Gadgets",
       description: "Quality electronics and accessories",
       ownerId: ownerA.id,
@@ -123,6 +123,7 @@ async function main() {
       {
         product: {
           name: "Wireless Earbuds",
+          sku: "WEB-001",
           description: "Noise-cancelling Bluetooth earbuds with charging case",
           price: cents(79.99),
           stock: 120,
@@ -148,6 +149,7 @@ async function main() {
       {
         product: {
           name: "Smart Home Hub",
+          sku: "SHH-001",
           description: "Control lights, thermostats, and more from one hub",
           price: cents(129.0),
           stock: 45,
@@ -173,6 +175,7 @@ async function main() {
       {
         product: {
           name: "USB-C Fast Charger",
+          sku: "UFC-001",
           description: "65W GaN fast charger with USB-C Power Delivery",
           price: cents(39.5),
           stock: 200,
@@ -198,6 +201,7 @@ async function main() {
       {
         product: {
           name: "Handwoven Basket",
+          sku: "HWB-001",
           description:
             "Eco-friendly storage basket handwoven from natural fibers",
           price: cents(24.99),
@@ -224,6 +228,7 @@ async function main() {
       {
         product: {
           name: "Ceramic Vase",
+          sku: "CV-001",
           description: "Minimalist ceramic vase for modern interiors",
           price: cents(34.99),
           stock: 60,
@@ -249,6 +254,7 @@ async function main() {
       {
         product: {
           name: "Leather Keychain",
+          sku: "LK-001",
           description: "Handcrafted leather keychain with brass ring",
           price: cents(14.99),
           stock: 150,
@@ -274,6 +280,7 @@ async function main() {
       {
         product: {
           name: "Bluetooth Speaker",
+          sku: "BS-001",
           description: "Portable speaker with deep bass and 12-hour battery",
           price: cents(59.99),
           stock: 95,

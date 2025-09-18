@@ -11,6 +11,7 @@ export default function AdminLayout({
   return (
     <AdminAuthWrapper>
       <div className="flex h-screen flex-col bg-gray-50 dark:bg-gray-900">
+        {/* TODO: Fix overflow bug */}
         <AdminHeader />
         <div className="flex flex-1 overflow-hidden">
           <AdminSidebar />

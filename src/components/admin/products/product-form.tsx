@@ -33,10 +33,11 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Upload, X, Save } from "lucide-react";
+import { X, Save, PlusIcon } from "lucide-react";
 import Image from "next/image";
 import { useCreateProduct } from "@/hooks/use-product-mutations";
 import { useRouter } from "next/navigation";
+import { UploadButton } from "@/lib/uploadthing";
 
 const productFormSchema = z.object({
   name: z
@@ -97,11 +98,7 @@ export function ProductForm({
   initialData,
   isEditing = false,
 }: ProductFormProps) {
-  const [images, setImages] = useState<string[]>([
-    "/headphones-front.png",
-    "/headphones-side.png",
-    "/headphones-back.png",
-  ]);
+  const [images, setImages] = useState<string[]>([]);
   const router = useRouter();
   const createProductMutation = useCreateProduct();
 
@@ -173,11 +170,6 @@ export function ProductForm({
     setImages(images.filter((_, i) => i !== index));
   };
 
-  const addImage = () => {
-    //TODO: Upload File
-    setImages([...images, "/placeholder.svg?height=200&width=200"]);
-  };
-
   return (
     <div className="space-y-6">
       <div className="mx-auto flex items-center justify-between">
@@ -224,14 +216,13 @@ export function ProductForm({
         <form
           id="product-form"
           onSubmit={form.handleSubmit(onSubmit)}
-          className="mx-auto max-w-6xl space-y-6"
+          className="mx-auto space-y-6"
         >
           <Tabs defaultValue="information" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="w-full">
               <TabsTrigger value="information"> Info</TabsTrigger>
               <TabsTrigger value="inventory">Inventory</TabsTrigger>
               <TabsTrigger value="seo">SEO</TabsTrigger>
-              <TabsTrigger value="images">Images</TabsTrigger>
             </TabsList>
             <TabsContent value="information" className="space-y-6">
               <Card>
@@ -300,6 +291,102 @@ export function ProductForm({
                       </FormItem>
                     )}
                   />
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Media</CardTitle>
+                </CardHeader>
+                <CardContent className="w-full">
+                  {images.length === 0 && (
+                    <div className="bg-muted/30 hover:bg-muted/50 border-muted-foreground flex h-64 w-full items-center justify-center rounded-lg border border-dashed transition">
+                      <UploadButton
+                        className="ut-button:bg-primary ut-button:text-primary-foreground ut-allowed-content:hidden"
+                        content={{
+                          button: "Upload images",
+                        }}
+                        endpoint="imageUploader"
+                        onClientUploadComplete={(res) => {
+                          setImages((prev) => [
+                            ...prev,
+                            ...res.map((r) => r.ufsUrl),
+                          ]);
+                          console.log(images);
+                        }}
+                      />
+                    </div>
+                  )}
+
+                  {images.length > 0 && (
+                    <div className="flex flex-col gap-4 sm:flex-row">
+                      <div className="flex-shrink-0">
+                        <div className="group relative">
+                          <Image
+                            src={images[0] || "/placeholder.svg"}
+                            alt="Main product image"
+                            width={300}
+                            height={300}
+                            className="h-48 w-48 rounded-lg border object-cover sm:h-64 sm:w-64 md:h-72 md:w-72 lg:h-80 lg:w-80"
+                          />
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="sm"
+                            className="absolute top-2 right-2 opacity-0 transition-opacity group-hover:opacity-100"
+                            onClick={() => removeImage(0)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+                          {images.slice(1).map((image, idx) => (
+                            <div
+                              key={image}
+                              className="group relative aspect-square"
+                            >
+                              <Image
+                                src={image || "/placeholder.svg"}
+                                alt={`Product image ${idx + 2}`}
+                                width={80}
+                                height={80}
+                                className="h-full min-h-[60px] w-full min-w-[60px] rounded-lg border object-cover"
+                              />
+                              <Button
+                                type="button"
+                                variant="destructive"
+                                size="sm"
+                                className="absolute top-1 right-1 h-6 w-6 p-0 opacity-0 transition-opacity group-hover:opacity-100"
+                                onClick={() => removeImage(idx + 1)}
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ))}
+
+                          <UploadButton
+                            className="ut-button:size-full ut-button:aspect-square ut-allowed-content:hidden ut-button:bg-muted/50 ut-button:hover:bg-muted/70 ut-button:text-muted-foreground ut-button:border-dashed ut-button:border-2 ut-button:border-muted-foreground/30 rounded-lg"
+                            content={{
+                              button: (
+                                <PlusIcon className="text-muted-foreground h-6 w-6" />
+                              ),
+                            }}
+                            endpoint="imageUploader"
+                            onClientUploadComplete={(res) => {
+                              setImages((prev) => [
+                                ...prev,
+                                ...res.map((r) => r.ufsUrl),
+                              ]);
+                              console.log(images);
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
@@ -772,69 +859,6 @@ export function ProductForm({
                       </FormItem>
                     )}
                   />
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="images" className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Product Images</CardTitle>
-                  <CardDescription>
-                    Upload images to showcase your product
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-6">
-                    <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-                      {images.map((image, index) => (
-                        <div key={index} className="group relative">
-                          <Image
-                            src={image || "/placeholder.svg"}
-                            alt={`Product image ${index + 1}`}
-                            width={200}
-                            height={200}
-                            className="h-32 w-full rounded-lg border object-cover"
-                          />
-                          <Button
-                            type="button"
-                            variant="destructive"
-                            size="sm"
-                            className="absolute top-2 right-2 opacity-0 transition-opacity group-hover:opacity-100"
-                            onClick={() => removeImage(index)}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                          {index === 0 && (
-                            <Badge className="absolute bottom-2 left-2">
-                              Primary
-                            </Badge>
-                          )}
-                        </div>
-                      ))}
-
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="h-32 border-dashed bg-transparent"
-                        onClick={addImage}
-                      >
-                        <div className="flex flex-col items-center gap-2">
-                          <Upload className="h-6 w-6" />
-                          <span className="text-sm">Add Image</span>
-                        </div>
-                      </Button>
-                    </div>
-
-                    <div className="text-muted-foreground text-sm">
-                      <p>
-                        • First image will be used as the primary product image
-                      </p>
-                      <p>• Recommended size: 800x800px or larger</p>
-                      <p>• Supported formats: JPG, PNG, WebP</p>
-                      <p>• Maximum file size: 5MB per image</p>
-                    </div>
-                  </div>
                 </CardContent>
               </Card>
             </TabsContent>

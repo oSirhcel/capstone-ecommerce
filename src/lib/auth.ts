@@ -1,4 +1,4 @@
-import { NextAuthOptions } from "next-auth";
+import type { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { db } from "@/server/db";
@@ -27,13 +27,13 @@ export const authOptions: NextAuthOptions = {
           .where(eq(users.username, credentials.username))
           .limit(1);
 
-        if (!user || !user.password) {
+        if (!user?.password) {
           return null;
         }
 
         const isValid = await bcrypt.compare(
           credentials.password,
-          user.password
+          user.password,
         );
 
         if (!isValid) {
@@ -59,7 +59,7 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user }) {
       // On sign in, persist id and userType onto the token
       if (user) {
-        token.sub = user.id as string;
+        token.sub = user.id;
         if (user.userType) token.userType = user.userType;
       }
       return token;
@@ -67,18 +67,18 @@ export const authOptions: NextAuthOptions = {
     async signIn({ user, account, profile }) {
       // If user signs in with Google and doesn't exist in our users table, create them
       if (account?.provider === "google" && profile?.email) {
-        const username = profile.email.split('@')[0];
+        const username = profile.email.split("@")[0];
         const existingUser = await db
           .select()
           .from(users)
           .where(eq(users.username, username));
-        
+
         if (existingUser.length === 0) {
           // Create new user with Google info
           await db.insert(users).values({
             id: randomUUID(),
             username,
-            password: '', // OAuth users don't need password
+            password: "", // OAuth users don't need password
             userType: "customer",
           });
         }
@@ -93,7 +93,7 @@ export const authOptions: NextAuthOptions = {
       }
       // Fallback: if userType missing but we have an email, try to fetch once
       if (session.user?.email && !session.user.userType) {
-        const username = session.user.email.split('@')[0];
+        const username = session.user.email.split("@")[0];
         const [user] = await db
           .select()
           .from(users)

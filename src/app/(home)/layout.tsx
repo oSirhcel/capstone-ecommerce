@@ -15,6 +15,7 @@ import { AuthNav } from "@/components/auth-nav";
 import { CartButton } from "@/components/cart/cart-button";
 import { CartProvider } from "@/contexts/cart-context";
 import { CartDrawer } from "@/components/cart/cart-drawer";
+import { CategoriesDropdown } from "@/components/categories-dropdown";
 
 const HomeLayout = ({ children }: { children: React.ReactNode }) => {
   return (
@@ -47,12 +48,7 @@ const Header = () => {
             <span className="hidden font-bold sm:inline-block">LOGO</span>
           </Link>
           <nav className="hidden gap-6 md:flex">
-            <Link
-              href="#"
-              className="text-muted-foreground hover:text-primary text-sm font-medium transition-colors"
-            >
-              Categories
-            </Link>
+            <CategoriesDropdown />
             <Link
               href="#"
               className="text-muted-foreground hover:text-primary text-sm font-medium transition-colors"

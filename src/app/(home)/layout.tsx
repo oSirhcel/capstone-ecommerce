@@ -50,6 +50,12 @@ const Header = () => {
           <nav className="hidden gap-6 md:flex">
             <CategoriesDropdown />
             <Link
+              href="/products"
+              className="text-muted-foreground hover:text-primary text-sm font-medium transition-colors"
+            >
+              All Products
+            </Link>
+            <Link
               href="#"
               className="text-muted-foreground hover:text-primary text-sm font-medium transition-colors"
             >

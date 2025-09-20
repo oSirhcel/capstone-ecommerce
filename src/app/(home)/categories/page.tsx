@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/card";
 import { TagIcon, ArrowRightIcon } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { categoryNameToSlug } from "@/lib/utils/category-slug";
 
 interface Category {
   id: number;
@@ -25,7 +26,7 @@ interface CategoriesResponse {
 
 function CategoryCard({ category }: { category: Category }) {
   return (
-    <Link href={`/categories/${category.id}`}>
+    <Link href={`/categories/${categoryNameToSlug(category.name)}`}>
       <Card className="cursor-pointer transition-all hover:scale-105 hover:shadow-md">
         <CardHeader className="text-center">
           <TagIcon className="text-primary mx-auto h-12 w-12" />

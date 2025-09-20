@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SearchIcon, TagIcon, ArrowLeftIcon } from "lucide-react";
 import Link from "next/link";
+import { getKnownCategoryName } from "@/lib/utils/category-slug";
 
 const PRODUCTS_PER_PAGE = 20;
 
@@ -32,7 +33,7 @@ function transformProductToCardProps(product: Product) {
 
 interface CategoryPageProps {
   params: Promise<{
-    id: string;
+    slug: string;
   }>;
 }
 
@@ -43,19 +44,24 @@ interface Category {
 }
 
 export default function CategoryPage({ params }: CategoryPageProps) {
-  const [categoryId, setCategoryId] = useState<string>("");
+  const [categoryName, setCategoryName] = useState<string>("");
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
 
   const [searchTerm, setSearchTerm] = useState(
-    searchParams.get("search") || "",
+    searchParams.get("search") ?? "",
   );
-  const currentPage = parseInt(searchParams.get("page") || "1");
+  const currentPage = parseInt(searchParams.get("page") ?? "1");
 
-  // Get category ID from params
+  // Get category slug from params and determine category name
   useEffect(() => {
-    params.then(({ id }) => setCategoryId(id));
+    void params.then(({ slug }) => {
+      const knownName = getKnownCategoryName(slug);
+      if (knownName) {
+        setCategoryName(knownName);
+      }
+    });
   }, [params]);
 
   // Fetch category details
@@ -64,22 +70,22 @@ export default function CategoryPage({ params }: CategoryPageProps) {
     isLoading: categoryLoading,
     error: categoryError,
   } = useQuery({
-    queryKey: ["category", categoryId],
+    queryKey: ["category", categoryName],
     queryFn: async (): Promise<Category> => {
       const response = await fetch("/api/categories");
       if (!response.ok) {
         throw new Error("Failed to fetch categories");
       }
-      const data = await response.json();
+      const data = (await response.json()) as { categories: Category[] };
       const category = data.categories.find(
-        (c: Category) => c.id === parseInt(categoryId),
+        (c: Category) => c.name === categoryName,
       );
       if (!category) {
         throw new Error("Category not found");
       }
       return category;
     },
-    enabled: !!categoryId,
+    enabled: !!categoryName,
   });
 
   // Fetch products in this category
@@ -93,7 +99,7 @@ export default function CategoryPage({ params }: CategoryPageProps) {
       {
         page: currentPage,
         limit: PRODUCTS_PER_PAGE,
-        category: categoryId ? parseInt(categoryId) : undefined,
+        category: category?.id,
         search: searchParams.get("search"),
       },
     ],
@@ -101,14 +107,14 @@ export default function CategoryPage({ params }: CategoryPageProps) {
       fetchProducts({
         page: currentPage,
         limit: PRODUCTS_PER_PAGE,
-        category: categoryId ? parseInt(categoryId) : undefined,
-        search: searchParams.get("search") || undefined,
+        category: category?.id,
+        search: searchParams.get("search") ?? undefined,
       }),
-    enabled: !!categoryId,
+    enabled: !!category?.id,
   });
 
-  const products = data?.products || [];
-  const pagination = data?.pagination || {
+  const products = data?.products ?? [];
+  const pagination = data?.pagination ?? {
     page: 1,
     limit: PRODUCTS_PER_PAGE,
     total: 0,
@@ -142,7 +148,7 @@ export default function CategoryPage({ params }: CategoryPageProps) {
   };
 
   useEffect(() => {
-    setSearchTerm(searchParams.get("search") || "");
+    setSearchTerm(searchParams.get("search") ?? "");
   }, [searchParams]);
 
   if (categoryLoading) {

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { ChevronDownIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { categoryNameToSlug } from "@/lib/utils/category-slug";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -86,7 +87,7 @@ export function CategoriesDropdown() {
                 categories.map((category) => (
                   <Link
                     key={category.id}
-                    href={`/categories/${category.id}`}
+                    href={`/categories/${categoryNameToSlug(category.name)}`}
                     className="hover:text-primary rounded-md px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
                     onClick={() => setIsOpen(false)}
                   >

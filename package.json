@@ -4,13 +4,20 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
+    "dev:test": "cp .env.local .env && next dev --turbopack",
     "build": "next build",
+    "build:test": "cp .env.local .env && next build",
     "start": "next start",
+    "start:test": "cp .env.local .env && next start",
+    "test:env": "cp .env.local .env && echo 'Test environment configured. Running with test database.' && next dev --turbopack",
     "lint": "next lint",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
+    "db:push:test": "cp .env.local .env && drizzle-kit push",
     "db:migrate": "drizzle-kit migrate",
-    "db:studio": "drizzle-kit studio"
+    "db:migrate:test": "cp .env.local .env && drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio",
+    "db:studio:test": "cp .env.local .env && drizzle-kit studio"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.10.0",

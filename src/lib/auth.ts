@@ -1,4 +1,4 @@
-import { NextAuthOptions } from "next-auth";
+import type { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { db } from "@/server/db";
@@ -27,13 +27,13 @@ export const authOptions: NextAuthOptions = {
           .where(eq(users.username, credentials.username))
           .limit(1);
 
-        if (!user || !user.password) {
+        if (!user?.password) {
           return null;
         }
 
         const isValid = await bcrypt.compare(
           credentials.password,
-          user.password
+          user.password,
         );
 
         if (!isValid) {
@@ -46,7 +46,6 @@ export const authOptions: NextAuthOptions = {
           name: user.username,
           // Provide an email-shaped value so existing callbacks that derive username from email continue to work
           email: `${user.username}@local`,
-          userType: user.userType,
         };
       },
     }),
@@ -56,52 +55,46 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
-      // On sign in, persist id and userType onto the token
+    async jwt({ token, trigger, user, session }) {
       if (user) {
-        token.sub = user.id as string;
-        if (user.userType) token.userType = user.userType;
+        token.sub = user.id;
+      }
+      // When the client calls session.update({ store: { id } }), persist to JWT
+      if (trigger === "update") {
+        const updated = session as { store?: { id?: string } } | undefined;
+        if (updated?.store?.id) {
+          token.storeId = updated.store.id;
+        }
       }
       return token;
     },
-    async signIn({ user, account, profile }) {
+    async signIn({ user: _user, account, profile }) {
       // If user signs in with Google and doesn't exist in our users table, create them
       if (account?.provider === "google" && profile?.email) {
-        const username = profile.email.split('@')[0];
+        const username = profile.email.split("@")[0];
         const existingUser = await db
           .select()
           .from(users)
           .where(eq(users.username, username));
-        
+
         if (existingUser.length === 0) {
           // Create new user with Google info
           await db.insert(users).values({
             id: randomUUID(),
             username,
-            password: '', // OAuth users don't need password
-            userType: "customer",
+            password: "", // OAuth users don't need password
           });
         }
       }
       return true;
     },
     async session({ session, token }) {
-      // Prefer values from token to avoid extra DB hit on every request
+      // Prefer values from token to avoid extra DB hits
       if (session.user) {
         session.user.id = token.sub!;
-        session.user.userType = token.userType;
       }
-      // Fallback: if userType missing but we have an email, try to fetch once
-      if (session.user?.email && !session.user.userType) {
-        const username = session.user.email.split('@')[0];
-        const [user] = await db
-          .select()
-          .from(users)
-          .where(eq(users.username, username));
-        if (user) {
-          session.user.id = user.id;
-          session.user.userType = user.userType;
-        }
+      if (token.storeId) {
+        session.store = { id: token.storeId };
       }
       return session;
     },

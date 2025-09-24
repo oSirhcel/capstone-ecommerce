@@ -25,7 +25,7 @@ export const categories = pgTable("categories", {
 
 export const stores = pgTable("stores", {
   id: varchar("id", { length: 255 }).primaryKey().notNull(),
-  name: varchar({ length: 255 }).notNull(),
+  name: varchar({ length: 255 }).unique().notNull(),
   description: varchar({ length: 1000 }),
   ownerId: varchar("ownerId", { length: 255 })
     .references(() => users.id)

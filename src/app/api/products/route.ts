@@ -1,14 +1,19 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
-import { products, stores, categories, productImages } from "@/server/db/schema";
+import {
+  products,
+  stores,
+  categories,
+  productImages,
+} from "@/server/db/schema";
 import { eq, desc, asc, and, like } from "drizzle-orm";
 
 // GET /api/products - Get all products with optional filtering
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "20");
+    const page = parseInt(searchParams.get("page") ?? "1");
+    const limit = parseInt(searchParams.get("limit") ?? "20");
     const category = searchParams.get("category");
     const store = searchParams.get("store");
     const search = searchParams.get("search");
@@ -17,21 +22,21 @@ export async function GET(request: NextRequest) {
 
     // Build WHERE conditions
     const whereConditions = [];
-    
+
     if (category) {
       whereConditions.push(eq(products.categoryId, parseInt(category)));
     }
-    
+
     if (store) {
       whereConditions.push(eq(products.storeId, store));
     }
-    
+
     if (search) {
       whereConditions.push(like(products.name, `%${search}%`));
     }
 
     // Build the main query
-    let query = db
+    const query = db
       .select({
         id: products.id,
         name: products.name,
@@ -53,12 +58,15 @@ export async function GET(request: NextRequest) {
       })
       .from(products)
       .leftJoin(stores, eq(products.storeId, stores.id))
-      .leftJoin(categories, eq(products.categoryId, categories.id));
-
-    // Apply WHERE conditions if any
-    if (whereConditions.length > 0) {
-      query = query.where(whereConditions.length === 1 ? whereConditions[0] : and(...whereConditions));
-    }
+      .leftJoin(categories, eq(products.categoryId, categories.id))
+      // Apply WHERE conditions if any
+      .where(
+        whereConditions.length === 0
+          ? undefined
+          : whereConditions.length === 1
+            ? whereConditions[0]
+            : and(...whereConditions),
+      );
 
     const productsData = await query
       .orderBy(desc(products.createdAt))
@@ -82,15 +90,20 @@ export async function GET(request: NextRequest) {
 
         return {
           ...product,
-          images: images.length > 0 ? images : [{ 
-            id: 0, 
-            imageUrl: "/placeholder.svg", 
-            altText: "Product image", 
-            isPrimary: true, 
-            displayOrder: 0 
-          }],
+          images:
+            images.length > 0
+              ? images
+              : [
+                  {
+                    id: 0,
+                    imageUrl: "/placeholder.svg",
+                    altText: "Product image",
+                    isPrimary: true,
+                    displayOrder: 0,
+                  },
+                ],
         };
-      })
+      }),
     );
 
     return NextResponse.json({
@@ -106,7 +119,7 @@ export async function GET(request: NextRequest) {
     console.error("Error fetching products:", error);
     return NextResponse.json(
       { error: "Failed to fetch products" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -116,7 +129,7 @@ export async function POST(request: NextRequest) {
   // TODO: Implement product creation with proper authentication
   return NextResponse.json(
     { error: "Product creation not yet implemented" },
-    { status: 501 }
+    { status: 501 },
   );
 }
 
@@ -125,7 +138,7 @@ export async function PUT(request: NextRequest) {
   // TODO: Implement product updates with proper authentication
   return NextResponse.json(
     { error: "Product updates not yet implemented" },
-    { status: 501 }
+    { status: 501 },
   );
 }
 
@@ -134,6 +147,6 @@ export async function DELETE(request: NextRequest) {
   // TODO: Implement product deletion with proper authentication
   return NextResponse.json(
     { error: "Product deletion not yet implemented" },
-    { status: 501 }
+    { status: 501 },
   );
 }

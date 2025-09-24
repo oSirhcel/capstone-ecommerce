@@ -29,13 +29,12 @@ async function main() {
   const db = drizzle(pool);
 
   try {
-    // Clean existing data using TRUNCATE to satisfy linter and keep FK order
     await db.execute(
       sql`TRUNCATE TABLE "product_images", "products", "stores", "categories" RESTART IDENTITY CASCADE`,
     );
 
     // Create two store owners
-    const passwordHash = bcrypt.hashSync("password123", 10);
+    const passwordHash = bcrypt.hashSync("Test123", 10);
     const ownerA: NewUser = {
       id: "default-store-id",
       username: "owner_alpha",
@@ -66,8 +65,18 @@ async function main() {
     // Categories
     const categoryData: NewCategory[] = [
       { name: "Electronics", description: "Gadgets and digital devices" },
-      { name: "Handmade", description: "Crafted with care" },
+      { name: "Clothing", description: "Fashion and apparel" },
       { name: "Home & Living", description: "Home essentials and decor" },
+      {
+        name: "Sports & Outdoors",
+        description: "Sports equipment and outdoor gear",
+      },
+      { name: "Books", description: "Books and educational materials" },
+      {
+        name: "Beauty & Personal Care",
+        description: "Beauty products and personal care items",
+      },
+      { name: "Handmade", description: "Crafted with care" },
       { name: "Accessories", description: "Wearables and add-ons" },
     ];
     const insertedCategories = await db
@@ -78,8 +87,12 @@ async function main() {
     const categoryMap = new Map(insertedCategories.map((c) => [c.name, c]));
     const categoryIds = {
       electronics: categoryMap.get("Electronics")!.id,
-      handmade: categoryMap.get("Handmade")!.id,
+      clothing: categoryMap.get("Clothing")!.id,
       homeLiving: categoryMap.get("Home & Living")!.id,
+      sports: categoryMap.get("Sports & Outdoors")!.id,
+      books: categoryMap.get("Books")!.id,
+      beauty: categoryMap.get("Beauty & Personal Care")!.id,
+      handmade: categoryMap.get("Handmade")!.id,
       accessories: categoryMap.get("Accessories")!.id,
     };
 
@@ -120,11 +133,33 @@ async function main() {
     const productsSeed: ProductSeed[] = [
       {
         product: {
-          name: "Wireless Earbuds",
+          name: "Wireless Earbuds Pro",
           sku: "WEB-001",
-          description: "Noise-cancelling Bluetooth earbuds with charging case",
+          description:
+            "Premium noise-cancelling Bluetooth earbuds with wireless charging case and 30-hour battery life. Perfect for music lovers and professionals.",
           price: cents(79.99),
+          compareAtPrice: cents(99.99),
+          costPerItem: cents(45.0),
           stock: 120,
+          trackQuantity: true,
+          allowBackorders: false,
+          weight: "0.05",
+          length: "6.5",
+          width: "2.5",
+          height: "3.0",
+          seoTitle: "Wireless Earbuds Pro - Premium Noise Cancelling",
+          seoDescription:
+            "Premium wireless earbuds with active noise cancellation, 30-hour battery life, and superior sound quality.",
+          slug: "wireless-earbuds-pro",
+          status: "active",
+          featured: true,
+          tags: JSON.stringify([
+            "wireless",
+            "bluetooth",
+            "earbuds",
+            "noise-cancelling",
+            "premium",
+          ]),
           storeId: alphaStore.id,
           categoryId: categoryIds.electronics,
         },
@@ -132,14 +167,14 @@ async function main() {
           {
             imageUrl:
               "https://cdn.shopify.com/s/files/1/0663/3229/5254/files/wireless-headphones-1.webp?v=1757144371",
-            altText: "Wireless Earbuds image 1",
+            altText: "Wireless Earbuds Pro - Front view",
             isPrimary: true,
             displayOrder: 0,
           },
           {
             imageUrl:
               "https://cdn.shopify.com/s/files/1/0663/3229/5254/files/wireless-headphones-2.webp?v=1757144374",
-            altText: "Wireless Earbuds image 2",
+            altText: "Wireless Earbuds Pro - Side view",
             displayOrder: 1,
           },
         ],
@@ -148,9 +183,25 @@ async function main() {
         product: {
           name: "Smart Home Hub",
           sku: "SHH-001",
-          description: "Control lights, thermostats, and more from one hub",
+          description:
+            "Centralized smart home control hub that connects and manages all your smart devices from lights to thermostats.",
           price: cents(129.0),
+          compareAtPrice: cents(149.0),
+          costPerItem: cents(75.0),
           stock: 45,
+          trackQuantity: true,
+          allowBackorders: true,
+          weight: "0.3",
+          length: "12.0",
+          width: "8.0",
+          height: "2.5",
+          seoTitle: "Smart Home Hub - Centralized Control System",
+          seoDescription:
+            "Control lights, thermostats, and more from one centralized smart home hub.",
+          slug: "smart-home-hub",
+          status: "active",
+          featured: false,
+          tags: JSON.stringify(["smart-home", "hub", "automation", "iot"]),
           storeId: alphaStore.id,
           categoryId: categoryIds.homeLiving,
         },
@@ -158,14 +209,14 @@ async function main() {
           {
             imageUrl:
               "https://cdn.shopify.com/s/files/1/0663/3229/5254/files/smart-home-hub-1.avif?v=1757144825",
-            altText: "Smart Home Hub image 1",
+            altText: "Smart Home Hub - Main unit",
             isPrimary: true,
             displayOrder: 0,
           },
           {
             imageUrl:
               "https://cdn.shopify.com/s/files/1/0663/3229/5254/files/smart-home-hub-2.jpg?v=1757144831",
-            altText: "Smart Home Hub image 2",
+            altText: "Smart Home Hub - Setup view",
             displayOrder: 1,
           },
         ],
@@ -174,9 +225,31 @@ async function main() {
         product: {
           name: "USB-C Fast Charger",
           sku: "UFC-001",
-          description: "65W GaN fast charger with USB-C Power Delivery",
+          description:
+            "65W GaN fast charger with USB-C Power Delivery 3.0, compatible with laptops, phones, and tablets.",
           price: cents(39.5),
+          compareAtPrice: cents(49.99),
+          costPerItem: cents(22.0),
           stock: 200,
+          trackQuantity: true,
+          allowBackorders: false,
+          weight: "0.15",
+          length: "7.0",
+          width: "4.5",
+          height: "2.0",
+          seoTitle: "USB-C Fast Charger 65W - GaN Technology",
+          seoDescription:
+            "High-speed 65W GaN charger with USB-C Power Delivery for fast charging of all devices.",
+          slug: "usb-c-fast-charger-65w",
+          status: "active",
+          featured: false,
+          tags: JSON.stringify([
+            "charger",
+            "usb-c",
+            "fast-charging",
+            "gan",
+            "65w",
+          ]),
           storeId: alphaStore.id,
           categoryId: categoryIds.accessories,
         },
@@ -184,26 +257,47 @@ async function main() {
           {
             imageUrl:
               "https://cdn.shopify.com/s/files/1/0663/3229/5254/files/fast-charger-1.jpg?v=1757144919",
-            altText: "USB-C Fast Charger image 1",
+            altText: "USB-C Fast Charger - Front view",
             isPrimary: true,
             displayOrder: 0,
           },
           {
             imageUrl:
               "https://cdn.shopify.com/s/files/1/0663/3229/5254/files/smart-charger-2.jpg?v=1757144919",
-            altText: "USB-C Fast Charger image 2",
+            altText: "USB-C Fast Charger - Side view",
             displayOrder: 1,
           },
         ],
       },
       {
         product: {
-          name: "Handwoven Basket",
+          name: "Handwoven Storage Basket",
           sku: "HWB-001",
           description:
-            "Eco-friendly storage basket handwoven from natural fibers",
+            "Eco-friendly storage basket handwoven from natural seagrass fibers. Perfect for organizing home essentials.",
           price: cents(24.99),
+          compareAtPrice: cents(34.99),
+          costPerItem: cents(12.0),
           stock: 80,
+          trackQuantity: true,
+          allowBackorders: false,
+          weight: "0.8",
+          length: "30.0",
+          width: "20.0",
+          height: "15.0",
+          seoTitle: "Handwoven Storage Basket - Natural Seagrass",
+          seoDescription:
+            "Eco-friendly storage basket handwoven from natural fibers for home organization.",
+          slug: "handwoven-storage-basket",
+          status: "active",
+          featured: true,
+          tags: JSON.stringify([
+            "handmade",
+            "basket",
+            "storage",
+            "eco-friendly",
+            "seagrass",
+          ]),
           storeId: betaStore.id,
           categoryId: categoryIds.handmade,
         },
@@ -211,25 +305,47 @@ async function main() {
           {
             imageUrl:
               "https://cdn.shopify.com/s/files/1/0663/3229/5254/files/handwoven-basket-1.avif?v=1757144999",
-            altText: "Handwoven Basket image 1",
+            altText: "Handwoven Storage Basket - Main view",
             isPrimary: true,
             displayOrder: 0,
           },
           {
             imageUrl:
               "https://cdn.shopify.com/s/files/1/0663/3229/5254/files/handwoven-basket-2.avif?v=1757144998",
-            altText: "Handwoven Basket image 2",
+            altText: "Handwoven Storage Basket - Detail view",
             displayOrder: 1,
           },
         ],
       },
       {
         product: {
-          name: "Ceramic Vase",
+          name: "Minimalist Ceramic Vase",
           sku: "CV-001",
-          description: "Minimalist ceramic vase for modern interiors",
+          description:
+            "Hand-thrown ceramic vase with a minimalist design, perfect for modern interiors and flower arrangements.",
           price: cents(34.99),
+          compareAtPrice: cents(45.0),
+          costPerItem: cents(18.0),
           stock: 60,
+          trackQuantity: true,
+          allowBackorders: false,
+          weight: "1.2",
+          length: "15.0",
+          width: "15.0",
+          height: "25.0",
+          seoTitle: "Minimalist Ceramic Vase - Hand-thrown Pottery",
+          seoDescription:
+            "Hand-thrown ceramic vase with minimalist design for modern home decor.",
+          slug: "minimalist-ceramic-vase",
+          status: "active",
+          featured: false,
+          tags: JSON.stringify([
+            "ceramic",
+            "vase",
+            "minimalist",
+            "handmade",
+            "decor",
+          ]),
           storeId: betaStore.id,
           categoryId: categoryIds.homeLiving,
         },
@@ -237,25 +353,47 @@ async function main() {
           {
             imageUrl:
               "https://cdn.shopify.com/s/files/1/0663/3229/5254/files/ceramic-vase-1.avif?v=1757145065",
-            altText: "Ceramic Vase image 1",
+            altText: "Minimalist Ceramic Vase - Front view",
             isPrimary: true,
             displayOrder: 0,
           },
           {
             imageUrl:
               "https://cdn.shopify.com/s/files/1/0663/3229/5254/files/ceramic-vase-2.avif?v=1757145065",
-            altText: "Ceramic Vase image 2",
+            altText: "Minimalist Ceramic Vase - Side view",
             displayOrder: 1,
           },
         ],
       },
       {
         product: {
-          name: "Leather Keychain",
+          name: "Handcrafted Leather Keychain",
           sku: "LK-001",
-          description: "Handcrafted leather keychain with brass ring",
+          description:
+            "Handcrafted leather keychain with brass hardware. Made from premium vegetable-tanned leather.",
           price: cents(14.99),
+          compareAtPrice: cents(19.99),
+          costPerItem: cents(6.0),
           stock: 150,
+          trackQuantity: true,
+          allowBackorders: false,
+          weight: "0.02",
+          length: "8.0",
+          width: "2.0",
+          height: "0.5",
+          seoTitle: "Handcrafted Leather Keychain - Premium Quality",
+          seoDescription:
+            "Handcrafted leather keychain with brass ring made from premium vegetable-tanned leather.",
+          slug: "handcrafted-leather-keychain",
+          status: "active",
+          featured: false,
+          tags: JSON.stringify([
+            "leather",
+            "keychain",
+            "handmade",
+            "brass",
+            "accessories",
+          ]),
           storeId: betaStore.id,
           categoryId: categoryIds.accessories,
         },
@@ -263,25 +401,47 @@ async function main() {
           {
             imageUrl:
               "https://cdn.shopify.com/s/files/1/0663/3229/5254/files/leather-keyring-1.webp?v=1757145189",
-            altText: "Leather Keychain image 1",
+            altText: "Handcrafted Leather Keychain - Main view",
             isPrimary: true,
             displayOrder: 0,
           },
           {
             imageUrl:
               "https://cdn.shopify.com/s/files/1/0663/3229/5254/files/leather-keyring-2.webp?v=1757145190",
-            altText: "Leather Keychain image 2",
+            altText: "Handcrafted Leather Keychain - Detail view",
             displayOrder: 1,
           },
         ],
       },
       {
         product: {
-          name: "Bluetooth Speaker",
+          name: "Portable Bluetooth Speaker",
           sku: "BS-001",
-          description: "Portable speaker with deep bass and 12-hour battery",
+          description:
+            "Waterproof portable speaker with deep bass, 12-hour battery life, and wireless connectivity.",
           price: cents(59.99),
+          compareAtPrice: cents(79.99),
+          costPerItem: cents(35.0),
           stock: 95,
+          trackQuantity: true,
+          allowBackorders: false,
+          weight: "0.6",
+          length: "18.0",
+          width: "7.0",
+          height: "7.0",
+          seoTitle: "Portable Bluetooth Speaker - Waterproof & Bass",
+          seoDescription:
+            "Portable speaker with deep bass, 12-hour battery life, and waterproof design.",
+          slug: "portable-bluetooth-speaker",
+          status: "active",
+          featured: true,
+          tags: JSON.stringify([
+            "speaker",
+            "bluetooth",
+            "portable",
+            "waterproof",
+            "bass",
+          ]),
           storeId: alphaStore.id,
           categoryId: categoryIds.electronics,
         },
@@ -289,15 +449,138 @@ async function main() {
           {
             imageUrl:
               "https://cdn.shopify.com/s/files/1/0663/3229/5254/files/bluetooth-speaker-1.webp?v=1757145189",
-            altText: "Bluetooth Speaker image 1",
+            altText: "Portable Bluetooth Speaker - Front view",
             isPrimary: true,
             displayOrder: 0,
           },
           {
             imageUrl:
               "https://cdn.shopify.com/s/files/1/0663/3229/5254/files/bluetooth-speaker-2.webp?v=1757145189",
-            altText: "Bluetooth Speaker image 2",
+            altText: "Portable Bluetooth Speaker - Side view",
             displayOrder: 1,
+          },
+        ],
+      },
+      {
+        product: {
+          name: "Organic Cotton T-Shirt",
+          sku: "OCT-001",
+          description:
+            "Soft organic cotton t-shirt made from sustainably sourced materials. Available in multiple colors.",
+          price: cents(24.99),
+          compareAtPrice: cents(32.99),
+          costPerItem: cents(12.0),
+          stock: 12,
+          trackQuantity: true,
+          allowBackorders: true,
+          weight: "0.2",
+          length: "70.0",
+          width: "50.0",
+          height: "1.0",
+          seoTitle: "Organic Cotton T-Shirt - Sustainable Fashion",
+          seoDescription:
+            "Soft organic cotton t-shirt made from sustainably sourced materials.",
+          slug: "organic-cotton-t-shirt",
+          status: "active",
+          featured: false,
+          tags: JSON.stringify([
+            "cotton",
+            "organic",
+            "t-shirt",
+            "sustainable",
+            "clothing",
+          ]),
+          storeId: betaStore.id,
+          categoryId: categoryIds.clothing,
+        },
+        images: [
+          {
+            imageUrl: "/placeholder.svg",
+            altText: "Organic Cotton T-Shirt - Front view",
+            isPrimary: true,
+            displayOrder: 0,
+          },
+        ],
+      },
+      {
+        product: {
+          name: "Yoga Mat Premium",
+          sku: "YM-001",
+          description:
+            "Non-slip premium yoga mat with extra cushioning and carrying strap. Perfect for all yoga practices.",
+          price: cents(49.99),
+          compareAtPrice: cents(69.99),
+          costPerItem: cents(25.0),
+          stock: 0,
+          trackQuantity: true,
+          allowBackorders: true,
+          weight: "1.5",
+          length: "180.0",
+          width: "60.0",
+          height: "0.5",
+          seoTitle: "Premium Yoga Mat - Non-slip & Cushioned",
+          seoDescription:
+            "Non-slip premium yoga mat with extra cushioning and carrying strap.",
+          slug: "yoga-mat-premium",
+          status: "draft",
+          featured: false,
+          tags: JSON.stringify([
+            "yoga",
+            "mat",
+            "fitness",
+            "non-slip",
+            "premium",
+          ]),
+          storeId: alphaStore.id,
+          categoryId: categoryIds.sports,
+        },
+        images: [
+          {
+            imageUrl: "/placeholder.svg",
+            altText: "Yoga Mat Premium - Main view",
+            isPrimary: true,
+            displayOrder: 0,
+          },
+        ],
+      },
+      {
+        product: {
+          name: "Programming Fundamentals Book",
+          sku: "PFB-001",
+          description:
+            "Comprehensive guide to programming fundamentals covering multiple languages and best practices.",
+          price: cents(29.99),
+          compareAtPrice: cents(39.99),
+          costPerItem: cents(15.0),
+          stock: 5,
+          trackQuantity: true,
+          allowBackorders: false,
+          weight: "0.8",
+          length: "23.0",
+          width: "15.0",
+          height: "2.5",
+          seoTitle: "Programming Fundamentals Book - Complete Guide",
+          seoDescription:
+            "Comprehensive guide to programming fundamentals covering multiple languages.",
+          slug: "programming-fundamentals-book",
+          status: "active",
+          featured: false,
+          tags: JSON.stringify([
+            "book",
+            "programming",
+            "education",
+            "coding",
+            "fundamentals",
+          ]),
+          storeId: alphaStore.id,
+          categoryId: categoryIds.books,
+        },
+        images: [
+          {
+            imageUrl: "/placeholder.svg",
+            altText: "Programming Fundamentals Book - Cover",
+            isPrimary: true,
+            displayOrder: 0,
           },
         ],
       },

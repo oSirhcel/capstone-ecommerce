@@ -7,7 +7,7 @@ import {
   categories,
   productImages,
 } from "@/server/db/schema";
-import { eq, desc, asc } from "drizzle-orm";
+import { eq, desc, asc, and, like } from "drizzle-orm";
 
 // GET /api/products - Get all products with optional filtering
 export async function GET(request: NextRequest) {
@@ -15,35 +15,35 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get("page") ?? "1");
     const limit = parseInt(searchParams.get("limit") ?? "20");
-    // const category = searchParams.get("category");
-    // const store = searchParams.get("store");
-    // const search = searchParams.get("search");
+    const category = searchParams.get("category");
+    const store = searchParams.get("store");
+    const search = searchParams.get("search");
 
     const offset = (page - 1) * limit;
 
+    // Build WHERE conditions
+    const whereConditions = [];
+
+    if (category) {
+      whereConditions.push(eq(products.categoryId, parseInt(category)));
+    }
+
+    if (store) {
+      whereConditions.push(eq(products.storeId, store));
+    }
+
+    if (search) {
+      whereConditions.push(like(products.name, `%${search}%`));
+    }
+
     // Build the main query
-    const productsData = await db
+    const query = db
       .select({
         id: products.id,
         name: products.name,
-        sku: products.sku,
         description: products.description,
         price: products.price,
-        compareAtPrice: products.compareAtPrice,
-        costPerItem: products.costPerItem,
         stock: products.stock,
-        trackQuantity: products.trackQuantity,
-        allowBackorders: products.allowBackorders,
-        weight: products.weight,
-        length: products.length,
-        width: products.width,
-        height: products.height,
-        seoTitle: products.seoTitle,
-        seoDescription: products.seoDescription,
-        slug: products.slug,
-        status: products.status,
-        featured: products.featured,
-        tags: products.tags,
         storeId: products.storeId,
         categoryId: products.categoryId,
         createdAt: products.createdAt,
@@ -60,6 +60,15 @@ export async function GET(request: NextRequest) {
       .from(products)
       .leftJoin(stores, eq(products.storeId, stores.id))
       .leftJoin(categories, eq(products.categoryId, categories.id))
+      .where(
+        whereConditions.length === 0
+          ? undefined
+          : whereConditions.length === 1
+            ? whereConditions[0]
+            : and(...whereConditions),
+      );
+
+    const productsData = await query
       .orderBy(desc(products.createdAt))
       .limit(limit)
       .offset(offset);

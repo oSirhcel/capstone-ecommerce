@@ -162,8 +162,10 @@ export function ProductForm({
     console.log(productData);
 
     createProductMutation.mutate(productData, {
-      onSuccess: () => {
-        router.push(`/admin/products/${productData.slug}`);
+      onSuccess: (res) => {
+        if (res.data) {
+          router.push(`/admin/products/${res.data.product.id}`);
+        }
       },
     });
   };

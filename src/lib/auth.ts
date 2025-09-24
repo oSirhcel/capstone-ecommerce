@@ -2,7 +2,7 @@ import type { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { db } from "@/server/db";
-import { users } from "@/server/db/schema";
+import { users, stores } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import bcrypt from "bcryptjs";
@@ -58,6 +58,19 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, trigger, user, session }) {
       if (user) {
         token.sub = user.id;
+
+        // Check if user has an existing store on first login
+        if (!token.storeId) {
+          const existingStore = await db
+            .select()
+            .from(stores)
+            .where(eq(stores.ownerId, user.id))
+            .limit(1);
+
+          if (existingStore.length > 0) {
+            token.storeId = existingStore[0].id;
+          }
+        }
       }
       // When the client calls session.update({ store: { id } }), persist to JWT
       if (trigger === "update") {

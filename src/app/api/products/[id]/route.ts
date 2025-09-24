@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
 import {
   products,
@@ -21,9 +21,24 @@ export async function GET(
       .select({
         id: products.id,
         name: products.name,
+        sku: products.sku,
         description: products.description,
         price: products.price,
+        compareAtPrice: products.compareAtPrice,
+        costPerItem: products.costPerItem,
         stock: products.stock,
+        trackQuantity: products.trackQuantity,
+        allowBackorders: products.allowBackorders,
+        weight: products.weight,
+        length: products.length,
+        width: products.width,
+        height: products.height,
+        seoTitle: products.seoTitle,
+        seoDescription: products.seoDescription,
+        slug: products.slug,
+        status: products.status,
+        featured: products.featured,
+        tags: products.tags,
         storeId: products.storeId,
         categoryId: products.categoryId,
         createdAt: products.createdAt,
@@ -89,8 +104,8 @@ export async function GET(
 
 // PUT /api/products/[id] - Update a product (placeholder for future implementation)
 export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
+  _request: NextRequest,
+  { params: _params }: { params: Promise<{ id: string }> },
 ) {
   // TODO: Implement product updates with proper authentication
   return NextResponse.json(
@@ -101,8 +116,8 @@ export async function PUT(
 
 // DELETE /api/products/[id] - Delete a product (placeholder for future implementation)
 export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
+  _request: NextRequest,
+  { params: _params }: { params: Promise<{ id: string }> },
 ) {
   // TODO: Implement product deletion with proper authentication
   return NextResponse.json(

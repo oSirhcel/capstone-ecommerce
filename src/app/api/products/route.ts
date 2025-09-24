@@ -1,5 +1,4 @@
-import type { NextRequest } from "next/server";
-import { NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
 import {
   products,
@@ -60,6 +59,7 @@ export async function GET(request: NextRequest) {
       .from(products)
       .leftJoin(stores, eq(products.storeId, stores.id))
       .leftJoin(categories, eq(products.categoryId, categories.id))
+      // Apply WHERE conditions if any
       .where(
         whereConditions.length === 0
           ? undefined
@@ -126,185 +126,11 @@ export async function GET(request: NextRequest) {
 
 // POST /api/products - Create a new product
 export async function POST(request: NextRequest) {
-  try {
-    const body = (await request.json()) as {
-      name: string;
-      sku: string;
-      description: string;
-      price: number;
-      storeId: string;
-      categoryId?: number;
-      compareAtPrice?: number;
-      costPerItem?: number;
-      stock?: number;
-      trackQuantity?: boolean;
-      allowBackorders?: boolean;
-      weight?: number;
-      dimensions?: {
-        length?: number;
-        width?: number;
-        height?: number;
-      };
-      seoTitle?: string;
-      seoDescription?: string;
-      slug?: string;
-      status?: string;
-      featured?: boolean;
-      tags?: string;
-      images?: string[];
-    };
-
-    // Validate required fields
-    const {
-      name,
-      sku,
-      description,
-      price,
-      storeId,
-      categoryId,
-      compareAtPrice,
-      costPerItem,
-      stock = 0,
-      trackQuantity = true,
-      allowBackorders = false,
-      weight,
-      dimensions,
-      seoTitle,
-      seoDescription,
-      slug,
-      status = "draft",
-      featured = false,
-      tags,
-      images = [],
-    } = body;
-
-    if (!name || !sku || !description || !price || !storeId) {
-      return NextResponse.json(
-        {
-          error:
-            "Missing required fields: name, sku, description, price, storeId",
-        },
-        { status: 400 },
-      );
-    }
-
-    // Convert price to cents
-    const priceInCents = Math.round(price * 100);
-    const compareAtPriceInCents = compareAtPrice
-      ? Math.round(compareAtPrice * 100)
-      : null;
-    const costPerItemInCents = costPerItem
-      ? Math.round(costPerItem * 100)
-      : null;
-
-    // Convert weight to decimal
-    const weightDecimal = weight ? weight.toString() : null;
-    const lengthDecimal = dimensions?.length
-      ? dimensions.length.toString()
-      : null;
-    const widthDecimal = dimensions?.width ? dimensions.width.toString() : null;
-    const heightDecimal = dimensions?.height
-      ? dimensions.height.toString()
-      : null;
-
-    // Convert tags array to JSON string
-    const tagsJson = tags
-      ? JSON.stringify(tags.split(",").map((tag: string) => tag.trim()))
-      : null;
-
-    // Create the product
-    const [newProduct] = await db
-      .insert(products)
-      .values({
-        name,
-        sku,
-        description,
-        price: priceInCents,
-        compareAtPrice: compareAtPriceInCents,
-        costPerItem: costPerItemInCents,
-        stock,
-        trackQuantity,
-        allowBackorders,
-        weight: weightDecimal,
-        length: lengthDecimal,
-        width: widthDecimal,
-        height: heightDecimal,
-        seoTitle,
-        seoDescription,
-        slug,
-        status,
-        featured,
-        tags: tagsJson,
-        storeId,
-        categoryId: categoryId ? parseInt(categoryId.toString()) : null,
-      })
-      .returning();
-
-    // Add product images if provided
-    if (images && images.length > 0) {
-      const imageInserts = images.map((imageUrl: string, index: number) => ({
-        productId: newProduct.id,
-        imageUrl,
-        altText: `${name} image ${index + 1}`,
-        isPrimary: index === 0,
-        displayOrder: index,
-      }));
-
-      await db.insert(productImages).values(imageInserts);
-    }
-
-    // Fetch the complete product with images
-    const productImagesData = await db
-      .select({
-        id: productImages.id,
-        imageUrl: productImages.imageUrl,
-        altText: productImages.altText,
-        isPrimary: productImages.isPrimary,
-        displayOrder: productImages.displayOrder,
-      })
-      .from(productImages)
-      .where(eq(productImages.productId, newProduct.id))
-      .orderBy(asc(productImages.displayOrder));
-
-    const completeProduct = {
-      ...newProduct,
-      images:
-        productImagesData.length > 0
-          ? productImagesData
-          : [
-              {
-                id: 0,
-                imageUrl: "/placeholder.svg",
-                altText: "Product image",
-                isPrimary: true,
-                displayOrder: 0,
-              },
-            ],
-    };
-
-    return NextResponse.json(
-      {
-        product: completeProduct,
-        message: "Product created successfully",
-      },
-      { status: 201 },
-    );
-  } catch (error) {
-    console.error("Error creating product:", error);
-
-    // Handle unique constraint violations
-    if (error instanceof Error && error.message.includes("unique")) {
-      return NextResponse.json(
-        { error: "A product with this SKU already exists" },
-        { status: 409 },
-      );
-    }
-
-    return NextResponse.json(
-      { error: "Failed to create product" },
-      { status: 500 },
-    );
-  }
+  // TODO: Implement product creation with proper authentication
+  return NextResponse.json(
+    { error: "Product creation not yet implemented" },
+    { status: 501 },
+  );
 }
 
 // PUT /api/products - Update products (placeholder for future implementation)

@@ -2,7 +2,20 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   images: {
-    domains: ["assets.myntassets.com", "cdn.shopify.com", "3lyyn5rnxe.ufs.sh"],
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "assets.myntassets.com",
+      },
+      {
+        protocol: "https",
+        hostname: "cdn.shopify.com",
+      },
+      {
+        protocol: "https",
+        hostname: "3lyyn5rnxe.ufs.sh",
+      },
+    ],
   },
 };
 

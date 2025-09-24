@@ -7,51 +7,14 @@ import {
   boolean,
   text,
   decimal,
-  pgEnum,
 } from "drizzle-orm/pg-core";
-
-// User type enum to define different user roles
-export const userTypeEnum = pgEnum("user_type", ["customer", "owner", "admin"]);
 
 export const users = pgTable("users", {
   id: varchar("id", { length: 255 }).primaryKey().notNull(),
   username: varchar({ length: 255 }).notNull(),
   password: varchar({ length: 255 }).notNull(),
-  userType: userTypeEnum().notNull().default("customer"), // Default to customer
   createdAt: timestamp().defaultNow().notNull(),
   updatedAt: timestamp().defaultNow().notNull(),
-});
-
-// NextAuth required tables - minimal additions
-export const accounts = pgTable("accounts", {
-  id: varchar("id", { length: 255 }).primaryKey().notNull(),
-  userId: varchar("userId", { length: 255 })
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  type: varchar("type", { length: 255 }).notNull(),
-  provider: varchar("provider", { length: 255 }).notNull(),
-  providerAccountId: varchar("providerAccountId", { length: 255 }).notNull(),
-  refresh_token: text("refresh_token"),
-  access_token: text("access_token"),
-  expires_at: integer("expires_at"),
-  token_type: varchar("token_type", { length: 255 }),
-  scope: varchar("scope", { length: 255 }),
-  id_token: text("id_token"),
-  session_state: varchar("session_state", { length: 255 }),
-});
-
-export const sessions = pgTable("sessions", {
-  sessionToken: varchar("sessionToken", { length: 255 }).primaryKey().notNull(),
-  userId: varchar("userId", { length: 255 })
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  expires: timestamp("expires", { mode: "date" }).notNull(),
-});
-
-export const verificationTokens = pgTable("verification_tokens", {
-  identifier: varchar("identifier", { length: 255 }).notNull(),
-  token: varchar("token", { length: 255 }).notNull().unique(),
-  expires: timestamp("expires", { mode: "date" }).notNull(),
 });
 
 export const categories = pgTable("categories", {
@@ -62,7 +25,7 @@ export const categories = pgTable("categories", {
 
 export const stores = pgTable("stores", {
   id: varchar("id", { length: 255 }).primaryKey().notNull(),
-  name: varchar({ length: 255 }).notNull(),
+  name: varchar({ length: 255 }).unique().notNull(),
   description: varchar({ length: 1000 }),
   ownerId: varchar("ownerId", { length: 255 })
     .references(() => users.id)
@@ -134,9 +97,11 @@ export const orderItems = pgTable("order_items", {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),
   orderId: integer()
     .references(() => orders.id)
+
     .notNull(),
   productId: integer()
     .references(() => products.id)
+
     .notNull(),
   quantity: integer().notNull(),
   priceAtTime: integer().notNull(), // Price in cents at time of purchase

@@ -46,7 +46,6 @@ export const authOptions: NextAuthOptions = {
           name: user.username,
           // Provide an email-shaped value so existing callbacks that derive username from email continue to work
           email: `${user.username}@local`,
-          userType: user.userType,
         };
       },
     }),
@@ -56,15 +55,20 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
-      // On sign in, persist id and userType onto the token
+    async jwt({ token, trigger, user, session }) {
       if (user) {
         token.sub = user.id;
-        if (user.userType) token.userType = user.userType;
+      }
+      // When the client calls session.update({ store: { id } }), persist to JWT
+      if (trigger === "update") {
+        const updated = session as { store?: { id?: string } } | undefined;
+        if (updated?.store?.id) {
+          token.storeId = updated.store.id;
+        }
       }
       return token;
     },
-    async signIn({ user, account, profile }) {
+    async signIn({ user: _user, account, profile }) {
       // If user signs in with Google and doesn't exist in our users table, create them
       if (account?.provider === "google" && profile?.email) {
         const username = profile.email.split("@")[0];
@@ -79,29 +83,18 @@ export const authOptions: NextAuthOptions = {
             id: randomUUID(),
             username,
             password: "", // OAuth users don't need password
-            userType: "customer",
           });
         }
       }
       return true;
     },
     async session({ session, token }) {
-      // Prefer values from token to avoid extra DB hit on every request
+      // Prefer values from token to avoid extra DB hits
       if (session.user) {
         session.user.id = token.sub!;
-        session.user.userType = token.userType;
       }
-      // Fallback: if userType missing but we have an email, try to fetch once
-      if (session.user?.email && !session.user.userType) {
-        const username = session.user.email.split("@")[0];
-        const [user] = await db
-          .select()
-          .from(users)
-          .where(eq(users.username, username));
-        if (user) {
-          session.user.id = user.id;
-          session.user.userType = user.userType;
-        }
+      if (token.storeId) {
+        session.store = { id: token.storeId };
       }
       return session;
     },

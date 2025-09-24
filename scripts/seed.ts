@@ -40,13 +40,11 @@ async function main() {
       id: "default-store-id",
       username: "owner_alpha",
       password: passwordHash,
-      userType: "owner",
     };
     const ownerB: NewUser = {
       id: uuidv4(),
       username: "owner_beta",
       password: passwordHash,
-      userType: "owner",
     };
 
     // Upsert-like: insert if not exists by id

@@ -126,11 +126,211 @@ export async function GET(request: NextRequest) {
 
 // POST /api/products - Create a new product
 export async function POST(request: NextRequest) {
-  // TODO: Implement product creation with proper authentication
-  return NextResponse.json(
-    { error: "Product creation not yet implemented" },
-    { status: 501 },
-  );
+  try {
+    const body = (await request.json()) as {
+      name: string;
+      sku: string;
+      description: string;
+      price: number;
+      compareAtPrice?: number;
+      costPerItem?: number;
+      stock?: number;
+      trackQuantity?: boolean;
+      allowBackorders?: boolean;
+      weight?: number;
+      dimensions?: {
+        length?: number;
+        width?: number;
+        height?: number;
+      };
+      seoTitle?: string;
+      seoDescription?: string;
+      slug?: string;
+      status?: "active" | "draft" | "archived";
+      featured?: boolean;
+      tags?: string;
+      storeId: string;
+      categoryId?: number;
+      images?: string[];
+    };
+
+    const {
+      name,
+      sku,
+      description,
+      price,
+      compareAtPrice,
+      costPerItem,
+      stock = 0,
+      trackQuantity = true,
+      allowBackorders = false,
+      weight,
+      dimensions,
+      seoTitle,
+      seoDescription,
+      slug,
+      status = "draft",
+      featured = false,
+      tags,
+      storeId,
+      categoryId,
+      images = [],
+    } = body;
+
+    // Validate required fields
+    if (!name || !sku || !description || !price || !storeId) {
+      return NextResponse.json(
+        {
+          error:
+            "Missing required fields: name, sku, description, price, storeId",
+        },
+        { status: 400 },
+      );
+    }
+
+    // Convert price to cents (assuming price is in dollars)
+    const priceInCents = Math.round(price * 100);
+    const compareAtPriceInCents = compareAtPrice
+      ? Math.round(compareAtPrice * 100)
+      : null;
+    const costPerItemInCents = costPerItem
+      ? Math.round(costPerItem * 100)
+      : null;
+
+    // Convert weight to string for decimal storage
+    const weightString = weight ? weight.toString() : null;
+
+    // Convert dimensions to strings for decimal storage
+    const lengthString = dimensions?.length
+      ? dimensions.length.toString()
+      : null;
+    const widthString = dimensions?.width ? dimensions.width.toString() : null;
+    const heightString = dimensions?.height
+      ? dimensions.height.toString()
+      : null;
+
+    // Create the product
+    const [newProduct] = await db
+      .insert(products)
+      .values({
+        name,
+        sku,
+        description,
+        price: priceInCents,
+        compareAtPrice: compareAtPriceInCents,
+        costPerItem: costPerItemInCents,
+        stock,
+        trackQuantity,
+        allowBackorders,
+        weight: weightString,
+        length: lengthString,
+        width: widthString,
+        height: heightString,
+        seoTitle,
+        seoDescription,
+        slug,
+        status,
+        featured,
+        tags: tags
+          ? JSON.stringify(tags.split(",").map((tag: string) => tag.trim()))
+          : null,
+        storeId,
+        categoryId: categoryId ?? null,
+      })
+      .returning();
+
+    // Insert product images if provided
+    if (images && images.length > 0) {
+      const imageRecords = images.map((imageUrl: string, index: number) => ({
+        productId: newProduct.id,
+        imageUrl,
+        altText: `${name} - Image ${index + 1}`,
+        isPrimary: index === 0, // First image is primary
+        displayOrder: index,
+      }));
+
+      await db.insert(productImages).values(imageRecords);
+    }
+
+    // Fetch the complete product with images
+    const productWithImages = await db
+      .select({
+        id: products.id,
+        name: products.name,
+        sku: products.sku,
+        description: products.description,
+        price: products.price,
+        compareAtPrice: products.compareAtPrice,
+        costPerItem: products.costPerItem,
+        stock: products.stock,
+        trackQuantity: products.trackQuantity,
+        allowBackorders: products.allowBackorders,
+        weight: products.weight,
+        length: products.length,
+        width: products.width,
+        height: products.height,
+        seoTitle: products.seoTitle,
+        seoDescription: products.seoDescription,
+        slug: products.slug,
+        status: products.status,
+        featured: products.featured,
+        tags: products.tags,
+        storeId: products.storeId,
+        categoryId: products.categoryId,
+        createdAt: products.createdAt,
+        updatedAt: products.updatedAt,
+        store: {
+          id: stores.id,
+          name: stores.name,
+        },
+        category: {
+          id: categories.id,
+          name: categories.name,
+        },
+      })
+      .from(products)
+      .leftJoin(stores, eq(products.storeId, stores.id))
+      .leftJoin(categories, eq(products.categoryId, categories.id))
+      .where(eq(products.id, newProduct.id))
+      .limit(1);
+
+    // Get product images
+    const productImagesData = await db
+      .select({
+        id: productImages.id,
+        imageUrl: productImages.imageUrl,
+        altText: productImages.altText,
+        isPrimary: productImages.isPrimary,
+        displayOrder: productImages.displayOrder,
+      })
+      .from(productImages)
+      .where(eq(productImages.productId, newProduct.id))
+      .orderBy(asc(productImages.displayOrder));
+
+    const completeProduct = {
+      ...productWithImages[0],
+      images:
+        productImagesData.length > 0
+          ? productImagesData
+          : [
+              {
+                id: 0,
+                imageUrl: "/placeholder.svg",
+                altText: "Product image",
+                isPrimary: true,
+                displayOrder: 0,
+              },
+            ],
+    };
+
+    return NextResponse.json({ product: completeProduct });
+  } catch (error) {
+    console.error("Error creating product:", error);
+    return NextResponse.json(
+      { error: "Failed to create product" },
+      { status: 500 },
+    );
+  }
 }
 
 // PUT /api/products - Update products (placeholder for future implementation)

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -15,7 +15,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import {
   Select,
@@ -38,6 +37,7 @@ import Image from "next/image";
 import { useCreateProduct } from "@/hooks/use-product-mutations";
 import { useRouter } from "next/navigation";
 import { UploadButton } from "@/lib/uploadthing";
+import { useSession } from "next-auth/react";
 
 const productFormSchema = z.object({
   name: z
@@ -85,6 +85,7 @@ const productFormSchema = z.object({
   slug: z.string().optional(),
   status: z.enum(["active", "draft", "archived"]).default("draft"),
   featured: z.boolean().default(false),
+  images: z.array(z.string().url("Invalid image URL")).optional(),
 });
 
 type ProductFormValues = z.input<typeof productFormSchema>;
@@ -98,6 +99,8 @@ export function ProductForm({
   initialData,
   isEditing = false,
 }: ProductFormProps) {
+  const session = useSession();
+  const storeId = session?.data?.store?.id ?? "";
   const [images, setImages] = useState<string[]>([]);
   const router = useRouter();
   const createProductMutation = useCreateProduct();
@@ -127,14 +130,12 @@ export function ProductForm({
       slug: "",
       status: "draft",
       featured: false,
+      images: [],
       ...initialData,
     },
   });
 
   const onSubmit = async (data: ProductFormValues) => {
-    //hardcoded storeId for now, will be change to use context later
-    const storeId = "default-store-id";
-
     const productData = {
       name: data.name,
       sku: data.sku,
@@ -149,25 +150,32 @@ export function ProductForm({
       dimensions: data.dimensions,
       seoTitle: data.seoTitle,
       seoDescription: data.seoDescription,
-      slug: data.slug,
+      slug: data.name.toLowerCase().replace(/ /g, "-"),
       status: data.status,
       featured: data.featured,
       tags: data.tags,
       storeId,
       categoryId: data.category ? parseInt(data.category) : undefined,
-      images,
+      images: data.images ?? images,
     };
+
+    console.log(productData);
 
     createProductMutation.mutate(productData, {
       onSuccess: () => {
-        // Redirect to products list on success
-        router.push("/admin/products");
+        router.push(`/admin/products/${productData.slug}`);
       },
     });
   };
 
+  // Sync images state with form
+  useEffect(() => {
+    form.setValue("images", images);
+  }, [images, form]);
+
   const removeImage = (index: number) => {
-    setImages(images.filter((_, i) => i !== index));
+    const newImages = images.filter((_, i) => i !== index);
+    setImages(newImages);
   };
 
   return (
@@ -312,7 +320,6 @@ export function ProductForm({
                             ...prev,
                             ...res.map((r) => r.ufsUrl),
                           ]);
-                          console.log(images);
                         }}
                       />
                     </div>
@@ -378,9 +385,12 @@ export function ProductForm({
                             onClientUploadComplete={(res) => {
                               setImages((prev) => [
                                 ...prev,
-                                ...res.map((r) => r.ufsUrl),
+                                ...res.map((r) => r.url),
                               ]);
-                              console.log(images);
+                              console.log(
+                                "Uploaded images:",
+                                res.map((r) => r.url),
+                              );
                             }}
                           />
                         </div>

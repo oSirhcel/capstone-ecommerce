@@ -3,11 +3,27 @@
 import { useState, useEffect } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { StoreCard, StoreCardSkeleton } from "@/components/store-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { SearchIcon, FilterIcon, Store } from "lucide-react";
+import {
+  SearchIcon,
+  FilterIcon,
+  Store,
+  Calendar,
+  Package,
+  Star,
+} from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const STORES_PER_PAGE = 20;
 
@@ -49,7 +65,7 @@ async function fetchStores(params?: {
     throw new Error(`Failed to fetch stores: ${response.statusText}`);
   }
 
-  return response.json();
+  return response.json() as Promise<StoresResponse>;
 }
 
 export default function StoresPage() {
@@ -58,9 +74,9 @@ export default function StoresPage() {
   const pathname = usePathname();
 
   const [searchTerm, setSearchTerm] = useState(
-    searchParams.get("search") || "",
+    searchParams.get("search") ?? "",
   );
-  const currentPage = parseInt(searchParams.get("page") || "1");
+  const currentPage = parseInt(searchParams.get("page") ?? "1");
 
   const { data, isLoading, error } = useQuery({
     queryKey: [
@@ -75,12 +91,12 @@ export default function StoresPage() {
       fetchStores({
         page: currentPage,
         limit: STORES_PER_PAGE,
-        search: searchParams.get("search") || undefined,
+        search: searchParams.get("search") ?? undefined,
       }),
   });
 
-  const stores = data?.stores || [];
-  const pagination = data?.pagination || {
+  const stores = data?.stores ?? [];
+  const pagination = data?.pagination ?? {
     page: 1,
     limit: STORES_PER_PAGE,
     total: 0,
@@ -114,7 +130,7 @@ export default function StoresPage() {
   };
 
   useEffect(() => {
-    setSearchTerm(searchParams.get("search") || "");
+    setSearchTerm(searchParams.get("search") ?? "");
   }, [searchParams]);
 
   return (
@@ -162,14 +178,54 @@ export default function StoresPage() {
           </div>
         </div>
 
-        {/* Stores Grid */}
+        {/* Stores Table */}
         <div className="space-y-6">
           {isLoading && (
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-              {Array.from({ length: STORES_PER_PAGE }).map((_, idx) => (
-                <StoreCardSkeleton key={`store-skeleton-${idx}`} />
-              ))}
-            </div>
+            <Card>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Store</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead className="text-center">Products</TableHead>
+                      <TableHead className="text-center">Rating</TableHead>
+                      <TableHead className="text-center">Joined</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {Array.from({ length: 10 }).map((_, idx) => (
+                      <TableRow key={`store-skeleton-${idx}`}>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <Skeleton className="h-12 w-12 rounded" />
+                            <div className="space-y-2">
+                              <Skeleton className="h-4 w-32" />
+                              <Skeleton className="h-3 w-24" />
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-1">
+                            <Skeleton className="h-4 w-full max-w-xs" />
+                            <Skeleton className="h-3 w-3/4" />
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Skeleton className="mx-auto h-4 w-8" />
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Skeleton className="mx-auto h-4 w-12" />
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Skeleton className="mx-auto h-4 w-16" />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
           )}
 
           {error && !isLoading && (
@@ -215,19 +271,86 @@ export default function StoresPage() {
 
           {!isLoading && !error && stores.length > 0 && (
             <>
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-                {stores.map((store) => (
-                  <StoreCard
-                    key={store.id}
-                    id={store.id}
-                    name={store.name}
-                    description={store.description}
-                    productCount={store.productCount}
-                    createdAt={store.createdAt}
-                    ownerId={store.ownerId}
-                  />
-                ))}
-              </div>
+              <Card>
+                <CardContent className="p-0">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Store</TableHead>
+                        <TableHead>Description</TableHead>
+                        <TableHead className="text-center">Products</TableHead>
+                        <TableHead className="text-center">Rating</TableHead>
+                        <TableHead className="text-center">Joined</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {stores.map((store) => {
+                        const joinedDate = new Date(
+                          store.createdAt,
+                        ).toLocaleDateString(undefined, {
+                          year: "numeric",
+                          month: "short",
+                        });
+
+                        return (
+                          <TableRow
+                            key={store.id}
+                            className="hover:bg-muted/50 cursor-pointer transition-colors"
+                            onClick={() => router.push(`/stores/${store.id}`)}
+                          >
+                            <TableCell>
+                              <div className="flex items-center gap-3">
+                                <div className="relative">
+                                  <div className="from-primary/20 to-primary/40 flex h-12 w-12 items-center justify-center rounded bg-gradient-to-br">
+                                    <Store className="text-primary h-6 w-6" />
+                                  </div>
+                                </div>
+                                <div>
+                                  <div className="text-primary font-semibold">
+                                    {store.name}
+                                  </div>
+                                  <div className="text-muted-foreground text-sm">
+                                    Store ID: {store.id}
+                                  </div>
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell className="max-w-xs">
+                              {store.description ? (
+                                <p className="text-muted-foreground line-clamp-2 text-sm">
+                                  {store.description}
+                                </p>
+                              ) : (
+                                <span className="text-muted-foreground text-sm italic">
+                                  No description available
+                                </span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Badge variant="secondary" className="gap-1">
+                                <Package className="h-3 w-3" />
+                                {store.productCount}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <div className="flex items-center justify-center gap-1">
+                                <Star className="fill-primary text-primary h-4 w-4" />
+                                <span className="font-medium">4.5</span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <div className="text-muted-foreground flex items-center justify-center gap-1 text-sm">
+                                <Calendar className="h-3 w-3" />
+                                <span>{joinedDate}</span>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
 
               {/* Pagination */}
               {pagination.totalPages > 1 && (
@@ -295,7 +418,7 @@ export default function StoresPage() {
             <CardContent className="p-6">
               <div className="text-center">
                 <h3 className="mb-2 text-lg font-semibold">Store Statistics</h3>
-                <div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-4">
+                <div className="grid grid-cols-2 gap-3 text-sm md:grid-cols-3">
                   <div>
                     <div className="text-primary text-2xl font-bold">
                       {pagination.total}
@@ -310,19 +433,6 @@ export default function StoresPage() {
                       )}
                     </div>
                     <div className="text-muted-foreground">Total Products</div>
-                  </div>
-                  <div>
-                    <div className="text-primary text-2xl font-bold">
-                      {Math.round(
-                        stores.reduce(
-                          (sum, store) => sum + store.productCount,
-                          0,
-                        ) / stores.length,
-                      ) || 0}
-                    </div>
-                    <div className="text-muted-foreground">
-                      Avg Products/Store
-                    </div>
                   </div>
                   <div>
                     <div className="text-primary text-2xl font-bold">

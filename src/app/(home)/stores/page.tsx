@@ -123,7 +123,6 @@ export default function StoresPage() {
         {/* Header */}
         <div>
           <h1 className="flex items-center gap-2 text-3xl font-bold text-gray-900 dark:text-white">
-            <Store className="h-8 w-8" />
             All Stores
           </h1>
           <p className="mt-2 text-gray-600 dark:text-gray-400">

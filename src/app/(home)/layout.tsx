@@ -61,6 +61,12 @@ const Header = () => {
               All Products
             </Link>
             <Link
+              href="/stores"
+              className="text-muted-foreground hover:text-primary text-sm font-medium transition-colors"
+            >
+              Stores
+            </Link>
+            <Link
               href="#"
               className="text-muted-foreground hover:text-primary text-sm font-medium transition-colors"
             >

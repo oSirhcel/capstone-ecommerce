@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
 import { products, stores, categories, productImages } from "@/server/db/schema";
-import { eq, desc, asc, and, like } from "drizzle-orm";
+import { eq, desc, asc, and, like, ilike } from "drizzle-orm";
 
 // GET /api/products - Get all products with optional filtering
 export async function GET(request: NextRequest) {
@@ -27,11 +27,11 @@ export async function GET(request: NextRequest) {
     }
     
     if (search) {
-      whereConditions.push(like(products.name, `%${search}%`));
+      whereConditions.push(ilike(products.name, `%${search}%`));
     }
 
     // Build the main query
-    let query = db
+    const baseQuery = db
       .select({
         id: products.id,
         name: products.name,
@@ -56,9 +56,9 @@ export async function GET(request: NextRequest) {
       .leftJoin(categories, eq(products.categoryId, categories.id));
 
     // Apply WHERE conditions if any
-    if (whereConditions.length > 0) {
-      query = query.where(whereConditions.length === 1 ? whereConditions[0] : and(...whereConditions));
-    }
+    const query = whereConditions.length > 0 
+      ? baseQuery.where(whereConditions.length === 1 ? whereConditions[0] : and(...whereConditions))
+      : baseQuery;
 
     const productsData = await query
       .orderBy(desc(products.createdAt))

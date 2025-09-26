@@ -1,37 +1,26 @@
+"use client";
+
 import { StoreCard } from "@/components/store-card";
 import { TrendingProducts } from "@/components/trending-products";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CheckIcon } from "lucide-react";
 import Image from "next/image";
-
 import { NewArrivals } from "@/components/new-arrivals";
+import { fetchFeaturedStores } from "@/lib/api/stores";
+import { useQuery } from "@tanstack/react-query";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function Home() {
-  // Mock store data for now (can be replaced with real API later)
-  const storeCardMockData = [
-    {
-      name: "Artisan Crafts",
-      image: "/logo1.svg",
-      category: "Handmade",
-      productCount: 124,
-      rating: 4.8,
-    },
-    {
-      name: "Digital Designs",
-      image: "/logo4.svg",
-      category: "Digital Products",
-      productCount: 87,
-      rating: 4.9,
-    },
-    {
-      name: "Eco Essentials",
-      image: "/logo3.svg",
-      category: "Sustainable",
-      productCount: 56,
-      rating: 4.7,
-    },
-  ];
+  // Fetch featured stores using React Query
+  const {
+    data: featuredStores,
+    isLoading: isLoadingStores,
+    error: storesError,
+  } = useQuery({
+    queryKey: ["featured-stores"],
+    queryFn: () => fetchFeaturedStores(6),
+  });
 
   return (
     <>
@@ -90,16 +79,49 @@ export default function Home() {
             </div>
           </div>
           <div className="mx-auto grid max-w-5xl grid-cols-1 gap-6 py-12 md:grid-cols-2 lg:grid-cols-3">
-            {storeCardMockData.map((store, index) => (
-              <StoreCard
-                key={index}
-                name={store.name}
-                image={store.image}
-                category={store.category}
-                productCount={store.productCount}
-                rating={store.rating}
-              />
-            ))}
+            {isLoadingStores ? (
+              // Loading skeletons
+              Array.from({ length: 6 }).map((_, index) => (
+                <div key={`skeleton-${index}`} className="space-y-3">
+                  <Skeleton className="aspect-[3/2] w-full rounded-lg" />
+                  <div className="space-y-2 p-4">
+                    <Skeleton className="h-5 w-3/4" />
+                    <Skeleton className="h-4 w-full" />
+                    <div className="flex justify-between">
+                      <Skeleton className="h-4 w-20" />
+                      <Skeleton className="h-4 w-12" />
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : storesError ? (
+              // Error state
+              <div className="col-span-full py-12 text-center">
+                <p className="text-muted-foreground">
+                  Failed to load featured stores
+                </p>
+              </div>
+            ) : featuredStores && featuredStores.length > 0 ? (
+              // Real store data
+              featuredStores.map((store) => (
+                <StoreCard
+                  key={store.id}
+                  id={store.id}
+                  name={store.name}
+                  description={store.description}
+                  productCount={store.productCount || 0}
+                  createdAt={store.createdAt.toString()}
+                  ownerId={store.ownerId}
+                />
+              ))
+            ) : (
+              // Empty state
+              <div className="col-span-full py-12 text-center">
+                <p className="text-muted-foreground">
+                  No featured stores available
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </section>

@@ -15,6 +15,7 @@ import { AuthNav } from "@/components/auth-nav";
 import { CartButton } from "@/components/cart/cart-button";
 import { CartProvider } from "@/contexts/cart-context";
 import { CartDrawer } from "@/components/cart/cart-drawer";
+import { HeaderSearchBar } from "@/components/ui/headersearch";
 
 const HomeLayout = ({ children }: { children: React.ReactNode }) => {
   return (
@@ -60,6 +61,12 @@ const Header = () => {
               All Products
             </Link>
             <Link
+              href="/stores"
+              className="text-muted-foreground hover:text-primary text-sm font-medium transition-colors"
+            >
+              Stores
+            </Link>
+            <Link
               href="#"
               className="text-muted-foreground hover:text-primary text-sm font-medium transition-colors"
             >
@@ -82,11 +89,7 @@ const Header = () => {
         <div className="flex items-center gap-4">
           <div className="relative hidden w-full max-w-sm lg:flex">
             <SearchIcon className="text-muted-foreground absolute top-2.5 left-2.5 h-4 w-4" />
-            <Input
-              type="search"
-              placeholder="Search products, stores, categories..."
-              className="bg-background w-full rounded-md border pl-8 md:w-[300px] lg:w-[400px]"
-            />
+            <HeaderSearchBar />
           </div>
           <CartButton />
           <AuthNav />

@@ -1,11 +1,6 @@
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
 import Credentials from "next-auth/providers/credentials";
-import { db } from "@/server/db";
-import { users } from "@/server/db/schema";
-import { eq } from "drizzle-orm";
-import { randomUUID } from "crypto";
-import bcrypt from "bcryptjs";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
@@ -20,6 +15,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           return null;
         }
 
+        // Defer server-only imports to avoid bundling them in Edge middleware
+        const { db } = await import("@/server/db");
+        const { users } = await import("@/server/db/schema");
+        const { eq } = await import("drizzle-orm");
+        const { default: bcryptjs } = await import("bcryptjs");
+
         // Find user by username
         const [user] = await db
           .select()
@@ -31,7 +32,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           return null;
         }
 
-        const isValid = await bcrypt.compare(
+        const isValid = await bcryptjs.compare(
           credentials.password as string,
           user.password
         );
@@ -68,6 +69,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       // If user signs in with Google and doesn't exist in our users table, create them
       if (account?.provider === "google" && profile?.email) {
         const username = profile.email.split('@')[0];
+        const { db } = await import("@/server/db");
+        const { users } = await import("@/server/db/schema");
+        const { eq } = await import("drizzle-orm");
         const existingUser = await db
           .select()
           .from(users)
@@ -76,7 +80,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (existingUser.length === 0) {
           // Create new user with Google info
           await db.insert(users).values({
-            id: randomUUID(),
+            id: crypto.randomUUID(),
             username,
             password: '', // OAuth users don't need password
             userType: "customer",
@@ -94,6 +98,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       // Fallback: if userType missing but we have an email, try to fetch once
       if (session.user?.email && !(session.user as any).userType) {
         const username = session.user.email.split('@')[0];
+        const { db } = await import("@/server/db");
+        const { users } = await import("@/server/db/schema");
+        const { eq } = await import("drizzle-orm");
         const [user] = await db
           .select()
           .from(users)

@@ -21,6 +21,8 @@ import {
 import { parseAsStringLiteral, useQueryStates } from "nuqs";
 import { toast } from "sonner";
 import { useCart } from "@/contexts/cart-context";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 
 interface ProductInfoProps {
   product: {
@@ -48,9 +50,21 @@ interface ProductInfoProps {
 export function ProductInfo({ product }: ProductInfoProps) {
   const [quantity, setQuantity] = useState(1);
   const { addItem } = useCart();
+  const { data: session } = useSession();
+  const router = useRouter();
 
   const handleAddToCart = () => {
     const price = product.discountPrice ?? product.price;
+
+    // If not logged in, redirect to sign in and do NOT show success toast
+    if (!session?.user) {
+      const callbackUrl =
+        typeof window !== "undefined"
+          ? encodeURIComponent(window.location.href)
+          : "/";
+      router.push(`/auth/signin?callbackUrl=${callbackUrl}`);
+      return;
+    }
 
     addItem({
       id: product.id,

@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
 import { stores, products } from "@/server/db/schema";
 import { eq, count } from "drizzle-orm";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { auth } from "@/lib/auth";
 
 interface SessionUser {
   id?: string;
@@ -68,7 +67,7 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await auth();
 
     if (!(session?.user as SessionUser)?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -136,7 +135,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await auth();
 
     if (!(session?.user as SessionUser)?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

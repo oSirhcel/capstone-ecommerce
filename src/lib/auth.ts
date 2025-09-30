@@ -1,15 +1,15 @@
-import { NextAuthOptions } from "next-auth";
-import GoogleProvider from "next-auth/providers/google";
-import CredentialsProvider from "next-auth/providers/credentials";
+import NextAuth from "next-auth";
+import Google from "next-auth/providers/google";
+import Credentials from "next-auth/providers/credentials";
 import { db } from "@/server/db";
 import { users } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import bcrypt from "bcryptjs";
 
-export const authOptions: NextAuthOptions = {
+export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
-    CredentialsProvider({
+    Credentials({
       name: "Credentials",
       credentials: {
         username: { label: "Username", type: "text" },
@@ -24,7 +24,7 @@ export const authOptions: NextAuthOptions = {
         const [user] = await db
           .select()
           .from(users)
-          .where(eq(users.username, credentials.username))
+          .where(eq(users.username, credentials.username as string))
           .limit(1);
 
         if (!user || !user.password) {
@@ -32,7 +32,7 @@ export const authOptions: NextAuthOptions = {
         }
 
         const isValid = await bcrypt.compare(
-          credentials.password,
+          credentials.password as string,
           user.password
         );
 
@@ -50,7 +50,7 @@ export const authOptions: NextAuthOptions = {
         };
       },
     }),
-    GoogleProvider({
+    Google({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     }),
@@ -60,7 +60,7 @@ export const authOptions: NextAuthOptions = {
       // On sign in, persist id and userType onto the token
       if (user) {
         token.sub = user.id as string;
-        if (user.userType) token.userType = user.userType;
+        if ((user as any).userType) token.userType = (user as any).userType;
       }
       return token;
     },
@@ -88,19 +88,19 @@ export const authOptions: NextAuthOptions = {
     async session({ session, token }) {
       // Prefer values from token to avoid extra DB hit on every request
       if (session.user) {
-        session.user.id = token.sub!;
-        session.user.userType = token.userType;
+        (session.user as any).id = token.sub!;
+        (session.user as any).userType = token.userType;
       }
       // Fallback: if userType missing but we have an email, try to fetch once
-      if (session.user?.email && !session.user.userType) {
+      if (session.user?.email && !(session.user as any).userType) {
         const username = session.user.email.split('@')[0];
         const [user] = await db
           .select()
           .from(users)
           .where(eq(users.username, username));
         if (user) {
-          session.user.id = user.id;
-          session.user.userType = user.userType;
+          (session.user as any).id = user.id;
+          (session.user as any).userType = user.userType;
         }
       }
       return session;
@@ -112,5 +112,14 @@ export const authOptions: NextAuthOptions = {
   session: {
     strategy: "jwt",
   },
+  secret: process.env.NEXTAUTH_SECRET,
+});
+
+// Legacy export for compatibility
+export const authOptions = {
+  providers: [],
+  callbacks: {},
+  pages: { signIn: "/auth/signin" },
+  session: { strategy: "jwt" as const },
   secret: process.env.NEXTAUTH_SECRET,
 };

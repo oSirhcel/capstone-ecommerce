@@ -29,7 +29,7 @@ import {
 import { Upload, Wand2, ChevronDown, SparklesIcon } from "lucide-react";
 import Image from "next/image";
 import { toast } from "sonner";
-import { useGenerateProductShot } from "@/hooks/use-product-mutations";
+import { useGenerateProductShot } from "@/hooks/products/use-product-mutations";
 import type { UseMutationResult } from "@tanstack/react-query";
 
 interface GenerateProductShotData {

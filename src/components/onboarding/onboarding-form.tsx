@@ -32,7 +32,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { useCreateStore, useQueryHandle } from "@/lib/api/onboarding";
+import { useCreateStore } from "@/hooks/onboarding/use-store-mutations";
+import { useStoreNameAvailability } from "@/hooks/onboarding/use-store-availability";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 
@@ -79,7 +80,7 @@ export const OnboardingForm = () => {
   const [query, setQuery] = useState("");
 
   const { data: isHandleAvailable, isLoading: isHandleLoading } =
-    useQueryHandle(query);
+    useStoreNameAvailability(query);
 
   const mutation = useCreateStore();
 
@@ -118,8 +119,11 @@ export const OnboardingForm = () => {
       },
       {
         onSuccess: (result) => {
-          void update({ store: { id: result.id } });
-          router.push("/admin");
+          //TODO: Fix redirect bug
+          if (result.data) {
+            void update({ store: { id: result.data.id } });
+            router.push("/admin");
+          }
         },
       },
     );

@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Search, Plus, Filter, Eye, Edit, Trash2 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useProducts } from "@/hooks/use-products";
+import { useProducts } from "@/hooks/products/use-products";
 import { Skeleton } from "@/components/ui/skeleton";
 import { type Product } from "@/lib/api/products";
 import { useSession } from "next-auth/react";

@@ -34,7 +34,7 @@ import {
 } from "@/components/ui/form";
 import { X, Save, PlusIcon } from "lucide-react";
 import Image from "next/image";
-import { useCreateProduct } from "@/hooks/use-product-mutations";
+import { useCreateProduct } from "@/hooks/products/use-product-mutations";
 import { useRouter } from "next/navigation";
 import { UploadButton } from "@/lib/uploadthing";
 import { useSession } from "next-auth/react";

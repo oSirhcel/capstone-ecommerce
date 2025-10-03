@@ -1,5 +1,5 @@
 "use client";
-import { useProduct } from "@/hooks/use-product";
+import { useProduct } from "@/hooks/products/use-product";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ProductHeader } from "@/components/admin/products/product-header";
 import { ProductGallery } from "@/components/admin/products/product-gallery";

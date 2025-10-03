@@ -114,10 +114,16 @@ export const OnboardingForm = () => {
       },
       {
         onSuccess: (result) => {
-          //TODO: Fix redirect bug
+          // Ensure session is updated with store id before navigating to admin to avoid redirect loop
           if (result.data) {
-            void update({ store: { id: result.data.id } });
-            router.push("/admin");
+            void update({ store: { id: result.data.id } })
+              .then(() => {
+                router.replace("/admin");
+              })
+              .catch(() => {
+                // Even if update fails, attempt navigation to let middleware evaluate latest token
+                router.replace("/admin");
+              });
           }
         },
       },

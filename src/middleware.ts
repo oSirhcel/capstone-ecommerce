@@ -1,50 +1,37 @@
-import { withAuth } from "next-auth/middleware";
 import { NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
 
-export default withAuth(
-  function middleware(req) {
-    const token = req.nextauth.token;
-    const pathname = req.nextUrl.pathname;
+export default auth(async (req) => {
+  const session = req.auth;
+  const pathname = req.nextUrl.pathname;
 
-    // Admin routes protection
-    if (pathname.startsWith("/admin")) {
-      if (!token) {
-        // Redirect to sign in if not authenticated
-        return NextResponse.redirect(new URL("/auth/signin", req.url));
-      }
-
-      if (!token.storeId) {
-        return NextResponse.redirect(new URL("/onboarding", req.url));
-      }
+  if (pathname.startsWith("/admin")) {
+    if (!session?.user) {
+      return NextResponse.redirect(new URL("/auth/signin", req.url));
     }
-    if (pathname.startsWith("/onboarding")) {
-      if (token?.storeId) {
-        return NextResponse.redirect(new URL("/admin", req.url));
-      }
+    if (!session?.store?.id) {
+      return NextResponse.redirect(new URL("/onboarding", req.url));
     }
+  }
 
-    return NextResponse.next();
-  },
-  {
-    callbacks: {
-      authorized: ({ token, req }) => {
-        const pathname = req.nextUrl.pathname;
+  if (pathname.startsWith("/onboarding")) {
+    if (!session?.user) {
+      return NextResponse.redirect(new URL("/auth/signin", req.url));
+    }
+    if (session?.store?.id) {
+      return NextResponse.redirect(new URL("/admin", req.url));
+    }
+  }
 
-        // Allow access to non-protected routes
-        if (
-          !pathname.startsWith("/admin") &&
-          !pathname.startsWith("/account")
-        ) {
-          return true;
-        }
-
-        // Require authentication for protected routes
-        return !!token;
-      },
-    },
-  },
-);
+  return NextResponse.next();
+});
 
 export const config = {
-  matcher: ["/account(.*)", "/admin(.*)", "/onboarding(.*)"],
+  matcher: [
+    // Skip Next.js internals and all static files, unless found in search params
+    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
+    // Always run for API routes
+    "/(api|trpc)(.*)",
+  ],
+  runtime: "nodejs",
 };

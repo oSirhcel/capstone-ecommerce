@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { generateText } from "ai";
 import { google } from "@ai-sdk/google";
+import { auth } from "@/lib/auth";
 
 interface GenerateProductShotRequest {
   image: string;
@@ -16,6 +17,11 @@ interface GenerateProductShotRequest {
 }
 
 export async function POST(request: NextRequest) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     // Check for required environment variable
     if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY) {

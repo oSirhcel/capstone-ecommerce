@@ -1,6 +1,5 @@
 import { createUploadthing, type FileRouter } from "uploadthing/next";
-import { authOptions } from "@/lib/auth";
-import { getServerSession } from "next-auth";
+import { auth } from "@/lib/auth";
 
 const f = createUploadthing();
 
@@ -21,7 +20,7 @@ export const ourFileRouter = {
     .middleware(async () => {
       // This code runs on your server before upload
 
-      const session = await getServerSession(authOptions);
+      const session = await auth();
 
       // If you throw, the user will not be able to upload
 

@@ -11,12 +11,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
-import {
-  UserRoundIcon,
-  ChevronLeftIcon,
-  PencilIcon,
-  StoreIcon,
-} from "lucide-react";
+import { ChevronLeftIcon, PencilIcon, StoreIcon } from "lucide-react";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";

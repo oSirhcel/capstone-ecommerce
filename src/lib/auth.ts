@@ -1,15 +1,14 @@
-import type { NextAuthOptions } from "next-auth";
-import GoogleProvider from "next-auth/providers/google";
-import CredentialsProvider from "next-auth/providers/credentials";
+import Google from "next-auth/providers/google";
+import NextAuth from "next-auth";
+import Credentials from "next-auth/providers/credentials";
 import { db } from "@/server/db";
 import { users, stores } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
-import { randomUUID } from "crypto";
 import bcrypt from "bcryptjs";
 
-export const authOptions: NextAuthOptions = {
+export const { auth, handlers, signIn, signOut } = NextAuth({
   providers: [
-    CredentialsProvider({
+    Credentials({
       name: "Credentials",
       credentials: {
         username: { label: "Username", type: "text" },
@@ -24,7 +23,7 @@ export const authOptions: NextAuthOptions = {
         const [user] = await db
           .select()
           .from(users)
-          .where(eq(users.username, credentials.username))
+          .where(eq(users.username, credentials.username as string))
           .limit(1);
 
         if (!user?.password) {
@@ -32,7 +31,7 @@ export const authOptions: NextAuthOptions = {
         }
 
         const isValid = await bcrypt.compare(
-          credentials.password,
+          credentials.password as string,
           user.password,
         );
 
@@ -49,7 +48,7 @@ export const authOptions: NextAuthOptions = {
         };
       },
     }),
-    GoogleProvider({
+    Google({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     }),
@@ -93,7 +92,7 @@ export const authOptions: NextAuthOptions = {
         if (existingUser.length === 0) {
           // Create new user with Google info
           await db.insert(users).values({
-            id: randomUUID(),
+            id: crypto.randomUUID(),
             username,
             password: "", // OAuth users don't need password
           });
@@ -107,7 +106,7 @@ export const authOptions: NextAuthOptions = {
         session.user.id = token.sub!;
       }
       if (token.storeId) {
-        session.store = { id: token.storeId };
+        session.store = { id: token.storeId as string };
       }
       return session;
     },
@@ -119,4 +118,4 @@ export const authOptions: NextAuthOptions = {
     strategy: "jwt",
   },
   secret: process.env.NEXTAUTH_SECRET,
-};
+});

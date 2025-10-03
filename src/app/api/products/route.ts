@@ -6,7 +6,7 @@ import {
   categories,
   productImages,
 } from "@/server/db/schema";
-import { eq, desc, asc, and, like } from "drizzle-orm";
+import { eq, desc, asc, and, ilike } from "drizzle-orm";
 
 // GET /api/products - Get all products with optional filtering
 export async function GET(request: NextRequest) {
@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (search) {
-      whereConditions.push(like(products.name, `%${search}%`));
+      whereConditions.push(ilike(products.name, `%${search}%`));
     }
 
     // Build the main query

@@ -1,7 +1,6 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { auth } from "@/lib/auth";
 import { db } from "@/server/db";
 import {
   carts,
@@ -24,7 +23,7 @@ interface SessionUser {
 // GET /api/cart - Get user's cart with items
 export async function GET(_request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await auth();
 
     if (!(session?.user as SessionUser)?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -121,7 +120,7 @@ export async function GET(_request: NextRequest) {
 // POST /api/cart - Add item to cart
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await auth();
 
     if (!(session?.user as SessionUser)?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -203,7 +202,7 @@ export async function POST(request: NextRequest) {
 // PUT /api/cart - Update cart item quantity
 export async function PUT(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await auth();
 
     if (!(session?.user as SessionUser)?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -280,7 +279,7 @@ export async function PUT(request: NextRequest) {
 // DELETE /api/cart - Remove item from cart or clear entire cart
 export async function DELETE(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await auth();
 
     if (!(session?.user as SessionUser)?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

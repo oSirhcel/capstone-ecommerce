@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Card,
@@ -21,80 +21,8 @@ import {
 } from "@/components/ui/select";
 import { Search, Eye, Package, X } from "lucide-react";
 import Image from "next/image";
-
-// Mock orders data - in real app, this would come from API
-const orders = [
-  {
-    id: "ORD-2024-001",
-    date: "2024-01-15",
-    status: "delivered",
-    total: 156.97,
-    itemCount: 3,
-    items: [
-      {
-        id: "1",
-        name: "Handcrafted Ceramic Mug",
-        image: "/placeholder.svg?height=60&width=60",
-        price: 24.99,
-        quantity: 2,
-        store: "Artisan Crafts",
-      },
-      {
-        id: "2",
-        name: "Organic Cotton T-Shirt",
-        image: "/placeholder.svg?height=60&width=60",
-        price: 34.99,
-        quantity: 1,
-        store: "Eco Essentials",
-      },
-    ],
-    canCancel: false,
-  },
-  {
-    id: "ORD-2024-002",
-    date: "2024-01-20",
-    status: "processing",
-    total: 89.5,
-    itemCount: 2,
-    items: [
-      {
-        id: "3",
-        name: "Wireless Headphones",
-        image: "/placeholder.svg?height=60&width=60",
-        price: 79.99,
-        quantity: 1,
-        store: "Tech Hub",
-      },
-    ],
-    canCancel: true,
-  },
-  {
-    id: "ORD-2024-003",
-    date: "2024-01-22",
-    status: "shipped",
-    total: 234.99,
-    itemCount: 4,
-    items: [
-      {
-        id: "4",
-        name: "Premium Leather Wallet",
-        image: "/placeholder.svg?height=60&width=60",
-        price: 89.99,
-        quantity: 1,
-        store: "Luxury Goods",
-      },
-      {
-        id: "5",
-        name: "Stainless Steel Watch",
-        image: "/placeholder.svg?height=60&width=60",
-        price: 145.0,
-        quantity: 1,
-        store: "Timepieces Co",
-      },
-    ],
-    canCancel: false,
-  },
-];
+import { useQuery } from "@tanstack/react-query";
+import { fetchOrders, type OrderDTO } from "@/lib/api/orders";
 
 const getStatusBadge = (status: string) => {
   switch (status) {
@@ -133,22 +61,30 @@ export default function OrdersPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
-  const filteredOrders = orders.filter((order) => {
-    const matchesSearch =
-      order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.items.some(
-        (item) =>
-          item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          item.store.toLowerCase().includes(searchTerm.toLowerCase()),
-      );
-
-    const matchesStatus =
-      statusFilter === "all" || order.status === statusFilter;
-
-    return matchesSearch && matchesStatus;
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["orders", { page: 1, limit: 20 }],
+    queryFn: () => fetchOrders({ page: 1, limit: 20 }),
   });
 
-  const handleCancelOrder = (orderId: string) => {
+  const orders = data?.orders ?? [];
+
+  const filteredOrders = useMemo(() => {
+    const term = searchTerm.toLowerCase();
+    return orders.filter((order: OrderDTO) => {
+      const matchesSearch =
+        String(order.id).toLowerCase().includes(term) ||
+        order.items.some((item) =>
+          (item.productName || "").toLowerCase().includes(term),
+        );
+
+      const matchesStatus =
+        statusFilter === "all" || order.status === statusFilter;
+
+      return matchesSearch && matchesStatus;
+    });
+  }, [orders, searchTerm, statusFilter]);
+
+  const handleCancelOrder = (orderId: number) => {
     //TODO: API call
     console.log("Cancelling order:", orderId);
   };
@@ -194,7 +130,15 @@ export default function OrdersPage() {
 
       {/* Orders List */}
       <div className="space-y-4">
-        {filteredOrders.length === 0 ? (
+        {isLoading ? (
+          <Card>
+            <CardContent className="py-12">Loading orders...</CardContent>
+          </Card>
+        ) : isError ? (
+          <Card>
+            <CardContent className="py-12">Failed to load orders.</CardContent>
+          </Card>
+        ) : filteredOrders.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
               <Package className="text-muted-foreground mb-4 h-12 w-12" />
@@ -210,21 +154,21 @@ export default function OrdersPage() {
             </CardContent>
           </Card>
         ) : (
-          filteredOrders.map((order) => (
+          filteredOrders.map((order: OrderDTO) => (
             <Card key={order.id}>
               <CardHeader>
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <CardTitle className="text-lg">{order.id}</CardTitle>
+                    <CardTitle className="text-lg">ORD-{order.id}</CardTitle>
                     <CardDescription>
-                      Placed on {new Date(order.date).toLocaleDateString()} •{" "}
-                      {order.itemCount} items
+                      Placed on {new Date(order.createdAt).toLocaleDateString()}{" "}
+                      • {order.items.length} items
                     </CardDescription>
                   </div>
                   <div className="flex items-center gap-3">
                     {getStatusBadge(order.status)}
                     <span className="font-semibold">
-                      ${order.total.toFixed(2)}
+                      ${(order.totalAmount / 100).toFixed(2)}
                     </span>
                   </div>
                 </div>
@@ -235,17 +179,19 @@ export default function OrdersPage() {
                   {order.items.slice(0, 2).map((item) => (
                     <div key={item.id} className="flex items-center gap-3">
                       <Image
-                        src={item.image || "/placeholder.svg"}
-                        alt={item.name}
+                        src={"/placeholder.svg"}
+                        alt={item.productName || "Item"}
                         width={48}
                         height={48}
                         className="rounded-md object-cover"
                       />
                       <div className="min-w-0 flex-1">
-                        <p className="truncate font-medium">{item.name}</p>
+                        <p className="truncate font-medium">
+                          {item.productName}
+                        </p>
                         <p className="text-muted-foreground text-sm">
-                          {item.store} • Qty: {item.quantity} • $
-                          {item.price.toFixed(2)}
+                          Qty: {item.quantity} • $
+                          {(item.priceAtTime / 100).toFixed(2)}
                         </p>
                       </div>
                     </div>
@@ -265,17 +211,7 @@ export default function OrdersPage() {
                       View Details
                     </Link>
                   </Button>
-                  {order.canCancel && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleCancelOrder(order.id)}
-                      className="text-red-600 hover:text-red-700"
-                    >
-                      <X className="mr-2 h-4 w-4" />
-                      Cancel Order
-                    </Button>
-                  )}
+                  {/* Cancel disabled until API supports it */}
                 </div>
               </CardContent>
             </Card>

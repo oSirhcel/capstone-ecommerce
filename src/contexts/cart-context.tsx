@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useReducer, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -86,6 +87,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
   const [state, dispatch] = useReducer(cartReducer, initialState);
   const { data: session } = useSession();
   const queryClient = useQueryClient();
+  const router = useRouter();
 
   // Fetch cart data from API
   const {
@@ -142,7 +144,11 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
 
   const addItem = (item: CartItem) => {
     if (!(session?.user as SessionUser)?.id) {
-      console.error("User must be logged in to add items to cart");
+      const callbackUrl =
+        typeof window !== "undefined"
+          ? encodeURIComponent(window.location.href)
+          : "/";
+      router.push(`/auth/signin?callbackUrl=${callbackUrl}`);
       return;
     }
     addItemMutation.mutate({ productId: item.id, quantity: item.quantity });

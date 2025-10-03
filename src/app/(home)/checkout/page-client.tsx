@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { useCart } from "@/contexts/cart-context";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,9 +24,13 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
+import { StripePaymentForm } from "@/components/checkout/stripe-payment-form";
+import { db } from "@/server/db";
+import { orders, orderItems } from "@/server/db/schema";
 
 export function CheckoutClient() {
   const { data: session } = useSession();
+  const router = useRouter();
   const {
     items,
     isLoading,
@@ -34,6 +40,25 @@ export function CheckoutClient() {
     subtotal,
     clearCart,
   } = useCart();
+
+  // Form states
+  const [currentStep, setCurrentStep] = useState<
+    "contact" | "shipping" | "payment"
+  >("contact");
+  const [contactData, setContactData] = useState({
+    email: session?.user?.email || "",
+    phone: "",
+  });
+  const [shippingData, setShippingData] = useState({
+    firstName: "",
+    lastName: "",
+    address: "",
+    city: "",
+    state: "",
+    postcode: "",
+    country: "AU",
+  });
+  const [isProcessingOrder, setIsProcessingOrder] = useState(false);
 
   // Redirect to login if not authenticated
   if (!session) {
@@ -117,20 +142,137 @@ export function CheckoutClient() {
   const tax = subtotal * 0.08;
   const total = subtotal + shipping + tax;
 
-  const handleCheckout = () => {
-    // Simulate successful checkout
-    toast.success("Order placed successfully!", {
-      description: `Your order total is $${total.toFixed(2)}. You will receive a confirmation email shortly.`,
+  // Create order in database
+  const createOrder = async () => {
+    try {
+      // Basic client-side validation to avoid server round-trip
+      if (!contactData.email || !contactData.phone) {
+        throw new Error("Please provide your email and phone number");
+      }
+      if (
+        !shippingData.firstName ||
+        !shippingData.lastName ||
+        !shippingData.address ||
+        !shippingData.city ||
+        !shippingData.state ||
+        !shippingData.postcode
+      ) {
+        throw new Error("Please complete your shipping information");
+      }
+      if (!items.length) {
+        throw new Error("Your cart is empty");
+      }
+
+      const response = await fetch("/api/orders", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          items: items.map((item) => ({
+            productId:
+              typeof item.id === "string"
+                ? parseInt((item.id as unknown as string) || "", 10)
+                : item.id,
+            quantity: item.quantity,
+            price: item.price,
+          })),
+          totalAmount: Math.round(total * 100), // Convert to cents
+          contactData,
+          shippingData,
+        }),
+      });
+
+      if (!response.ok) {
+        let serverMessage = "Failed to create order";
+        try {
+          const err = await response.json();
+          if (err?.error) serverMessage = err.error as string;
+        } catch (_) {}
+        throw new Error(serverMessage);
+      }
+
+      const orderData = await response.json();
+      return orderData.orderId;
+    } catch (error) {
+      const msg =
+        error instanceof Error ? error.message : "Failed to create order";
+      console.error("Order creation error:", error);
+      toast.error("Could not create order", { description: msg });
+      throw error;
+    }
+  };
+
+  // Create order and handle payment
+  const handlePaymentInit = async () => {
+    try {
+      setIsProcessingOrder(true);
+
+      // Create order first
+      const orderId = await createOrder();
+      return orderId;
+    } catch (error) {
+      console.error("Order creation error:", error);
+      toast.error("Failed to create order", {
+        description: "Please try again or contact support.",
+      });
+      throw error;
+    } finally {
+      setIsProcessingOrder(false);
+    }
+  };
+
+  // Handle successful payment
+  const handlePaymentSuccess = async (paymentResult: any) => {
+    try {
+      toast.success("Payment successful!", {
+        description:
+          "Your order has been confirmed and will be processed shortly.",
+        duration: 5000,
+      });
+
+      // Clear the cart
+      clearCart();
+
+      // Redirect to success page
+      setTimeout(() => {
+        const params = new URLSearchParams();
+        params.set("payment_intent", paymentResult.paymentIntentId);
+        if (paymentResult.orderId) {
+          params.set("order_id", paymentResult.orderId.toString());
+        }
+        router.push(`/checkout/success?${params.toString()}`);
+      }, 2000);
+    } catch (error) {
+      console.error("Post-payment processing error:", error);
+      toast.error("Payment successful but order processing failed", {
+        description: "Please contact support with your payment confirmation.",
+      });
+    }
+  };
+
+  // Handle payment error
+  const handlePaymentError = (error: string) => {
+    toast.error("Payment failed", {
+      description: error,
       duration: 5000,
     });
+  };
 
-    // Clear the cart
-    clearCart();
+  // Step navigation
+  const canProceedToShipping = () => {
+    return contactData.email && contactData.phone;
+  };
 
-    // Redirect to home after a short delay
-    setTimeout(() => {
-      window.location.href = "/";
-    }, 2000);
+  const canProceedToPayment = () => {
+    return (
+      shippingData.firstName &&
+      shippingData.lastName &&
+      shippingData.address &&
+      shippingData.city &&
+      shippingData.state &&
+      shippingData.postcode
+    );
   };
 
   return (
@@ -164,171 +306,214 @@ export function CheckoutClient() {
         <div className="grid gap-8 lg:grid-cols-3">
           {/* Checkout Forms */}
           <div className="space-y-6 lg:col-span-2">
-            {/* Contact Information */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Mail className="h-5 w-5" />
-                  Contact Information
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid gap-4 md:grid-cols-2">
+            {/* Multi-step form sections */}
+            {currentStep === "contact" && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Mail className="h-5 w-5" />
+                    Contact Information
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="email">Email Address</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        placeholder="your@email.com"
+                        value={contactData.email}
+                        onChange={(e) =>
+                          setContactData({
+                            ...contactData,
+                            email: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="phone">Phone Number</Label>
+                      <Input
+                        id="phone"
+                        type="tel"
+                        placeholder="+61 4 1234 5678"
+                        value={contactData.phone}
+                        onChange={(e) =>
+                          setContactData({
+                            ...contactData,
+                            phone: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
+                  <Button
+                    size="default"
+                    className="w-full"
+                    onClick={() => setCurrentStep("shipping")}
+                    disabled={!canProceedToShipping()}
+                  >
+                    Continue to Shipping
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
+            {currentStep === "shipping" && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <MapPin className="h-5 w-5" />
+                    Shipping Information
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="firstName">First Name</Label>
+                      <Input
+                        id="firstName"
+                        placeholder="John"
+                        value={shippingData.firstName}
+                        onChange={(e) =>
+                          setShippingData({
+                            ...shippingData,
+                            firstName: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="lastName">Last Name</Label>
+                      <Input
+                        id="lastName"
+                        placeholder="Doe"
+                        value={shippingData.lastName}
+                        onChange={(e) =>
+                          setShippingData({
+                            ...shippingData,
+                            lastName: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
+
                   <div className="space-y-2">
-                    <Label htmlFor="email">Email Address</Label>
+                    <Label htmlFor="address">Address</Label>
                     <Input
-                      id="email"
-                      type="email"
-                      placeholder="your@email.com"
-                      defaultValue={session?.user?.email ?? ""}
+                      id="address"
+                      placeholder="123 Main Street"
+                      value={shippingData.address}
+                      onChange={(e) =>
+                        setShippingData({
+                          ...shippingData,
+                          address: e.target.value,
+                        })
+                      }
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="phone">Phone Number</Label>
-                    <Input
-                      id="phone"
-                      type="tel"
-                      placeholder="+61 4 1234 5678"
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
 
-            {/* Shipping Information */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <MapPin className="h-5 w-5" />
-                  Shipping Information
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="firstName">First Name</Label>
-                    <Input id="firstName" placeholder="John" />
+                  <div className="grid gap-4 md:grid-cols-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="city">City</Label>
+                      <Input
+                        id="city"
+                        placeholder="Sydney"
+                        value={shippingData.city}
+                        onChange={(e) =>
+                          setShippingData({
+                            ...shippingData,
+                            city: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="state">State</Label>
+                      <Select
+                        value={shippingData.state}
+                        onValueChange={(value) =>
+                          setShippingData({ ...shippingData, state: value })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select state" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="NSW">New South Wales</SelectItem>
+                          <SelectItem value="VIC">Victoria</SelectItem>
+                          <SelectItem value="QLD">Queensland</SelectItem>
+                          <SelectItem value="WA">Western Australia</SelectItem>
+                          <SelectItem value="SA">South Australia</SelectItem>
+                          <SelectItem value="TAS">Tasmania</SelectItem>
+                          <SelectItem value="ACT">
+                            Australian Capital Territory
+                          </SelectItem>
+                          <SelectItem value="NT">Northern Territory</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="postcode">Postcode</Label>
+                      <Input
+                        id="postcode"
+                        placeholder="2000"
+                        value={shippingData.postcode}
+                        onChange={(e) =>
+                          setShippingData({
+                            ...shippingData,
+                            postcode: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="lastName">Last Name</Label>
-                    <Input id="lastName" placeholder="Doe" />
+
+                  <div className="flex flex-col gap-3 sm:flex-row sm:gap-4">
+                    <Button
+                      variant="outline"
+                      size="default"
+                      className="flex-1"
+                      onClick={() => setCurrentStep("contact")}
+                    >
+                      Back to Contact
+                    </Button>
+                    <Button
+                      size="default"
+                      className="flex-1"
+                      onClick={() => setCurrentStep("payment")}
+                      disabled={!canProceedToPayment()}
+                    >
+                      Continue to Payment
+                    </Button>
                   </div>
-                </div>
+                </CardContent>
+              </Card>
+            )}
 
-                <div className="space-y-2">
-                  <Label htmlFor="address">Address</Label>
-                  <Input id="address" placeholder="123 Main Street" />
-                </div>
+            {currentStep === "payment" && (
+              <>
+                <Button
+                  variant="outline"
+                  size="default"
+                  className="mb-4"
+                  onClick={() => setCurrentStep("shipping")}
+                >
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Back to Shipping
+                </Button>
 
-                <div className="grid gap-4 md:grid-cols-3">
-                  <div className="space-y-2">
-                    <Label htmlFor="city">City</Label>
-                    <Input id="city" placeholder="Sydney" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="state">State</Label>
-                    <Select>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select state" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="NSW">New South Wales</SelectItem>
-                        <SelectItem value="VIC">Victoria</SelectItem>
-                        <SelectItem value="QLD">Queensland</SelectItem>
-                        <SelectItem value="WA">Western Australia</SelectItem>
-                        <SelectItem value="SA">South Australia</SelectItem>
-                        <SelectItem value="TAS">Tasmania</SelectItem>
-                        <SelectItem value="ACT">
-                          Australian Capital Territory
-                        </SelectItem>
-                        <SelectItem value="NT">Northern Territory</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="zip">Postcode</Label>
-                    <Input id="zip" placeholder="2000" />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="country">Country</Label>
-                  <Select defaultValue="AU">
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="AU">Australia</SelectItem>
-                      <SelectItem value="US">United States</SelectItem>
-                      <SelectItem value="CA">Canada</SelectItem>
-                      <SelectItem value="GB">United Kingdom</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Payment Information */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <CreditCard className="h-5 w-5" />
-                  Payment Information
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="cardNumber">Card Number</Label>
-                  <Input
-                    id="cardNumber"
-                    placeholder="1234 5678 9012 3456"
-                    maxLength={19}
-                  />
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-3">
-                  <div className="space-y-2">
-                    <Label htmlFor="expiry">Expiry Date</Label>
-                    <Input id="expiry" placeholder="MM/YY" maxLength={5} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="cvc">CVC</Label>
-                    <Input id="cvc" placeholder="123" maxLength={4} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="zipCode">Postcode</Label>
-                    <Input id="zipCode" placeholder="2000" maxLength={10} />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="cardName">Name on Card</Label>
-                  <Input id="cardName" placeholder="John Doe" />
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <Checkbox id="saveCard" />
-                  <Label htmlFor="saveCard" className="text-sm">
-                    Save this card for future purchases
-                  </Label>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Security Notice */}
-            <Card className="border-green-200 bg-green-50">
-              <CardContent>
-                <div className="flex items-center gap-2 text-green-800">
-                  <Shield className="h-4 w-4" />
-                  <span className="text-sm font-medium">
-                    Your payment information is secure and encrypted
-                  </span>
-                </div>
-                <p className="mt-1 text-sm text-green-700">
-                  We use industry-standard encryption to protect your data.
-                </p>
-              </CardContent>
-            </Card>
+                <StripePaymentForm
+                  amount={total}
+                  currency="aud"
+                  onSuccess={handlePaymentSuccess}
+                  onError={handlePaymentError}
+                  onCreateOrder={handlePaymentInit}
+                />
+              </>
+            )}
           </div>
 
           {/* Order Summary */}
@@ -424,9 +609,16 @@ export function CheckoutClient() {
                   </div>
                 )}
 
-                <Button className="w-full" size="lg" onClick={handleCheckout}>
-                  Complete Order
-                </Button>
+                {currentStep !== "payment" && (
+                  <Button
+                    className="w-full"
+                    size="lg"
+                    onClick={() => setCurrentStep("payment")}
+                    disabled={!canProceedToPayment()}
+                  >
+                    Proceed to Payment
+                  </Button>
+                )}
 
                 <p className="text-muted-foreground text-center text-xs">
                   Secure checkout powered by Stripe

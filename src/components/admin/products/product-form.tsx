@@ -38,6 +38,7 @@ import { useCreateProduct } from "@/hooks/use-product-mutations";
 import { useRouter } from "next/navigation";
 import { UploadButton } from "@/lib/uploadthing";
 import { useSession } from "next-auth/react";
+import { ProductShotModal } from "./product-shot-modal";
 
 const productFormSchema = z.object({
   name: z
@@ -226,7 +227,7 @@ export function ProductForm({
         <form
           id="product-form"
           onSubmit={form.handleSubmit(onSubmit)}
-          className="mx-auto space-y-6"
+          className="mx-auto space-y-6 lg:max-w-4xl"
         >
           <Tabs defaultValue="information" className="space-y-6">
             <TabsList className="w-full">
@@ -306,7 +307,16 @@ export function ProductForm({
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Media</CardTitle>
+                  <div className="flex items-center gap-2">
+                    <CardTitle>Media</CardTitle>
+                    <ProductShotModal
+                      onImagesGenerated={(generatedImages) => {
+                        setImages((prev) => [...prev, ...generatedImages]);
+                      }}
+                      productName={form.watch("name")}
+                      productDescription={form.watch("description")}
+                    />
+                  </div>
                 </CardHeader>
                 <CardContent className="w-full">
                   {images.length === 0 && (
@@ -351,7 +361,7 @@ export function ProductForm({
                       </div>
 
                       <div className="min-w-0 flex-1">
-                        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+                        <div className="grid grid-cols-3 gap-1">
                           {images.slice(1).map((image, idx) => (
                             <div
                               key={image}

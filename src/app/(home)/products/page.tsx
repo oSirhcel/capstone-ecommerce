@@ -14,6 +14,30 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SearchIcon, FilterIcon } from "lucide-react";
 
+// Interface for search API response
+interface SearchResult {
+  products: Product[];
+  stores: Array<{
+    id: string;
+    name: string;
+    description: string | null;
+    ownerId: string;
+    createdAt: string;
+  }>;
+  categories: Array<{
+    id: number;
+    name: string;
+    description: string | null;
+  }>;
+  query: string;
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
 const PRODUCTS_PER_PAGE = 20;
 
 // Transform API Product to ProductCard props
@@ -39,30 +63,54 @@ export default function ProductsPage() {
   );
   const currentPage = parseInt(searchParams.get("page") || "1");
 
+  const searchQuery = searchParams.get("search");
+  const isSearching = Boolean(searchQuery?.trim());
+
+  // Function to fetch search results
+  const fetchSearchResults = async (): Promise<SearchResult> => {
+    const response = await fetch(
+      `/api/search?q=${encodeURIComponent(searchQuery!)}&type=products&page=${currentPage}&limit=${PRODUCTS_PER_PAGE}`,
+    );
+    if (!response.ok) {
+      throw new Error("Failed to fetch search results");
+    }
+    return response.json();
+  };
+
   const { data, isLoading, error } = useQuery({
     queryKey: [
-      "products",
+      isSearching ? "search-products" : "products",
       {
         page: currentPage,
         limit: PRODUCTS_PER_PAGE,
-        search: searchParams.get("search"),
+        search: searchQuery,
       },
     ],
     queryFn: () =>
-      fetchProducts({
-        page: currentPage,
-        limit: PRODUCTS_PER_PAGE,
-        search: searchParams.get("search") || undefined,
-      }),
+      isSearching
+        ? fetchSearchResults()
+        : fetchProducts({
+            page: currentPage,
+            limit: PRODUCTS_PER_PAGE,
+          }),
   });
 
   const products = data?.products || [];
-  const pagination = data?.pagination || {
-    page: 1,
-    limit: PRODUCTS_PER_PAGE,
-    total: 0,
-    totalPages: 1,
-  };
+  const pagination = isSearching
+    ? {
+        page: currentPage,
+        limit: PRODUCTS_PER_PAGE,
+        total: data?.products?.length || 0,
+        totalPages: Math.ceil(
+          (data?.products?.length || 0) / PRODUCTS_PER_PAGE,
+        ),
+      }
+    : data?.pagination || {
+        page: 1,
+        limit: PRODUCTS_PER_PAGE,
+        total: 0,
+        totalPages: 1,
+      };
 
   const handlePageChange = (page: number) => {
     const params = new URLSearchParams(searchParams);

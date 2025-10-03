@@ -30,6 +30,8 @@
     "@radix-ui/react-slot": "^1.2.3",
     "@radix-ui/react-switch": "^1.2.6",
     "@radix-ui/react-tabs": "^1.1.12",
+    "@stripe/react-stripe-js": "^4.0.2",
+    "@stripe/stripe-js": "^7.9.0",
     "@t3-oss/env-nextjs": "^0.13.8",
     "@tanstack/react-query": "^5.80.7",
     "@types/bcryptjs": "^2.4.6",
@@ -41,7 +43,7 @@
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "dotenv": "^17.2.1",
-    "drizzle-kit": "^0.31.1",
+    "drizzle-kit": "^0.31.5",
     "drizzle-orm": "^0.44.2",
     "lucide-react": "^0.536.0",
     "next": "^15.5.4",
@@ -56,6 +58,7 @@
     "react-icons": "^5.5.0",
     "recharts": "2.15.4",
     "sonner": "^2.0.7",
+    "stripe": "^18.5.0",
     "tailwind-merge": "^3.3.1",
     "uploadthing": "^7.7.4",
     "usehooks-ts": "^3.1.1",
@@ -88,6 +91,7 @@
     ]
   },
   "overrides": {
-    "react-is": "^19.0.0"
+    "react-is": "^19.0.0",
+    "esbuild": "^0.25.10"
   }
 }

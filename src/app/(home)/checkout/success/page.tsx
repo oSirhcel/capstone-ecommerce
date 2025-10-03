@@ -1,0 +1,283 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useSession } from "next-auth/react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { CheckCircle, Package, Mail, ArrowRight } from "lucide-react";
+import Link from "next/link";
+import { getPaymentStatus } from "@/lib/stripe-client";
+import { Skeleton } from "@/components/ui/skeleton";
+
+interface PaymentDetails {
+  transaction: {
+    id: number;
+    orderId: number;
+    amount: number;
+    currency: string;
+    status: string;
+    transactionId: string;
+    createdAt: string;
+  };
+}
+
+export default function CheckoutSuccessPage() {
+  const { data: session } = useSession();
+  const searchParams = useSearchParams();
+  const paymentIntentId = searchParams.get("payment_intent");
+  const orderId = searchParams.get("order_id");
+
+  const [paymentDetails, setPaymentDetails] = useState<PaymentDetails | null>(
+    null,
+  );
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchPaymentDetails = async () => {
+      if (!paymentIntentId && !orderId) {
+        setError("No payment or order information found");
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        let details;
+        if (paymentIntentId) {
+          details = await getPaymentStatus({ paymentIntentId });
+        } else if (orderId) {
+          details = await getPaymentStatus({ orderId: parseInt(orderId) });
+        }
+
+        if (details) {
+          setPaymentDetails(details);
+        } else {
+          setError("Payment details not found");
+        }
+      } catch (error) {
+        console.error("Failed to fetch payment details:", error);
+        setError("Failed to load payment details");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchPaymentDetails();
+  }, [paymentIntentId, orderId]);
+
+  if (!session) {
+    return (
+      <div className="bg-background min-h-screen">
+        <div className="container mx-auto px-4 py-12 md:px-6">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold">Please Sign In</h1>
+            <p className="text-muted-foreground mt-2">
+              You need to be signed in to view your order details.
+            </p>
+            <Button asChild className="mt-4">
+              <Link href="/auth/signin">Sign In</Link>
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="bg-background min-h-screen">
+        <div className="container mx-auto px-4 py-12 md:px-6">
+          <div className="mx-auto max-w-2xl space-y-6">
+            <Skeleton className="mx-auto h-8 w-64" />
+            <Skeleton className="h-64 w-full" />
+            <Skeleton className="h-32 w-full" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-background min-h-screen">
+        <div className="container mx-auto px-4 py-12 md:px-6">
+          <div className="mx-auto max-w-2xl text-center">
+            <h1 className="text-2xl font-bold text-red-600">Error</h1>
+            <p className="text-muted-foreground mt-2">{error}</p>
+            <Button asChild className="mt-4">
+              <Link href="/">Return Home</Link>
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const formatAmount = (amount: number, currency: string) => {
+    return new Intl.NumberFormat("en-AU", {
+      style: "currency",
+      currency: currency.toUpperCase(),
+    }).format(amount / 100);
+  };
+
+  return (
+    <div className="bg-background min-h-screen">
+      <div className="container mx-auto px-4 py-12 md:px-6">
+        <div className="mx-auto max-w-2xl space-y-8">
+          {/* Success Header */}
+          <div className="text-center">
+            <CheckCircle className="mx-auto h-16 w-16 text-green-500" />
+            <h1 className="mt-4 text-3xl font-bold">Payment Successful!</h1>
+            <p className="text-muted-foreground mt-2">
+              Thank you for your order. We've received your payment and your
+              order is being processed.
+            </p>
+          </div>
+
+          {/* Order Summary */}
+          {paymentDetails && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Package className="h-5 w-5" />
+                  Order Summary
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span>Order Number</span>
+                  <Badge variant="outline">
+                    #{paymentDetails.transaction.orderId}
+                  </Badge>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span>Payment Method</span>
+                  <span>Credit Card</span>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span>Transaction ID</span>
+                  <span className="font-mono text-sm">
+                    {paymentDetails.transaction.transactionId.slice(-8)}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span>Status</span>
+                  <Badge
+                    variant={
+                      paymentDetails.transaction.status === "completed"
+                        ? "default"
+                        : "secondary"
+                    }
+                  >
+                    {paymentDetails.transaction.status === "completed"
+                      ? "Paid"
+                      : paymentDetails.transaction.status}
+                  </Badge>
+                </div>
+
+                <Separator />
+
+                <div className="flex items-center justify-between text-lg font-semibold">
+                  <span>Total Amount</span>
+                  <span>
+                    {formatAmount(
+                      paymentDetails.transaction.amount,
+                      paymentDetails.transaction.currency,
+                    )}
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* What Happens Next */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Mail className="h-5 w-5" />
+                What Happens Next
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-3">
+                <div className="flex items-start gap-3">
+                  <div className="bg-primary text-primary-foreground flex h-6 w-6 items-center justify-center rounded-full text-sm font-medium">
+                    1
+                  </div>
+                  <div>
+                    <h4 className="font-medium">Order Confirmation</h4>
+                    <p className="text-muted-foreground text-sm">
+                      You'll receive an email confirmation shortly with your
+                      order details.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <div className="bg-primary text-primary-foreground flex h-6 w-6 items-center justify-center rounded-full text-sm font-medium">
+                    2
+                  </div>
+                  <div>
+                    <h4 className="font-medium">Order Processing</h4>
+                    <p className="text-muted-foreground text-sm">
+                      Your order will be processed and prepared for shipping
+                      within 1-2 business days.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <div className="bg-primary text-primary-foreground flex h-6 w-6 items-center justify-center rounded-full text-sm font-medium">
+                    3
+                  </div>
+                  <div>
+                    <h4 className="font-medium">Shipping Updates</h4>
+                    <p className="text-muted-foreground text-sm">
+                      You'll receive tracking information once your order ships.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Action Buttons */}
+          <div className="flex flex-col gap-4 sm:flex-row">
+            <Button asChild className="flex-1">
+              <Link href="/account/orders">
+                View Order Details
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+
+            <Button variant="outline" asChild className="flex-1">
+              <Link href="/">Continue Shopping</Link>
+            </Button>
+          </div>
+
+          {/* Support Information */}
+          <Card className="border-blue-200 bg-blue-50">
+            <CardContent className="pt-6">
+              <div className="text-center">
+                <h4 className="font-medium text-blue-900">Need Help?</h4>
+                <p className="mt-1 text-sm text-blue-700">
+                  If you have any questions about your order, please contact our
+                  support team.
+                </p>
+                <Button variant="link" className="mt-2 text-blue-600" asChild>
+                  <Link href="/support">Contact Support</Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+}

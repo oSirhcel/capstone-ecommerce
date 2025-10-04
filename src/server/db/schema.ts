@@ -36,9 +36,9 @@ export const stores = pgTable("stores", {
 export const products = pgTable("products", {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),
   name: varchar({ length: 255 }).notNull(),
-  sku: varchar({ length: 50 }).notNull().unique(),
+  sku: varchar({ length: 50 }).unique(), // Nullable for drafts, unique constraint allows multiple NULLs
   description: varchar({ length: 1000 }),
-  price: integer().notNull(), // Price in cents
+  price: integer(), // Price in cents - nullable for drafts
   compareAtPrice: integer(), // Compare at price in cents
   costPerItem: integer(), // Cost per item in cents
   stock: integer().notNull().default(0),

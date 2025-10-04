@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -32,79 +32,134 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { X, Save, PlusIcon } from "lucide-react";
+import { X, Save, PlusIcon, CloudOff } from "lucide-react";
 import Image from "next/image";
-import { useCreateProduct } from "@/hooks/products/use-product-mutations";
+import {
+  useCreateProduct,
+  useUpdateProduct,
+} from "@/hooks/products/use-product-mutations";
 import { useRouter } from "next/navigation";
 import { UploadButton } from "@/lib/uploadthing";
 import { useSession } from "next-auth/react";
 import { ProductShotModal } from "./product-shot-modal";
 
-const productFormSchema = z.object({
-  name: z
-    .string()
-    .min(1, "Product name is required")
-    .max(100, "Product name must be less than 100 characters"),
-  sku: z
-    .string()
-    .min(1, "SKU is required")
-    .max(50, "SKU must be less than 50 characters"),
-  description: z
-    .string()
-    .min(10, "Description must be at least 10 characters")
-    .max(1000, "Description must be less than 1000 characters"),
-  price: z.number().min(0.01, "Price must be greater than 0"),
-  compareAtPrice: z
-    .number()
-    .min(0, "Compare at price must be 0 or greater")
-    .optional(),
-  costPerItem: z
-    .number()
-    .min(0, "Cost per item must be 0 or greater")
-    .optional(),
-  category: z.string().min(1, "Category is required"),
-  tags: z.string().optional(),
-  trackQuantity: z.boolean().default(true),
-  quantity: z.number().min(0, "Quantity must be 0 or greater").default(0),
-  allowBackorders: z.boolean().default(false),
-  weight: z.number().min(0, "Weight must be 0 or greater").optional(),
-  dimensions: z
-    .object({
-      length: z.number().min(0, "Length must be 0 or greater").optional(),
-      width: z.number().min(0, "Width must be 0 or greater").optional(),
-      height: z.number().min(0, "Height must be 0 or greater").optional(),
-    })
-    .optional(),
-  seoTitle: z
-    .string()
-    .max(60, "SEO title must be less than 60 characters")
-    .optional(),
-  seoDescription: z
-    .string()
-    .max(160, "SEO description must be less than 160 characters")
-    .optional(),
-  slug: z.string().optional(),
-  status: z.enum(["active", "draft", "archived"]).default("draft"),
-  featured: z.boolean().default(false),
-  images: z.array(z.string().url("Invalid image URL")).optional(),
-});
+const productFormSchema = z
+  .object({
+    name: z
+      .string()
+      .min(1, "Product name is required")
+      .max(100, "Product name must be less than 100 characters"),
+    sku: z
+      .string()
+      .max(50, "SKU must be less than 8 characters")
+      .optional()
+      .or(z.literal("")), // Allow empty string for drafts
+    description: z
+      .string()
+      .max(1000, "Description must be less than 1000 characters")
+      .optional()
+      .or(z.literal("")), // Allow empty for drafts
+    price: z.number().min(0, "Price must be 0 or greater").optional(),
+    compareAtPrice: z
+      .number()
+      .min(0, "Compare at price must be 0 or greater")
+      .optional(),
+    costPerItem: z
+      .number()
+      .min(0, "Cost per item must be 0 or greater")
+      .optional(),
+    category: z.string().optional(),
+    tags: z.string().optional(),
+    trackQuantity: z.boolean().default(true),
+    quantity: z.number().min(0, "Quantity must be 0 or greater").default(0),
+    allowBackorders: z.boolean().default(false),
+    weight: z.number().min(0, "Weight must be 0 or greater").optional(),
+    dimensions: z
+      .object({
+        length: z.number().min(0, "Length must be 0 or greater").optional(),
+        width: z.number().min(0, "Width must be 0 or greater").optional(),
+        height: z.number().min(0, "Height must be 0 or greater").optional(),
+      })
+      .optional(),
+    seoTitle: z
+      .string()
+      .max(60, "SEO title must be less than 60 characters")
+      .optional(),
+    seoDescription: z
+      .string()
+      .max(160, "SEO description must be less than 160 characters")
+      .optional(),
+    slug: z.string().optional(),
+    status: z.enum(["active", "draft", "archived"]).default("draft"),
+    featured: z.boolean().default(false),
+    images: z.array(z.string()).optional(),
+  })
+  .refine(
+    (data) => {
+      // SKU is required when status is "active"
+      if (data.status === "active" && (!data.sku || data.sku === "")) {
+        return false;
+      }
+      return true;
+    },
+    {
+      message: "SKU is required for active products",
+      path: ["sku"],
+    },
+  )
+  .refine(
+    (data) => {
+      // Description is required when status is "active"
+      if (
+        data.status === "active" &&
+        (!data.description || data.description.trim() === "")
+      ) {
+        return false;
+      }
+      return true;
+    },
+    {
+      message: "Description is required for active products",
+      path: ["description"],
+    },
+  )
+  .refine(
+    (data) => {
+      // Price is required when status is "active"
+      if (
+        data.status === "active" &&
+        (data.price === undefined || data.price === null || data.price <= 0)
+      ) {
+        return false;
+      }
+      return true;
+    },
+    {
+      message:
+        "Price is required and must be greater than 0 for active products",
+      path: ["price"],
+    },
+  );
 
 type ProductFormValues = z.input<typeof productFormSchema>;
 
 interface ProductFormProps {
   initialData?: Partial<ProductFormValues>;
   isEditing?: boolean;
+  productId?: number;
 }
 
 export function ProductForm({
   initialData,
   isEditing = false,
+  productId,
 }: ProductFormProps) {
   const session = useSession();
   const storeId = session?.data?.store?.id ?? "";
-  const [images, setImages] = useState<string[]>([]);
+  const [images, setImages] = useState<string[]>(initialData?.images ?? []);
   const router = useRouter();
   const createProductMutation = useCreateProduct();
+  const updateProductMutation = useUpdateProduct();
 
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productFormSchema),
@@ -136,6 +191,8 @@ export function ProductForm({
     },
   });
 
+  const { isDirty } = form.formState;
+
   const onSubmit = async (data: ProductFormValues) => {
     const productData = {
       name: data.name,
@@ -151,34 +208,43 @@ export function ProductForm({
       dimensions: data.dimensions,
       seoTitle: data.seoTitle,
       seoDescription: data.seoDescription,
-      slug: data.name.toLowerCase().replace(/ /g, "-"),
+      slug: data.slug,
       status: data.status,
       featured: data.featured,
       tags: data.tags,
       storeId,
       categoryId: data.category ? parseInt(data.category) : undefined,
-      images: data.images ?? images,
+      // Always use the images state as the source of truth
+      images: images,
     };
 
-    console.log(productData);
-
-    createProductMutation.mutate(productData, {
-      onSuccess: (res) => {
-        if (res.data) {
-          router.push(`/admin/products/${res.data.product.id}`);
-        }
-      },
-    });
+    if (isEditing && productId) {
+      // Update existing product
+      updateProductMutation.mutate(
+        { id: productId, updates: productData },
+        {
+          onSuccess: () => {
+            // Reset form dirty state with the current images
+            form.reset({ ...data, images });
+          },
+        },
+      );
+    } else {
+      // Create new product
+      createProductMutation.mutate(productData, {
+        onSuccess: (res) => {
+          if (res.data) {
+            router.replace(`/admin/products/${res.data.product.id}/edit`);
+          }
+        },
+      });
+    }
   };
-
-  // Sync images state with form
-  useEffect(() => {
-    form.setValue("images", images);
-  }, [images, form]);
 
   const removeImage = (index: number) => {
     const newImages = images.filter((_, i) => i !== index);
     setImages(newImages);
+    form.setValue("images", newImages, { shouldDirty: true });
   };
 
   return (
@@ -189,26 +255,24 @@ export function ProductForm({
             <h1 className="text-2xl font-bold tracking-tight">
               {isEditing ? "Edit Product" : "Add Product"}
             </h1>
+            {isDirty && (
+              <p className="text-muted-foreground flex items-center gap-2 text-sm">
+                <CloudOff className="h-4 w-4" />
+                Unsaved changes
+              </p>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-2">
           <Button
-            variant="outline"
-            disabled={createProductMutation.isPending}
-            onClick={() => {
-              const formData = form.getValues();
-              formData.status = "draft";
-              void onSubmit(formData);
-            }}
-          >
-            Save as Draft
-          </Button>
-          <Button
             form="product-form"
             type="submit"
-            disabled={createProductMutation.isPending}
+            disabled={
+              createProductMutation.isPending || updateProductMutation.isPending
+            }
           >
-            {createProductMutation.isPending ? (
+            {createProductMutation.isPending ||
+            updateProductMutation.isPending ? (
               <>
                 <div className="mr-2 h-4 w-4 animate-spin rounded-full border-b-2 border-white" />
                 Saving...
@@ -268,13 +332,18 @@ export function ProductForm({
                       name="sku"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>SKU *</FormLabel>
+                          <FormLabel>
+                            SKU {form.watch("status") === "active" && "*"}
+                          </FormLabel>
                           <FormControl>
-                            <Input placeholder="Enter SKU" {...field} />
+                            <Input
+                              placeholder="Enter SKU (optional for drafts)"
+                              {...field}
+                            />
                           </FormControl>
                           <FormDescription>
-                            Stock Keeping Unit - unique identifier for this
-                            product
+                            Stock Keeping Unit - unique identifier. Required
+                            when publishing product.
                           </FormDescription>
                           <FormMessage />
                         </FormItem>
@@ -287,16 +356,19 @@ export function ProductForm({
                     name="description"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Description *</FormLabel>
+                        <FormLabel>
+                          Description {form.watch("status") === "active" && "*"}
+                        </FormLabel>
                         <FormControl>
                           <Textarea
-                            placeholder="Enter detailed product description"
+                            placeholder="Enter detailed product description (optional for drafts)"
                             className="min-h-[120px]"
                             {...field}
                           />
                         </FormControl>
                         <FormDescription>
-                          {field.value?.length ?? 0}/1000 characters
+                          {field.value?.length ?? 0}/1000 characters. Required
+                          when publishing product.
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -311,7 +383,11 @@ export function ProductForm({
                     <CardTitle>Media</CardTitle>
                     <ProductShotModal
                       onImagesGenerated={(generatedImages) => {
-                        setImages((prev) => [...prev, ...generatedImages]);
+                        const newImages = [...images, ...generatedImages];
+                        setImages(newImages);
+                        form.setValue("images", newImages, {
+                          shouldDirty: true,
+                        });
                       }}
                       productName={form.watch("name")}
                       productDescription={form.watch("description")}
@@ -328,10 +404,14 @@ export function ProductForm({
                         }}
                         endpoint="imageUploader"
                         onClientUploadComplete={(res) => {
-                          setImages((prev) => [
-                            ...prev,
+                          const newImages = [
+                            ...images,
                             ...res.map((r) => r.ufsUrl),
-                          ]);
+                          ];
+                          setImages(newImages);
+                          form.setValue("images", newImages, {
+                            shouldDirty: true,
+                          });
                         }}
                       />
                     </div>
@@ -395,13 +475,17 @@ export function ProductForm({
                             }}
                             endpoint="imageUploader"
                             onClientUploadComplete={(res) => {
-                              setImages((prev) => [
-                                ...prev,
-                                ...res.map((r) => r.url),
-                              ]);
+                              const newImages = [
+                                ...images,
+                                ...res.map((r) => r.ufsUrl),
+                              ];
+                              setImages(newImages);
+                              form.setValue("images", newImages, {
+                                shouldDirty: true,
+                              });
                               console.log(
                                 "Uploaded images:",
-                                res.map((r) => r.url),
+                                res.map((r) => r.ufsUrl),
                               );
                             }}
                           />
@@ -424,12 +508,14 @@ export function ProductForm({
                       name="price"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Price *</FormLabel>
+                          <FormLabel>
+                            Price {form.watch("status") === "active" && "*"}
+                          </FormLabel>
                           <FormControl>
                             <Input
                               type="number"
                               step="0.01"
-                              placeholder="0.00"
+                              placeholder="0.00 (optional for drafts)"
                               {...field}
                               onChange={(e) =>
                                 field.onChange(
@@ -438,7 +524,9 @@ export function ProductForm({
                               }
                             />
                           </FormControl>
-                          <div className="h-5" />
+                          <FormDescription>
+                            Required when publishing product.
+                          </FormDescription>
                           <FormMessage />
                         </FormItem>
                       )}

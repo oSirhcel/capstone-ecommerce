@@ -178,18 +178,42 @@ export async function POST(request: NextRequest) {
     } = body;
 
     // Validate required fields
-    if (!name || !sku || !description || !price || !storeId) {
+    if (!name || !storeId) {
       return NextResponse.json(
         {
-          error:
-            "Missing required fields: name, sku, description, price, storeId",
+          error: "Missing required fields: name, storeId",
         },
         { status: 400 },
       );
     }
 
+    // Validate required fields for active products
+    if (status === "active") {
+      if (!sku || sku.trim() === "") {
+        return NextResponse.json(
+          { error: "SKU is required for active products" },
+          { status: 400 },
+        );
+      }
+      if (!description || description.trim() === "") {
+        return NextResponse.json(
+          { error: "Description is required for active products" },
+          { status: 400 },
+        );
+      }
+      if (!price || price <= 0) {
+        return NextResponse.json(
+          {
+            error:
+              "Price is required and must be greater than 0 for active products",
+          },
+          { status: 400 },
+        );
+      }
+    }
+
     // Convert price to cents (assuming price is in dollars)
-    const priceInCents = Math.round(price * 100);
+    const priceInCents = price ? Math.round(price * 100) : 0;
     const compareAtPriceInCents = compareAtPrice
       ? Math.round(compareAtPrice * 100)
       : null;
@@ -214,7 +238,7 @@ export async function POST(request: NextRequest) {
       .insert(products)
       .values({
         name,
-        sku,
+        sku: sku && sku.trim() !== "" ? sku : null, // Convert empty strings to null
         description,
         price: priceInCents,
         compareAtPrice: compareAtPriceInCents,
@@ -228,7 +252,7 @@ export async function POST(request: NextRequest) {
         height: heightString,
         seoTitle,
         seoDescription,
-        slug,
+        slug: slug && slug.trim() !== "" ? slug : null, // Convert empty strings to null
         status,
         featured,
         tags: tags

@@ -43,6 +43,13 @@
       "when": 1758750205067,
       "tag": "0005_past_johnny_storm",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1759580469016,
+      "tag": "0006_neat_wolfsbane",
+      "breakpoints": true
     }
   ]
 }

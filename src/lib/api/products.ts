@@ -4,9 +4,9 @@ import { getBaseUrl, type ApiResponse } from "./config";
 export interface Product {
   id: number;
   name: string;
-  sku: string;
+  sku: string | null;
   description: string | null;
-  price: number;
+  price: number | null;
   compareAtPrice: number | null;
   costPerItem: number | null;
   stock: number;
@@ -18,7 +18,7 @@ export interface Product {
   height: string | null;
   seoTitle: string | null;
   seoDescription: string | null;
-  slug: string | null;
+  slug: string | null; // Nullable for drafts
   status: string;
   featured: boolean;
   tags: string | null;
@@ -55,9 +55,9 @@ export interface ProductsResponse {
 
 export interface CreateProductData {
   name: string;
-  sku: string;
-  description: string;
-  price: number;
+  sku?: string;
+  description?: string;
+  price?: number;
   compareAtPrice?: number;
   costPerItem?: number;
   stock?: number;

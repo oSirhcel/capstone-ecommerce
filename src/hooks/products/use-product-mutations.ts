@@ -1,5 +1,10 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { createProduct, type CreateProductData } from "@/lib/api/products";
+import {
+  createProduct,
+  updateProduct,
+  type CreateProductData,
+  type UpdateProductData,
+} from "@/lib/api/products";
 import { toast } from "sonner";
 
 interface GenerateProductShotData {
@@ -65,6 +70,35 @@ export function useCreateProduct() {
     onError: (error) => {
       console.error("Error creating product:", error);
       toast.error("Failed to create product. Please try again.");
+    },
+  });
+}
+
+export function useUpdateProduct() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, updates }: { id: number; updates: UpdateProductData }) =>
+      updateProduct(id, updates),
+    onSuccess: (response, variables) => {
+      if (response.data) {
+        // Invalidate and refetch products list
+        void queryClient.invalidateQueries({ queryKey: ["products"] });
+
+        // Update the product in the cache
+        queryClient.setQueryData(
+          ["product", variables.id],
+          response.data.product,
+        );
+
+        toast.success("Product updated successfully!");
+      } else if (response.error) {
+        toast.error(response.error);
+      }
+    },
+    onError: (error) => {
+      console.error("Error updating product:", error);
+      toast.error("Failed to update product. Please try again.");
     },
   });
 }

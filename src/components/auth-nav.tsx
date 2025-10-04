@@ -13,7 +13,6 @@ import {
   DropdownMenuGroup,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
-import { ShieldIcon } from "lucide-react";
 
 export function AuthNav() {
   const { data: session, status } = useSession();
@@ -27,7 +26,7 @@ export function AuthNav() {
   }
 
   if (session?.user) {
-    const isAdmin = session.user?.userType === "admin";
+    // Admin inferred by presence of a store on the session
 
     return (
       <DropdownMenu>
@@ -48,11 +47,6 @@ export function AuthNav() {
               <p className="text-sm leading-none font-medium">
                 {session.user.name ?? session.user.email}
               </p>
-              {isAdmin && (
-                <p className="text-xs font-medium text-blue-600 dark:text-blue-400">
-                  Administrator
-                </p>
-              )}
             </div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
@@ -64,19 +58,18 @@ export function AuthNav() {
               <Link href="/account/orders">Orders</Link>
             </DropdownMenuItem>
           </DropdownMenuGroup>
-          {isAdmin && (
-            <>
-              <DropdownMenuSeparator />
-              <DropdownMenuGroup>
-                <DropdownMenuItem asChild>
-                  <Link href="/admin" className="flex items-center">
-                    <ShieldIcon className="mr-2 h-4 w-4" />
-                    Admin Panel
-                  </Link>
-                </DropdownMenuItem>
-              </DropdownMenuGroup>
-            </>
-          )}
+
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuGroup>
+              <DropdownMenuItem asChild>
+                <Link href="/admin" className="flex items-center">
+                  My Store
+                </Link>
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
+          </>
+
           <DropdownMenuSeparator />
           <DropdownMenuItem onSelect={() => signOut({ callbackUrl: "/" })}>
             Sign Out

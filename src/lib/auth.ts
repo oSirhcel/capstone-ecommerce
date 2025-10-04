@@ -1,8 +1,12 @@
-import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
+import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
+import { db } from "@/server/db";
+import { users, stores } from "@/server/db/schema";
+import { eq } from "drizzle-orm";
+import bcrypt from "bcryptjs";
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
+export const { auth, handlers, signIn, signOut } = NextAuth({
   providers: [
     Credentials({
       name: "Credentials",
@@ -15,12 +19,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           return null;
         }
 
-        // Defer server-only imports to avoid bundling them in Edge middleware
-        const { db } = await import("@/server/db");
-        const { users } = await import("@/server/db/schema");
-        const { eq } = await import("drizzle-orm");
-        const { default: bcryptjs } = await import("bcryptjs");
-
         // Find user by username
         const [user] = await db
           .select()
@@ -28,13 +26,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           .where(eq(users.username, credentials.username as string))
           .limit(1);
 
-        if (!user || !user.password) {
+        if (!user?.password) {
           return null;
         }
 
-        const isValid = await bcryptjs.compare(
+        const isValid = await bcrypt.compare(
           credentials.password as string,
-          user.password
+          user.password,
         );
 
         if (!isValid) {
@@ -47,7 +45,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           name: user.username,
           // Provide an email-shaped value so existing callbacks that derive username from email continue to work
           email: `${user.username}@local`,
-          userType: user.userType,
         };
       },
     }),
@@ -57,58 +54,59 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
-      // On sign in, persist id and userType onto the token
+    async jwt({ token, trigger, user, session }) {
       if (user) {
-        token.sub = user.id as string;
-        if ((user as any).userType) token.userType = (user as any).userType;
+        token.sub = user.id;
+
+        // Check if user has an existing store on first login
+        if (!token.storeId) {
+          const existingStore = await db
+            .select()
+            .from(stores)
+            .where(eq(stores.ownerId, user.id))
+            .limit(1);
+
+          if (existingStore.length > 0) {
+            token.storeId = existingStore[0].id;
+          }
+        }
+      }
+      // When the client calls session.update({ store: { id } }), persist to JWT
+      if (trigger === "update") {
+        const updated = session as { store?: { id?: string } } | undefined;
+        if (updated?.store?.id) {
+          token.storeId = updated.store.id;
+        }
       }
       return token;
     },
-    async signIn({ user, account, profile }) {
+    async signIn({ user: _user, account, profile }) {
       // If user signs in with Google and doesn't exist in our users table, create them
       if (account?.provider === "google" && profile?.email) {
-        const username = profile.email.split('@')[0];
-        const { db } = await import("@/server/db");
-        const { users } = await import("@/server/db/schema");
-        const { eq } = await import("drizzle-orm");
+        const username = profile.email.split("@")[0];
         const existingUser = await db
           .select()
           .from(users)
           .where(eq(users.username, username));
-        
+
         if (existingUser.length === 0) {
           // Create new user with Google info
           await db.insert(users).values({
             id: crypto.randomUUID(),
             username,
-            password: '', // OAuth users don't need password
-            userType: "customer",
+            password: "", // OAuth users don't need password
           });
         }
       }
       return true;
     },
     async session({ session, token }) {
-      // Prefer values from token to avoid extra DB hit on every request
+      // Prefer values from token to avoid extra DB hits
       if (session.user) {
-        (session.user as any).id = token.sub!;
-        (session.user as any).userType = token.userType;
+        session.user.id = token.sub!;
       }
-      // Fallback: if userType missing but we have an email, try to fetch once
-      if (session.user?.email && !(session.user as any).userType) {
-        const username = session.user.email.split('@')[0];
-        const { db } = await import("@/server/db");
-        const { users } = await import("@/server/db/schema");
-        const { eq } = await import("drizzle-orm");
-        const [user] = await db
-          .select()
-          .from(users)
-          .where(eq(users.username, username));
-        if (user) {
-          (session.user as any).id = user.id;
-          (session.user as any).userType = user.userType;
-        }
+      if (token.storeId) {
+        session.store = { id: token.storeId as string };
       }
       return session;
     },
@@ -121,12 +119,3 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
   secret: process.env.NEXTAUTH_SECRET,
 });
-
-// Legacy export for compatibility
-export const authOptions = {
-  providers: [],
-  callbacks: {},
-  pages: { signIn: "/auth/signin" },
-  session: { strategy: "jwt" as const },
-  secret: process.env.NEXTAUTH_SECRET,
-};

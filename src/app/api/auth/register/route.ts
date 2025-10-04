@@ -4,9 +4,12 @@ import { eq } from "drizzle-orm";
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json() as { username: string; password: string };
+    const body = (await request.json()) as {
+      username: string;
+      password: string;
+    };
     const { username, password } = body;
-    
+
     // TODO: Proper validation
     if (!username || !password) {
       return Response.json(
@@ -30,7 +33,6 @@ export async function POST(request: Request) {
       id: crypto.randomUUID(),
       username,
       password,
-      userType: "customer",
       createdAt: new Date(),
       updatedAt: new Date(),
     });

@@ -11,7 +11,6 @@ interface ProductDetailsProps {
   product: {
     name: string;
     description: string;
-    shortDescription?: string;
     price: number;
     compareAtPrice?: number;
     costPerItem?: number;
@@ -37,15 +36,6 @@ export function ProductDetails({ product }: ProductDetailsProps) {
             </h3>
             <p className="text-sm">{product.description}</p>
           </div>
-
-          {product.shortDescription && (
-            <div>
-              <h3 className="text-muted-foreground mb-1 text-sm font-medium">
-                Short Description
-              </h3>
-              <p className="text-sm">{product.shortDescription}</p>
-            </div>
-          )}
 
           <div className="grid grid-cols-2 gap-4">
             <div>

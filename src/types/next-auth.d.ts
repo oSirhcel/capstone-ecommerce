@@ -1,5 +1,4 @@
-import NextAuth from "next-auth";
-import { JWT } from "next-auth/jwt";
+export {};
 
 declare module "next-auth" {
   interface Session {
@@ -8,8 +7,8 @@ declare module "next-auth" {
       name?: string | null;
       email?: string | null;
       image?: string | null;
-      userType: "customer" | "owner" | "admin";
     };
+    store?: { id: string } | undefined;
   }
 
   interface User {
@@ -17,12 +16,11 @@ declare module "next-auth" {
     name?: string | null;
     email?: string | null;
     image?: string | null;
-    userType: "customer" | "owner" | "admin";
   }
 }
 
 declare module "next-auth/jwt" {
   interface JWT {
-    userType: "customer" | "owner" | "admin";
+    storeId?: string;
   }
 }

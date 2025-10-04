@@ -5,7 +5,10 @@ import bcrypt from "bcryptjs";
 
 export async function POST(request: Request) {
   try {
-    const { username, password } = await request.json();
+    const { username, password } = (await request.json()) as {
+      username: string;
+      password: string;
+    };
     // Basic validation
     if (!username || !password) {
       return Response.json(
@@ -20,7 +23,7 @@ export async function POST(request: Request) {
       .where(eq(users.username, username))
       .limit(1);
 
-    if (!user || !user.password) {
+    if (!user?.password) {
       return Response.json(
         { error: "Invalid username or password" },
         { status: 401 },
@@ -36,7 +39,9 @@ export async function POST(request: Request) {
     }
 
     // Do not return password
-    const { password: _pw, ...safeUser } = user as typeof user & { password?: string };
+    const { password: _pw, ...safeUser } = user as typeof user & {
+      password?: string;
+    };
     return Response.json({ message: "Login successful", user: safeUser });
   } catch (error: unknown) {
     let message = "Invalid request";

@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import { DataTable } from "@/components/admin/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,144 +15,94 @@ import { Badge } from "@/components/ui/badge";
 import { Search, Plus, Filter, Eye, Edit, Trash2 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-
-const products = [
-  {
-    id: "1",
-    name: "Handcrafted Ceramic Mug",
-    category: "Home & Living",
-    price: "$24.99",
-    stock: 45,
-    status: "Active",
-    store: "Artisan Crafts",
-    image: "/placeholder.svg?height=40&width=40",
-    sales: 127,
-    rating: 4.8,
-  },
-  {
-    id: "2",
-    name: "Digital Marketing Course",
-    category: "Digital Products",
-    price: "$129.99",
-    stock: 999,
-    status: "Active",
-    store: "Digital Academy",
-    image: "/placeholder.svg?height=40&width=40",
-    sales: 89,
-    rating: 4.9,
-  },
-  {
-    id: "3",
-    name: "Organic Cotton T-Shirt",
-    category: "Clothing",
-    price: "$34.99",
-    stock: 12,
-    status: "Low Stock",
-    store: "Eco Essentials",
-    image: "/placeholder.svg?height=40&width=40",
-    sales: 234,
-    rating: 4.6,
-  },
-  {
-    id: "4",
-    name: "Handmade Silver Earrings",
-    category: "Jewelry",
-    price: "$45.99",
-    stock: 0,
-    status: "Out of Stock",
-    store: "Silver Crafts",
-    image: "/placeholder.svg?height=40&width=40",
-    sales: 56,
-    rating: 4.7,
-  },
-  {
-    id: "5",
-    name: "Premium Coffee Beans",
-    category: "Food & Beverage",
-    price: "$18.99",
-    stock: 78,
-    status: "Active",
-    store: "Coffee Roasters",
-    image: "/placeholder.svg?height=40&width=40",
-    sales: 312,
-    rating: 4.9,
-  },
-];
+import { useProducts } from "@/hooks/products/use-products";
+import { Skeleton } from "@/components/ui/skeleton";
+import { type Product } from "@/lib/api/products";
+import { useSession } from "next-auth/react";
 
 const columns = [
   {
     header: "Product",
     accessorKey: "name",
-    cell: ({ row }: any) => (
-      <div className="flex items-center gap-3">
-        <Image
-          src={row.original.image || "/placeholder.svg"}
-          alt={row.original.name}
-          width={40}
-          height={40}
-          className="rounded-md object-cover"
-        />
-        <div>
-          <div className="font-medium">{row.original.name}</div>
-          <div className="text-muted-foreground text-sm">
-            {row.original.category}
+    cell: ({ row }: { row: { original: Product } }) => {
+      const product = row.original;
+      const primaryImage =
+        product.images.find((img) => img.isPrimary) ?? product.images[0];
+
+      return (
+        <div className="flex items-center gap-3">
+          <Image
+            src={primaryImage?.imageUrl ?? "/placeholder.svg"}
+            alt={primaryImage?.altText ?? product.name}
+            width={40}
+            height={40}
+            className="rounded-md object-cover"
+          />
+          <div>
+            <div className="font-medium">{product.name}</div>
+            <div className="text-muted-foreground text-sm">
+              {product.category?.name ?? "Uncategorized"}
+            </div>
           </div>
         </div>
-      </div>
-    ),
+      );
+    },
   },
   {
     header: "Store",
     accessorKey: "store",
+    cell: ({ row }: { row: { original: Product } }) => (
+      <span>{row.original.store?.name ?? "Unknown Store"}</span>
+    ),
   },
   {
     header: "Price",
     accessorKey: "price",
-    cell: ({ row }: any) => (
-      <span className="font-medium">{row.original.price}</span>
+    cell: ({ row }: { row: { original: Product } }) => (
+      <span className="font-medium">
+        ${(row.original.price / 100).toFixed(2)}
+      </span>
     ),
   },
   {
     header: "Stock",
     accessorKey: "stock",
-    cell: ({ row }: any) => (
-      <span
-        className={row.original.stock < 20 ? "font-medium text-orange-600" : ""}
-      >
-        {row.original.stock}
-      </span>
-    ),
-  },
-  {
-    header: "Sales",
-    accessorKey: "sales",
-  },
-  {
-    header: "Rating",
-    accessorKey: "rating",
-    cell: ({ row }: any) => (
-      <div className="flex items-center gap-1">
-        <span>⭐</span>
-        <span>{row.original.rating}</span>
-      </div>
-    ),
+    cell: ({ row }: { row: { original: Product } }) => {
+      const stock = row.original.stock;
+      return (
+        <span className={stock < 20 ? "font-medium text-orange-600" : ""}>
+          {stock}
+        </span>
+      );
+    },
   },
   {
     header: "Status",
     accessorKey: "status",
-    cell: ({ row }: any) => {
+    cell: ({ row }: { row: { original: Product } }) => {
       const status = row.original.status;
+      const stock = row.original.stock;
+
+      let displayStatus = status;
       let variant: "default" | "secondary" | "destructive" = "default";
 
-      if (status === "Low Stock") variant = "secondary";
-      if (status === "Out of Stock") variant = "destructive";
+      if (stock === 0) {
+        displayStatus = "Out of Stock";
+        variant = "destructive";
+      } else if (stock < 20) {
+        displayStatus = "Low Stock";
+        variant = "secondary";
+      } else if (status === "active") {
+        displayStatus = "Active";
+        variant = "default";
+      }
 
-      return <Badge variant={variant}>{status}</Badge>;
+      return <Badge variant={variant}>{displayStatus}</Badge>;
     },
   },
   {
     header: "Actions",
-    cell: ({ row }: any) => (
+    cell: ({ row }: { row: { original: Product } }) => (
       <div className="flex gap-1">
         <Link href={`/admin/products/${row.original.id}`}>
           <Button variant="ghost" size="sm">
@@ -174,6 +127,41 @@ const columns = [
 ];
 
 export default function ProductsPage() {
+  const session = useSession();
+  const storeId = session?.data?.store?.id ?? "";
+  const [searchTerm, setSearchTerm] = useState("");
+  const {
+    data: productsData,
+    isLoading,
+    error,
+  } = useProducts({
+    search: searchTerm || undefined,
+    store: storeId,
+  });
+
+  const products = productsData?.products ?? [];
+  const totalProducts = productsData?.pagination?.total ?? 0;
+  const activeProducts = products.filter((p) => p.status === "active").length;
+  const lowStockProducts = products.filter(
+    (p) => p.stock > 0 && p.stock < 20,
+  ).length;
+  const outOfStockProducts = products.filter((p) => p.stock === 0).length;
+
+  if (error) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-gray-900">
+            Error loading products
+          </h2>
+          <p className="mt-2 text-gray-600">
+            There was an error loading the products. Please try again.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -200,7 +188,11 @@ export default function ProductsPage() {
                 <p className="text-muted-foreground text-sm font-medium">
                   Total Products
                 </p>
-                <p className="text-2xl font-bold">1,247</p>
+                {isLoading ? (
+                  <Skeleton className="h-8 w-16" />
+                ) : (
+                  <p className="text-2xl font-bold">{totalProducts}</p>
+                )}
               </div>
               <div className="text-green-600">
                 <span className="text-sm">+12%</span>
@@ -216,7 +208,11 @@ export default function ProductsPage() {
                 <p className="text-muted-foreground text-sm font-medium">
                   Active Products
                 </p>
-                <p className="text-2xl font-bold">1,189</p>
+                {isLoading ? (
+                  <Skeleton className="h-8 w-16" />
+                ) : (
+                  <p className="text-2xl font-bold">{activeProducts}</p>
+                )}
               </div>
               <div className="text-green-600">
                 <span className="text-sm">+8%</span>
@@ -232,7 +228,11 @@ export default function ProductsPage() {
                 <p className="text-muted-foreground text-sm font-medium">
                   Low Stock
                 </p>
-                <p className="text-2xl font-bold">23</p>
+                {isLoading ? (
+                  <Skeleton className="h-8 w-16" />
+                ) : (
+                  <p className="text-2xl font-bold">{lowStockProducts}</p>
+                )}
               </div>
               <div className="text-orange-600">
                 <span className="text-sm">+3</span>
@@ -248,7 +248,11 @@ export default function ProductsPage() {
                 <p className="text-muted-foreground text-sm font-medium">
                   Out of Stock
                 </p>
-                <p className="text-2xl font-bold">35</p>
+                {isLoading ? (
+                  <Skeleton className="h-8 w-16" />
+                ) : (
+                  <p className="text-2xl font-bold">{outOfStockProducts}</p>
+                )}
               </div>
               <div className="text-red-600">
                 <span className="text-sm">+7</span>
@@ -269,14 +273,33 @@ export default function ProductsPage() {
           <div className="mb-6 flex items-center gap-4">
             <div className="relative max-w-sm flex-1">
               <Search className="text-muted-foreground absolute top-2.5 left-2.5 h-4 w-4" />
-              <Input placeholder="Search products..." className="pl-8" />
+              <Input
+                placeholder="Search products..."
+                className="pl-8"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
             </div>
             <Button variant="outline">
               <Filter className="mr-2 h-4 w-4" />
               Filter
             </Button>
           </div>
-          <DataTable columns={columns} data={products} />
+          {isLoading ? (
+            <div className="space-y-4">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="flex items-center space-x-4">
+                  <Skeleton className="h-10 w-10 rounded-md" />
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-[200px]" />
+                    <Skeleton className="h-4 w-[100px]" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <DataTable columns={columns} data={products} />
+          )}
         </CardContent>
       </Card>
     </div>

@@ -15,7 +15,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import {
   Select,
@@ -33,79 +32,134 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Upload, X, Save, ArrowLeft } from "lucide-react";
+import { X, Save, PlusIcon, CloudOff } from "lucide-react";
 import Image from "next/image";
-import Link from "next/link";
+import {
+  useCreateProduct,
+  useUpdateProduct,
+} from "@/hooks/products/use-product-mutations";
+import { useRouter } from "next/navigation";
+import { UploadButton } from "@/lib/uploadthing";
+import { useSession } from "next-auth/react";
+import { ProductShotModal } from "./product-shot-modal";
 
-const productFormSchema = z.object({
-  name: z
-    .string()
-    .min(1, "Product name is required")
-    .max(100, "Product name must be less than 100 characters"),
-  sku: z
-    .string()
-    .min(1, "SKU is required")
-    .max(50, "SKU must be less than 50 characters"),
-  description: z
-    .string()
-    .min(10, "Description must be at least 10 characters")
-    .max(1000, "Description must be less than 1000 characters"),
-  shortDescription: z
-    .string()
-    .max(200, "Short description must be less than 200 characters")
-    .optional(),
-  price: z.number().min(0.01, "Price must be greater than 0"),
-  compareAtPrice: z
-    .number()
-    .min(0, "Compare at price must be 0 or greater")
-    .optional(),
-  costPerItem: z
-    .number()
-    .min(0, "Cost per item must be 0 or greater")
-    .optional(),
-  category: z.string().min(1, "Category is required"),
-  tags: z.string().optional(),
-  trackQuantity: z.boolean().default(true),
-  quantity: z.number().min(0, "Quantity must be 0 or greater").default(0),
-  allowBackorders: z.boolean().default(false),
-  weight: z.number().min(0, "Weight must be 0 or greater").optional(),
-  dimensions: z
-    .object({
-      length: z.number().min(0, "Length must be 0 or greater").optional(),
-      width: z.number().min(0, "Width must be 0 or greater").optional(),
-      height: z.number().min(0, "Height must be 0 or greater").optional(),
-    })
-    .optional(),
-  seoTitle: z
-    .string()
-    .max(60, "SEO title must be less than 60 characters")
-    .optional(),
-  seoDescription: z
-    .string()
-    .max(160, "SEO description must be less than 160 characters")
-    .optional(),
-  slug: z.string().optional(),
-  status: z.enum(["active", "draft", "archived"]).default("draft"),
-  featured: z.boolean().default(false),
-});
+const productFormSchema = z
+  .object({
+    name: z
+      .string()
+      .min(1, "Product name is required")
+      .max(100, "Product name must be less than 100 characters"),
+    sku: z
+      .string()
+      .max(50, "SKU must be less than 8 characters")
+      .optional()
+      .or(z.literal("")), // Allow empty string for drafts
+    description: z
+      .string()
+      .max(1000, "Description must be less than 1000 characters")
+      .optional()
+      .or(z.literal("")), // Allow empty for drafts
+    price: z.number().min(0, "Price must be 0 or greater").optional(),
+    compareAtPrice: z
+      .number()
+      .min(0, "Compare at price must be 0 or greater")
+      .optional(),
+    costPerItem: z
+      .number()
+      .min(0, "Cost per item must be 0 or greater")
+      .optional(),
+    category: z.string().optional(),
+    tags: z.string().optional(),
+    trackQuantity: z.boolean().default(true),
+    quantity: z.number().min(0, "Quantity must be 0 or greater").default(0),
+    allowBackorders: z.boolean().default(false),
+    weight: z.number().min(0, "Weight must be 0 or greater").optional(),
+    dimensions: z
+      .object({
+        length: z.number().min(0, "Length must be 0 or greater").optional(),
+        width: z.number().min(0, "Width must be 0 or greater").optional(),
+        height: z.number().min(0, "Height must be 0 or greater").optional(),
+      })
+      .optional(),
+    seoTitle: z
+      .string()
+      .max(60, "SEO title must be less than 60 characters")
+      .optional(),
+    seoDescription: z
+      .string()
+      .max(160, "SEO description must be less than 160 characters")
+      .optional(),
+    slug: z.string().optional(),
+    status: z.enum(["active", "draft", "archived"]).default("draft"),
+    featured: z.boolean().default(false),
+    images: z.array(z.string()).optional(),
+  })
+  .refine(
+    (data) => {
+      // SKU is required when status is "active"
+      if (data.status === "active" && (!data.sku || data.sku === "")) {
+        return false;
+      }
+      return true;
+    },
+    {
+      message: "SKU is required for active products",
+      path: ["sku"],
+    },
+  )
+  .refine(
+    (data) => {
+      // Description is required when status is "active"
+      if (
+        data.status === "active" &&
+        (!data.description || data.description.trim() === "")
+      ) {
+        return false;
+      }
+      return true;
+    },
+    {
+      message: "Description is required for active products",
+      path: ["description"],
+    },
+  )
+  .refine(
+    (data) => {
+      // Price is required when status is "active"
+      if (
+        data.status === "active" &&
+        (data.price === undefined || data.price === null || data.price <= 0)
+      ) {
+        return false;
+      }
+      return true;
+    },
+    {
+      message:
+        "Price is required and must be greater than 0 for active products",
+      path: ["price"],
+    },
+  );
 
 type ProductFormValues = z.input<typeof productFormSchema>;
 
 interface ProductFormProps {
   initialData?: Partial<ProductFormValues>;
   isEditing?: boolean;
+  productId?: number;
 }
 
 export function ProductForm({
   initialData,
   isEditing = false,
+  productId,
 }: ProductFormProps) {
-  const [images, setImages] = useState<string[]>([
-    "/headphones-front.png",
-    "/headphones-side.png",
-    "/headphones-back.png",
-  ]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const session = useSession();
+  const storeId = session?.data?.store?.id ?? "";
+  const [images, setImages] = useState<string[]>(initialData?.images ?? []);
+  const router = useRouter();
+  const createProductMutation = useCreateProduct();
+  const updateProductMutation = useUpdateProduct();
 
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productFormSchema),
@@ -113,7 +167,6 @@ export function ProductForm({
       name: "",
       sku: "",
       description: "",
-      shortDescription: "",
       price: 0,
       compareAtPrice: 0,
       costPerItem: 0,
@@ -133,60 +186,93 @@ export function ProductForm({
       slug: "",
       status: "draft",
       featured: false,
+      images: [],
       ...initialData,
     },
   });
 
+  const { isDirty } = form.formState;
+
   const onSubmit = async (data: ProductFormValues) => {
-    setIsSubmitting(true);
-    try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      console.log("Form data:", data);
-      // Handle form submission here
-    } catch (error) {
-      console.error("Error submitting form:", error);
-    } finally {
-      setIsSubmitting(false);
+    const productData = {
+      name: data.name,
+      sku: data.sku,
+      description: data.description,
+      price: data.price,
+      compareAtPrice: data.compareAtPrice,
+      costPerItem: data.costPerItem,
+      stock: data.quantity,
+      trackQuantity: data.trackQuantity,
+      allowBackorders: data.allowBackorders,
+      weight: data.weight,
+      dimensions: data.dimensions,
+      seoTitle: data.seoTitle,
+      seoDescription: data.seoDescription,
+      slug: data.slug,
+      status: data.status,
+      featured: data.featured,
+      tags: data.tags,
+      storeId,
+      categoryId: data.category ? parseInt(data.category) : undefined,
+      // Always use the images state as the source of truth
+      images: images,
+    };
+
+    if (isEditing && productId) {
+      // Update existing product
+      updateProductMutation.mutate(
+        { id: productId, updates: productData },
+        {
+          onSuccess: () => {
+            // Reset form dirty state with the current images
+            form.reset({ ...data, images });
+          },
+        },
+      );
+    } else {
+      // Create new product
+      createProductMutation.mutate(productData, {
+        onSuccess: (res) => {
+          if (res.data) {
+            router.replace(`/admin/products/${res.data.product.id}/edit`);
+          }
+        },
+      });
     }
   };
 
   const removeImage = (index: number) => {
-    setImages(images.filter((_, i) => i !== index));
-  };
-
-  const addImage = () => {
-    // In a real app, this would open a file picker
-    setImages([...images, "/placeholder.svg?height=200&width=200"]);
+    const newImages = images.filter((_, i) => i !== index);
+    setImages(newImages);
+    form.setValue("images", newImages, { shouldDirty: true });
   };
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="mx-auto flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/admin/products">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Products
-            </Link>
-          </Button>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">
-              {isEditing ? "Edit Product" : "Add New Product"}
+            <h1 className="text-2xl font-bold tracking-tight">
+              {isEditing ? "Edit Product" : "Add Product"}
             </h1>
-            <p className="text-muted-foreground">
-              {isEditing
-                ? "Update product information"
-                : "Create a new product for your store"}
-            </p>
+            {isDirty && (
+              <p className="text-muted-foreground flex items-center gap-2 text-sm">
+                <CloudOff className="h-4 w-4" />
+                Unsaved changes
+              </p>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" disabled={isSubmitting}>
-            Save as Draft
-          </Button>
-          <Button form="product-form" type="submit" disabled={isSubmitting}>
-            {isSubmitting ? (
+          <Button
+            form="product-form"
+            type="submit"
+            disabled={
+              createProductMutation.isPending || updateProductMutation.isPending
+            }
+          >
+            {createProductMutation.isPending ||
+            updateProductMutation.isPending ? (
               <>
                 <div className="mr-2 h-4 w-4 animate-spin rounded-full border-b-2 border-white" />
                 Saving...
@@ -205,17 +291,15 @@ export function ProductForm({
         <form
           id="product-form"
           onSubmit={form.handleSubmit(onSubmit)}
-          className="space-y-6"
+          className="mx-auto space-y-6 lg:max-w-4xl"
         >
-          <Tabs defaultValue="basic" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="basic">Basic Info</TabsTrigger>
+          <Tabs defaultValue="information" className="space-y-6">
+            <TabsList className="w-full">
+              <TabsTrigger value="information"> Info</TabsTrigger>
               <TabsTrigger value="inventory">Inventory</TabsTrigger>
               <TabsTrigger value="seo">SEO</TabsTrigger>
-              <TabsTrigger value="images">Images</TabsTrigger>
             </TabsList>
-
-            <TabsContent value="basic" className="space-y-6">
+            <TabsContent value="information" className="space-y-6">
               <Card>
                 <CardHeader>
                   <CardTitle>Product Information</CardTitle>
@@ -237,6 +321,7 @@ export function ProductForm({
                               {...field}
                             />
                           </FormControl>
+                          <div className="h-5" />
                           <FormMessage />
                         </FormItem>
                       )}
@@ -247,13 +332,18 @@ export function ProductForm({
                       name="sku"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>SKU *</FormLabel>
+                          <FormLabel>
+                            SKU {form.watch("status") === "active" && "*"}
+                          </FormLabel>
                           <FormControl>
-                            <Input placeholder="Enter SKU" {...field} />
+                            <Input
+                              placeholder="Enter SKU (optional for drafts)"
+                              {...field}
+                            />
                           </FormControl>
                           <FormDescription>
-                            Stock Keeping Unit - unique identifier for this
-                            product
+                            Stock Keeping Unit - unique identifier. Required
+                            when publishing product.
                           </FormDescription>
                           <FormMessage />
                         </FormItem>
@@ -266,42 +356,143 @@ export function ProductForm({
                     name="description"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Description *</FormLabel>
+                        <FormLabel>
+                          Description {form.watch("status") === "active" && "*"}
+                        </FormLabel>
                         <FormControl>
                           <Textarea
-                            placeholder="Enter detailed product description"
+                            placeholder="Enter detailed product description (optional for drafts)"
                             className="min-h-[120px]"
                             {...field}
                           />
                         </FormControl>
                         <FormDescription>
-                          {field.value?.length ?? 0}/1000 characters
+                          {field.value?.length ?? 0}/1000 characters. Required
+                          when publishing product.
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
+                </CardContent>
+              </Card>
 
-                  <FormField
-                    control={form.control}
-                    name="shortDescription"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Short Description</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            placeholder="Enter short description for product listings"
-                            className="min-h-[80px]"
-                            {...field}
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center gap-2">
+                    <CardTitle>Media</CardTitle>
+                    <ProductShotModal
+                      onImagesGenerated={(generatedImages) => {
+                        const newImages = [...images, ...generatedImages];
+                        setImages(newImages);
+                        form.setValue("images", newImages, {
+                          shouldDirty: true,
+                        });
+                      }}
+                      productName={form.watch("name")}
+                      productDescription={form.watch("description")}
+                    />
+                  </div>
+                </CardHeader>
+                <CardContent className="w-full">
+                  {images.length === 0 && (
+                    <div className="bg-muted/30 hover:bg-muted/50 border-muted-foreground flex h-64 w-full items-center justify-center rounded-lg border border-dashed transition">
+                      <UploadButton
+                        className="ut-button:bg-primary ut-button:text-primary-foreground ut-allowed-content:hidden"
+                        content={{
+                          button: "Upload images",
+                        }}
+                        endpoint="imageUploader"
+                        onClientUploadComplete={(res) => {
+                          const newImages = [
+                            ...images,
+                            ...res.map((r) => r.ufsUrl),
+                          ];
+                          setImages(newImages);
+                          form.setValue("images", newImages, {
+                            shouldDirty: true,
+                          });
+                        }}
+                      />
+                    </div>
+                  )}
+
+                  {images.length > 0 && (
+                    <div className="flex flex-col gap-4 sm:flex-row">
+                      <div className="flex-shrink-0">
+                        <div className="group relative">
+                          <Image
+                            src={images[0] || "/placeholder.svg"}
+                            alt="Main product image"
+                            width={300}
+                            height={300}
+                            className="h-48 w-48 rounded-lg border object-cover sm:h-64 sm:w-64 md:h-72 md:w-72 lg:h-80 lg:w-80"
                           />
-                        </FormControl>
-                        <FormDescription>
-                          {field.value?.length ?? 0}/200 characters
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="sm"
+                            className="absolute top-2 right-2 opacity-0 transition-opacity group-hover:opacity-100"
+                            onClick={() => removeImage(0)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="grid grid-cols-3 gap-1">
+                          {images.slice(1).map((image, idx) => (
+                            <div
+                              key={image}
+                              className="group relative aspect-square"
+                            >
+                              <Image
+                                src={image || "/placeholder.svg"}
+                                alt={`Product image ${idx + 2}`}
+                                width={80}
+                                height={80}
+                                className="h-full min-h-[60px] w-full min-w-[60px] rounded-lg border object-cover"
+                              />
+                              <Button
+                                type="button"
+                                variant="destructive"
+                                size="sm"
+                                className="absolute top-1 right-1 h-6 w-6 p-0 opacity-0 transition-opacity group-hover:opacity-100"
+                                onClick={() => removeImage(idx + 1)}
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ))}
+
+                          <UploadButton
+                            className="ut-button:size-full ut-button:aspect-square ut-allowed-content:hidden ut-button:bg-muted/50 ut-button:hover:bg-muted/70 ut-button:text-muted-foreground ut-button:border-dashed ut-button:border-2 ut-button:border-muted-foreground/30 rounded-lg"
+                            content={{
+                              button: (
+                                <PlusIcon className="text-muted-foreground h-6 w-6" />
+                              ),
+                            }}
+                            endpoint="imageUploader"
+                            onClientUploadComplete={(res) => {
+                              const newImages = [
+                                ...images,
+                                ...res.map((r) => r.ufsUrl),
+                              ];
+                              setImages(newImages);
+                              form.setValue("images", newImages, {
+                                shouldDirty: true,
+                              });
+                              console.log(
+                                "Uploaded images:",
+                                res.map((r) => r.ufsUrl),
+                              );
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
@@ -317,12 +508,14 @@ export function ProductForm({
                       name="price"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Price *</FormLabel>
+                          <FormLabel>
+                            Price {form.watch("status") === "active" && "*"}
+                          </FormLabel>
                           <FormControl>
                             <Input
                               type="number"
                               step="0.01"
-                              placeholder="0.00"
+                              placeholder="0.00 (optional for drafts)"
                               {...field}
                               onChange={(e) =>
                                 field.onChange(
@@ -331,6 +524,9 @@ export function ProductForm({
                               }
                             />
                           </FormControl>
+                          <FormDescription>
+                            Required when publishing product.
+                          </FormDescription>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -773,69 +969,6 @@ export function ProductForm({
                       </FormItem>
                     )}
                   />
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="images" className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Product Images</CardTitle>
-                  <CardDescription>
-                    Upload images to showcase your product
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-6">
-                    <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-                      {images.map((image, index) => (
-                        <div key={index} className="group relative">
-                          <Image
-                            src={image || "/placeholder.svg"}
-                            alt={`Product image ${index + 1}`}
-                            width={200}
-                            height={200}
-                            className="h-32 w-full rounded-lg border object-cover"
-                          />
-                          <Button
-                            type="button"
-                            variant="destructive"
-                            size="sm"
-                            className="absolute top-2 right-2 opacity-0 transition-opacity group-hover:opacity-100"
-                            onClick={() => removeImage(index)}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                          {index === 0 && (
-                            <Badge className="absolute bottom-2 left-2">
-                              Primary
-                            </Badge>
-                          )}
-                        </div>
-                      ))}
-
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="h-32 border-dashed bg-transparent"
-                        onClick={addImage}
-                      >
-                        <div className="flex flex-col items-center gap-2">
-                          <Upload className="h-6 w-6" />
-                          <span className="text-sm">Add Image</span>
-                        </div>
-                      </Button>
-                    </div>
-
-                    <div className="text-muted-foreground text-sm">
-                      <p>
-                        • First image will be used as the primary product image
-                      </p>
-                      <p>• Recommended size: 800x800px or larger</p>
-                      <p>• Supported formats: JPG, PNG, WebP</p>
-                      <p>• Maximum file size: 5MB per image</p>
-                    </div>
-                  </div>
                 </CardContent>
               </Card>
             </TabsContent>

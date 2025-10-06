@@ -30,37 +30,27 @@ async function main() {
 
   try {
     await db.execute(
-      sql`TRUNCATE TABLE "product_images", "products", "stores", "categories" RESTART IDENTITY CASCADE`,
+      sql`TRUNCATE TABLE "product_images", "products", "stores", "categories", "users" RESTART IDENTITY CASCADE`,
     );
 
     // Create two store owners
     const passwordHash = bcrypt.hashSync("Test123", 10);
+    const ownerAId = "default-store-id";
+    const ownerBId = uuidv4();
+    
     const ownerA: NewUser = {
-      id: "default-store-id",
+      id: ownerAId,
       username: "owner_alpha",
       password: passwordHash,
     };
     const ownerB: NewUser = {
-      id: uuidv4(),
+      id: ownerBId,
       username: "owner_beta",
       password: passwordHash,
     };
 
-    // Upsert-like: insert if not exists by id
-    const existingOwnerA = await db
-      .select({ id: users.id })
-      .from(users)
-      .where(eq(users.username, ownerA.username));
-    if (existingOwnerA.length === 0) {
-      await db.insert(users).values(ownerA);
-    }
-    const existingOwnerB = await db
-      .select({ id: users.id })
-      .from(users)
-      .where(eq(users.username, ownerB.username));
-    if (existingOwnerB.length === 0) {
-      await db.insert(users).values(ownerB);
-    }
+    // Insert users
+    await db.insert(users).values([ownerA, ownerB]);
 
     // Categories
     const categoryData: NewCategory[] = [
@@ -607,7 +597,7 @@ async function main() {
       await db.insert(productImages).values(imageRecords);
     }
 
-    console.log("✅ Seed complete:", {
+    console.log("Seed complete:", {
       users: 2,
       stores: insertedStores.length,
       categories: insertedCategories.length,
@@ -620,6 +610,6 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error("❌ Seed failed:", err);
+  console.error("Seed failed:", err);
   process.exit(1);
 });

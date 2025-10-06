@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { fetchProduct } from "@/lib/api/products";
 
-export function useProduct(id: number) {
+export function useProductQuery(id: number) {
   return useQuery({
     queryKey: ["product", id],
     queryFn: () => fetchProduct(id),

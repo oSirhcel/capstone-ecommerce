@@ -1,3 +1,5 @@
+"use client";
+
 import {
   Card,
   CardContent,
@@ -8,46 +10,60 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MapPin, Edit, Trash2, Plus } from "lucide-react";
+import { useCustomerDetail } from "@/contexts/customer-detail-context";
+import { useCustomerAddressesQuery } from "@/hooks/admin/customers/use-customer-addresses-query";
+import { useSession } from "next-auth/react";
 
-interface CustomerAddressesProps {
-  customerId: string;
-}
+export function CustomerAddresses() {
+  const { customerId } = useCustomerDetail();
+  const session = useSession();
+  const storeId = session.data?.store?.id ?? "";
 
-// Mock addresses data
-const addresses = [
-  {
-    id: "1",
-    type: "shipping",
-    isDefault: true,
-    firstName: "Sarah",
-    lastName: "Johnson",
-    company: "",
-    address1: "42 Wallaby Way",
-    address2: "Unit 3",
-    city: "Sydney",
-    state: "NSW",
-    zipCode: "2000",
-    country: "Australia",
-    phone: "+61 2 9876 5432",
-  },
-  {
-    id: "2",
-    type: "billing",
-    isDefault: false,
-    firstName: "Sarah",
-    lastName: "Johnson",
-    company: "Johnson Consulting",
-    address1: "88 George Street",
-    address2: "Level 12",
-    city: "Parramatta",
-    state: "NSW",
-    zipCode: "2150",
-    country: "Australia",
-    phone: "+61 2 9876 5432",
-  },
-];
+  const { data, isLoading, error } = useCustomerAddressesQuery({
+    customerId,
+    storeId,
+  });
 
-export function CustomerAddresses({ customerId }: CustomerAddressesProps) {
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <MapPin className="h-5 w-5" />
+            Addresses
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex h-32 items-center justify-center">
+            <p className="text-muted-foreground text-sm">
+              Loading addresses...
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <MapPin className="h-5 w-5" />
+            Addresses
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex h-32 items-center justify-center">
+            <p className="text-destructive text-sm">Failed to load addresses</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const addresses = data?.addresses ?? [];
+
   return (
     <Card>
       <CardHeader>
@@ -68,67 +84,71 @@ export function CustomerAddresses({ customerId }: CustomerAddressesProps) {
         </div>
       </CardHeader>
       <CardContent>
-        <div className="grid gap-4 md:grid-cols-2">
-          {addresses.map((address) => (
-            <Card key={address.id} className="relative">
-              <CardContent className="p-4">
-                <div className="flex items-start justify-between">
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <Badge
-                        variant={
-                          address.type === "shipping" ? "default" : "secondary"
-                        }
-                      >
-                        {address.type === "shipping" ? "Shipping" : "Billing"}
-                      </Badge>
-                      {address.isDefault && (
-                        <Badge variant="outline" className="text-xs">
-                          Default
+        {addresses.length === 0 ? (
+          <div className="flex h-32 items-center justify-center">
+            <p className="text-muted-foreground text-sm">No addresses found</p>
+          </div>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2">
+            {addresses.map((address) => (
+              <Card key={address.id} className="relative">
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Badge
+                          variant={
+                            address.type === "shipping"
+                              ? "default"
+                              : "secondary"
+                          }
+                        >
+                          {address.type === "shipping" ? "Shipping" : "Billing"}
                         </Badge>
-                      )}
+                        {address.isDefault && (
+                          <Badge variant="outline" className="text-xs">
+                            Default
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="space-y-1 text-sm">
+                        <p className="font-medium">
+                          {address.firstName} {address.lastName}
+                        </p>
+                        <p className="text-muted-foreground">
+                          {address.addressLine1}
+                        </p>
+                        {address.addressLine2 && (
+                          <p className="text-muted-foreground">
+                            {address.addressLine2}
+                          </p>
+                        )}
+                        <p className="text-muted-foreground">
+                          {address.city}, {address.state} {address.postalCode}
+                        </p>
+                        <p className="text-muted-foreground">
+                          {address.country}
+                        </p>
+                      </div>
                     </div>
-                    <div className="space-y-1 text-sm">
-                      <p className="font-medium">
-                        {address.firstName} {address.lastName}
-                      </p>
-                      {address.company && (
-                        <p className="text-muted-foreground">
-                          {address.company}
-                        </p>
-                      )}
-                      <p className="text-muted-foreground">
-                        {address.address1}
-                      </p>
-                      {address.address2 && (
-                        <p className="text-muted-foreground">
-                          {address.address2}
-                        </p>
-                      )}
-                      <p className="text-muted-foreground">
-                        {address.city}, {address.state} {address.zipCode}
-                      </p>
-                      <p className="text-muted-foreground">{address.country}</p>
-                      <p className="text-muted-foreground">{address.phone}</p>
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-destructive h-8 w-8"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
                   </div>
-                  <div className="flex gap-1">
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="text-destructive h-8 w-8"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
       </CardContent>
     </Card>
   );

@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Search, Plus, Filter, Eye, Edit, Trash2 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useProducts } from "@/hooks/products/use-products";
+import { useProductsQuery } from "@/hooks/products/use-products-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { type Product } from "@/lib/api/products";
 import { useSession } from "next-auth/react";
@@ -60,7 +60,7 @@ const columns = [
     accessorKey: "price",
     cell: ({ row }: { row: { original: Product } }) => (
       <span className="font-medium">
-        ${(row.original.price / 100).toFixed(2)}
+        ${(row.original.price ?? 0 / 100).toFixed(2)}
       </span>
     ),
   },
@@ -134,7 +134,7 @@ export default function ProductsPage() {
     data: productsData,
     isLoading,
     error,
-  } = useProducts({
+  } = useProductsQuery({
     search: searchTerm || undefined,
     store: storeId,
   });

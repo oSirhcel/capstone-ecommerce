@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { fetchProducts, type ProductsResponse } from "@/lib/api/products";
 
-export function useProducts(params?: {
+export function useProductsQuery(params?: {
   page?: number;
   limit?: number;
   category?: number;

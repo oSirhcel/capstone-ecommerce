@@ -86,9 +86,7 @@ const getPriorityBadge = (priority: string) => {
   }
 };
 
-export function CustomerInteractions({
-  customerId,
-}: CustomerInteractionsProps) {
+export function CustomerInteractions() {
   return (
     <div className="space-y-6">
       {/* Support Tickets */}
@@ -170,7 +168,7 @@ export function CustomerInteractions({
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <div className="flex">
-                      {[...Array(5)].map((_, i) => (
+                      {Array.from({ length: 5 }, (_, i) => (
                         <span key={i} className="text-yellow-400">
                           ★
                         </span>
@@ -195,7 +193,7 @@ export function CustomerInteractions({
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <div className="flex">
-                      {[...Array(4)].map((_, i) => (
+                      {Array.from({ length: 4 }, (_, i) => (
                         <span key={i} className="text-yellow-400">
                           ★
                         </span>
@@ -206,8 +204,8 @@ export function CustomerInteractions({
                   </div>
                   <p className="font-medium">Good value for money</p>
                   <p className="text-muted-foreground text-sm">
-                    &quot;Nice product overall, delivery was a bit slow but
-                    the quality makes up for it.&quot;
+                    &quot;Nice product overall, delivery was a bit slow but the
+                    quality makes up for it.&quot;
                   </p>
                   <p className="text-muted-foreground text-xs">
                     December 28, 2023 • Eco-Friendly Water Bottle

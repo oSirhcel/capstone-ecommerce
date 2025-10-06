@@ -14,7 +14,7 @@ export function CustomerStats({ customer }: CustomerStatsProps) {
   const stats = [
     {
       title: "Total Spent",
-      value: `$${customer.totalSpent.toFixed(2)}`,
+      value: `$${(customer.totalSpent / 100).toFixed(2)}`,
       icon: DollarSign,
       description: "Lifetime value",
     },
@@ -26,7 +26,7 @@ export function CustomerStats({ customer }: CustomerStatsProps) {
     },
     {
       title: "Average Order",
-      value: `$${customer.averageOrderValue.toFixed(2)}`,
+      value: `$${(customer.averageOrderValue / 100).toFixed(2)}`,
       icon: TrendingUp,
       description: "Per order",
     },

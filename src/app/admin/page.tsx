@@ -1,7 +1,5 @@
 import { DashboardCards } from "@/components/admin/dashboard/charts/dashboard-charts";
 import { SalesChart } from "@/components/admin/dashboard/charts/sales-chart";
-import { UserGrowthChart } from "@/components/admin/dashboard/charts/user-growth-chart";
-import { TopProductsChart } from "@/components/admin/dashboard/charts/top-products-chart";
 import { RecentActivity } from "@/components/admin/dashboard/recent-activity";
 import { RecentOrders } from "@/components/admin/dashboard/recent-orders";
 import { Button } from "@/components/ui/button";
@@ -37,8 +35,6 @@ export default function AdminPage() {
         <div className="md:col-span-2">
           <SalesChart />
         </div>
-        <UserGrowthChart />
-        <TopProductsChart />
       </div>
 
       {/* Recent Activity and Orders */}

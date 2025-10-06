@@ -1,3 +1,5 @@
+"use client";
+
 import {
   Card,
   CardContent,
@@ -12,10 +14,7 @@ import {
   User,
   CreditCard,
 } from "lucide-react";
-
-interface CustomerTimelineProps {
-  customerId: string;
-}
+import { useCustomerDetail } from "@/contexts/customer-detail-context";
 
 // Mock timeline data
 const timelineEvents = [
@@ -76,7 +75,7 @@ const getEventColor = (type: string) => {
   }
 };
 
-export function CustomerTimeline({ customerId }: CustomerTimelineProps) {
+export function CustomerTimeline() {
   return (
     <Card>
       <CardHeader>

@@ -87,6 +87,9 @@ export const orders = pgTable("orders", {
   userId: varchar("userId", { length: 255 })
     .references(() => users.id)
     .notNull(),
+  storeId: varchar("storeId", { length: 255 })
+    .references(() => stores.id)
+    .notNull(), // Orders belong to a specific store
   status: varchar({ length: 50 }).notNull().default("pending"),
   totalAmount: integer().notNull(), // Total in cents
   createdAt: timestamp().defaultNow().notNull(),
@@ -156,6 +159,11 @@ export const userProfiles = pgTable("user_profiles", {
   email: varchar({ length: 255 }).notNull(),
   phone: varchar({ length: 20 }),
   dateOfBirth: timestamp(),
+  // Admin-managed fields
+  location: varchar({ length: 255 }), // Customer location (city, state)
+  tags: text(), // JSON array of customer tags (e.g., ["VIP", "Repeat Customer"])
+  adminNotes: text(), // Internal admin notes about the customer
+  status: varchar({ length: 20 }).notNull().default("Active"), // 'Active', 'Inactive', 'Suspended'
   createdAt: timestamp().defaultNow().notNull(),
   updatedAt: timestamp().defaultNow().notNull(),
 });

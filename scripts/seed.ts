@@ -10,14 +10,22 @@ import {
   categories,
   products,
   productImages,
+  userProfiles,
+  orders,
+  orderItems,
+  addresses,
 } from "../src/server/db/schema";
-import { eq, sql, type InferInsertModel } from "drizzle-orm";
+import { sql, type InferInsertModel } from "drizzle-orm";
 
 type NewUser = InferInsertModel<typeof users>;
 type NewStore = InferInsertModel<typeof stores>;
 type NewCategory = InferInsertModel<typeof categories>;
 type NewProduct = InferInsertModel<typeof products>;
 type NewProductImage = InferInsertModel<typeof productImages>;
+type NewUserProfile = InferInsertModel<typeof userProfiles>;
+type NewOrder = InferInsertModel<typeof orders>;
+type NewOrderItem = InferInsertModel<typeof orderItems>;
+type NewAddress = InferInsertModel<typeof addresses>;
 
 async function main() {
   const databaseUrl = process.env.DATABASE_URL;
@@ -29,9 +37,24 @@ async function main() {
   const db = drizzle(pool);
 
   try {
+    console.log("🔄 Resetting database...");
+
+    // Truncate all tables in correct order (respecting foreign keys)
     await db.execute(
-      sql`TRUNCATE TABLE "product_images", "products", "stores", "categories" RESTART IDENTITY CASCADE`,
+      sql`TRUNCATE TABLE 
+        "product_images", 
+        "order_items", 
+        "orders", 
+        "addresses", 
+        "user_profiles", 
+        "products", 
+        "stores", 
+        "categories", 
+        "users" 
+        RESTART IDENTITY CASCADE`,
     );
+
+    console.log("✅ Database reset complete");
 
     // Create two store owners
     const passwordHash = bcrypt.hashSync("Test123", 10);
@@ -46,21 +69,7 @@ async function main() {
       password: passwordHash,
     };
 
-    // Upsert-like: insert if not exists by id
-    const existingOwnerA = await db
-      .select({ id: users.id })
-      .from(users)
-      .where(eq(users.username, ownerA.username));
-    if (existingOwnerA.length === 0) {
-      await db.insert(users).values(ownerA);
-    }
-    const existingOwnerB = await db
-      .select({ id: users.id })
-      .from(users)
-      .where(eq(users.username, ownerB.username));
-    if (existingOwnerB.length === 0) {
-      await db.insert(users).values(ownerB);
-    }
+    await db.insert(users).values([ownerA, ownerB]);
 
     // Categories
     const categoryData: NewCategory[] = [
@@ -607,12 +616,148 @@ async function main() {
       await db.insert(productImages).values(imageRecords);
     }
 
+    // Create customer users
+    const customer1: NewUser = {
+      id: uuidv4(),
+      username: "customer_james",
+      password: passwordHash,
+    };
+    const customer2: NewUser = {
+      id: uuidv4(),
+      username: "customer_emma",
+      password: passwordHash,
+    };
+
+    await db.insert(users).values([customer1, customer2]);
+
+    // Create user profiles for customers
+    const customerProfiles: NewUserProfile[] = [
+      {
+        userId: customer1.id,
+        email: "james.wilson@example.com.au",
+        firstName: "James",
+        lastName: "Wilson",
+        phone: "+61 2 9876 5432",
+        status: "Active",
+        location: "Sydney, NSW",
+        tags: JSON.stringify(["VIP", "Regular"]),
+        adminNotes: "Great customer, always pays on time",
+      },
+      {
+        userId: customer2.id,
+        email: "emma.thompson@example.com.au",
+        firstName: "Emma",
+        lastName: "Thompson",
+        phone: "+61 3 8765 4321",
+        status: "Active",
+        location: "Melbourne, VIC",
+        tags: JSON.stringify(["New Customer"]),
+        adminNotes: "First-time buyer",
+      },
+    ];
+
+    await db.insert(userProfiles).values(customerProfiles);
+
+    // Create addresses for customers
+    const customerAddresses: NewAddress[] = [
+      {
+        userId: customer1.id,
+        type: "shipping",
+        firstName: "James",
+        lastName: "Wilson",
+        addressLine1: "42 George Street",
+        addressLine2: "Unit 7",
+        city: "Sydney",
+        state: "NSW",
+        postalCode: "2000",
+        country: "AU",
+        isDefault: true,
+      },
+      {
+        userId: customer2.id,
+        type: "shipping",
+        firstName: "Emma",
+        lastName: "Thompson",
+        addressLine1: "156 Collins Street",
+        city: "Melbourne",
+        state: "VIC",
+        postalCode: "3000",
+        country: "AU",
+        isDefault: true,
+      },
+    ];
+
+    await db.insert(addresses).values(customerAddresses);
+
+    // Create orders for customers (from Alpha Gadgets store)
+    const customerOrders: NewOrder[] = [
+      {
+        userId: customer1.id,
+        storeId: alphaStore.id,
+        status: "completed",
+        totalAmount: cents(119.49), // Wireless Earbuds Pro + USB-C Charger
+      },
+      {
+        userId: customer1.id,
+        storeId: alphaStore.id,
+        status: "completed",
+        totalAmount: cents(39.5), // USB-C Fast Charger
+      },
+      {
+        userId: customer2.id,
+        storeId: alphaStore.id,
+        status: "processing",
+        totalAmount: cents(59.99), // Portable Bluetooth Speaker
+      },
+    ];
+
+    const insertedOrders = await db
+      .insert(orders)
+      .values(customerOrders)
+      .returning();
+
+    // Create order items
+    const items: NewOrderItem[] = [
+      // James's first order - 2 items
+      {
+        orderId: insertedOrders[0].id,
+        productId: insertedProducts[0].id, // Wireless Earbuds Pro
+        quantity: 1,
+        priceAtTime: cents(79.99),
+      },
+      {
+        orderId: insertedOrders[0].id,
+        productId: insertedProducts[2].id, // USB-C Fast Charger
+        quantity: 1,
+        priceAtTime: cents(39.5),
+      },
+      // James's second order
+      {
+        orderId: insertedOrders[1].id,
+        productId: insertedProducts[2].id, // USB-C Fast Charger
+        quantity: 1,
+        priceAtTime: cents(39.5),
+      },
+      // Emma's order
+      {
+        orderId: insertedOrders[2].id,
+        productId: insertedProducts[6].id, // Portable Bluetooth Speaker
+        quantity: 1,
+        priceAtTime: cents(59.99),
+      },
+    ];
+
+    await db.insert(orderItems).values(items);
+
     console.log("✅ Seed complete:", {
-      users: 2,
+      users: 4, // 2 owners + 2 customers
       stores: insertedStores.length,
       categories: insertedCategories.length,
       products: insertedProducts.length,
       images: imageRecords.length,
+      customers: 2,
+      orders: insertedOrders.length,
+      orderItems: items.length,
     });
   } finally {
     await pool.end();

@@ -1,3 +1,5 @@
+"use client";
+
 import {
   Card,
   CardContent,
@@ -8,10 +10,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CreditCard, Edit, Trash2, Plus } from "lucide-react";
-
-interface CustomerPaymentsProps {
-  customerId: string;
-}
+import { useCustomerDetail } from "@/contexts/customer-detail-context";
 
 // Mock payment methods data
 const paymentMethods = [
@@ -41,7 +40,7 @@ const getBrandIcon = (brand: string) => {
   return brand.toUpperCase();
 };
 
-export function CustomerPayments({ customerId }: CustomerPaymentsProps) {
+export function CustomerPayments() {
   return (
     <Card>
       <CardHeader>

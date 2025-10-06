@@ -44,6 +44,7 @@ const PRODUCTS_PER_PAGE = 20;
 function transformProductToCardProps(product: Product) {
   return {
     id: product.id,
+    slug: product.slug,
     name: product.name,
     price: product.price / 100, // Convert from cents to dollars
     image: getPrimaryImageUrl(product),

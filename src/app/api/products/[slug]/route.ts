@@ -8,13 +8,17 @@ import {
 } from "@/server/db/schema";
 import { eq, asc } from "drizzle-orm";
 
-// GET /api/products/[slug] - Get a specific product by slug
+// GET /api/products/[slug] - Get a specific product by slug or ID
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ slug: string }> },
 ) {
   try {
     const { slug } = await params;
+
+    // Check if the slug is a numeric ID
+    const isNumericId = /^\d+$/.test(slug);
+    const productId = isNumericId ? parseInt(slug) : null;
 
     // Get product with store and category information
     const productData = await db
@@ -56,7 +60,11 @@ export async function GET(
       .from(products)
       .leftJoin(stores, eq(products.storeId, stores.id))
       .leftJoin(categories, eq(products.categoryId, categories.id))
-      .where(eq(products.slug, slug))
+      .where(
+        isNumericId 
+          ? eq(products.id, productId!)
+          : eq(products.slug, slug)
+      )
       .limit(1);
 
     if (productData.length === 0) {
@@ -102,7 +110,7 @@ export async function GET(
   }
 }
 
-// PUT /api/products/[slug] - Update a product
+// PUT /api/products/[slug] - Update a product by slug or ID
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ slug: string }> },
@@ -110,18 +118,26 @@ export async function PUT(
   try {
     const { slug } = await params;
     
-    // First, get the product ID from the slug
-    const productLookup = await db
-      .select({ id: products.id })
-      .from(products)
-      .where(eq(products.slug, slug))
-      .limit(1);
+    // Check if the slug is a numeric ID
+    const isNumericId = /^\d+$/.test(slug);
+    let productId: number;
     
-    if (productLookup.length === 0) {
-      return NextResponse.json({ error: "Product not found" }, { status: 404 });
+    if (isNumericId) {
+      productId = parseInt(slug);
+    } else {
+      // First, get the product ID from the slug
+      const productLookup = await db
+        .select({ id: products.id })
+        .from(products)
+        .where(eq(products.slug, slug))
+        .limit(1);
+      
+      if (productLookup.length === 0) {
+        return NextResponse.json({ error: "Product not found" }, { status: 404 });
+      }
+      
+      productId = productLookup[0].id;
     }
-    
-    const productId = productLookup[0].id;
 
     const body = (await request.json()) as {
       name?: string;

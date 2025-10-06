@@ -10,23 +10,23 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 // Mock customer data - in a real app, this would be fetched based on the ID
 const getCustomerData = (id: string) => ({
   id,
-  name: "Sarah Johnson",
-  email: "sarah.johnson@example.com",
-  phone: "+1 (555) 123-4567",
+  name: "Emily Nguyen",
+  email: "emily.nguyen@example.com",
+  phone: "+61 2 9876 5432",
   avatar: "/placeholder.svg?height=80&width=80",
   status: "Active",
-  customerSince: "2023-03-15",
-  lastOrder: "2024-01-10",
-  totalSpent: 1247.89,
-  totalOrders: 12,
-  averageOrderValue: 103.99,
-  location: "New York, NY",
-  tags: ["VIP", "Repeat Customer"],
+  customerSince: "2022-11-20",
+  lastOrder: "2024-02-05",
+  totalSpent: 1899.5,
+  totalOrders: 18,
+  averageOrderValue: 105.53,
+  location: "Sydney, NSW",
+  tags: ["NSW", "Loyal", "Newsletter Subscriber"],
   notes:
-    "Prefers eco-friendly products. Excellent customer, always pays on time.",
+    "Enjoys local brands and fast shipping. Responds well to SMS offers. Based in New South Wales.",
   marketingConsent: true,
   emailVerified: true,
-  phoneVerified: false,
+  phoneVerified: true,
 });
 
 export default function CustomerDetailPage({

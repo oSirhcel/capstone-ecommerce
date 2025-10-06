@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Search, Plus, Filter } from "lucide-react";
+import { Search, Filter } from "lucide-react";
 import Link from "next/link";
 
 const customers = [
@@ -116,19 +116,11 @@ const columns = [
 export default function CustomersPage() {
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Customer Management</h1>
-          <p className="text-muted-foreground">
-            Manage all customers and their permissions
-          </p>
-        </div>
-        <Button asChild>
-          <Link href="/admin/customers/add">
-            <Plus className="mr-2 h-4 w-4" />
-            Add Customer
-          </Link>
-        </Button>
+      <div>
+        <h1 className="text-3xl font-bold">Customer Management</h1>
+        <p className="text-muted-foreground">
+          View and manage registered customers
+        </p>
       </div>
 
       <Card>

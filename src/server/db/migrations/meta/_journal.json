@@ -50,6 +50,20 @@
       "when": 1759580469016,
       "tag": "0006_neat_wolfsbane",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1759804132433,
+      "tag": "0007_right_whirlwind",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1759819100348,
+      "tag": "0008_fair_tyrannus",
+      "breakpoints": true
     }
   ]
 }

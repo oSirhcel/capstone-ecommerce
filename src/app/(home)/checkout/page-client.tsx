@@ -252,9 +252,43 @@ export function CheckoutClient() {
   };
 
   // Handle payment error
-  const handlePaymentError = (error: string) => {
+  const handlePaymentError = (error: string | Error) => {
+    // Check if this is a zero trust block
+    if (error instanceof Error && (error as any).isZeroTrustBlock) {
+      const zeroTrustError = error as any;
+
+      // Redirect to blocked page with risk details
+      const params = new URLSearchParams();
+      params.set("score", zeroTrustError.riskScore?.toString() || "0");
+      params.set("factors", zeroTrustError.riskFactors?.join(",") || "");
+      params.set(
+        "support",
+        zeroTrustError.supportContact || "support@yourstore.com",
+      );
+
+      router.push(`/checkout/blocked?${params.toString()}`);
+      return;
+    }
+
+    // Check if this is a zero trust verification required
+    if (error instanceof Error && (error as any).isZeroTrustVerification) {
+      const verificationError = error as any;
+
+      // Redirect to verification page with details
+      const params = new URLSearchParams();
+      params.set("token", verificationError.verificationToken || "");
+      params.set("score", verificationError.riskScore?.toString() || "0");
+      params.set("factors", verificationError.riskFactors?.join(",") || "");
+      params.set("email", verificationError.userEmail || "");
+
+      router.push(`/checkout/verify?${params.toString()}`);
+      return;
+    }
+
+    // Handle regular payment errors
+    const errorMessage = error instanceof Error ? error.message : error;
     toast.error("Payment failed", {
-      description: error,
+      description: errorMessage,
       duration: 5000,
     });
   };

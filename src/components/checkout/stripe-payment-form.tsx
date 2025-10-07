@@ -117,7 +117,13 @@ function PaymentForm({
       const errorMessage =
         error instanceof Error ? error.message : "Payment processing failed";
       setPaymentError(errorMessage);
-      onError(errorMessage);
+
+      // Pass the actual error object for zero trust handling
+      if (error instanceof Error) {
+        onError(error);
+      } else {
+        onError(errorMessage);
+      }
     } finally {
       setIsProcessing(false);
     }

@@ -75,9 +75,14 @@ export default function SignUpPage() {
 
       return { ok: true };
     },
-    onSuccess: () => {
-      window.location.href =
-        "/auth/signin?message=Account created successfully! Please sign in.";
+    onSuccess: async (_data, variables) => {
+      // Automatically sign the user in after successful registration
+      await signIn("credentials", {
+        redirect: true,
+        username: variables.username,
+        password: variables.password,
+        callbackUrl: "/",
+      });
     },
   });
 

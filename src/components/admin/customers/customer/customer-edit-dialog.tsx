@@ -1,6 +1,5 @@
 "use client";
-
-import { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -13,6 +12,14 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import {
   Select,
   SelectContent,
@@ -53,171 +60,198 @@ export function CustomerEditDialog({
   onOpenChange,
   onSave,
 }: CustomerEditDialogProps) {
-  const [editForm, setEditForm] = useState<CustomerEditFormData>({
-    firstName: customer.name.split(" ")[0] || "",
-    lastName: customer.name.split(" ").slice(1).join(" ") || "",
-    phone: customer.phone,
-    location: customer.location,
-    tags: customer.tags.join(", "),
-    notes: customer.notes,
-    status: customer.status,
+  function deriveFormFromCustomer(
+    c: CustomerEditDialogProps["customer"],
+  ): CustomerEditFormData {
+    return {
+      firstName: c.name.split(" ")[0] || "",
+      lastName: c.name.split(" ").slice(1).join(" ") || "",
+      phone: c.phone,
+      location: c.location,
+      tags: c.tags.join(", "),
+      notes: c.notes,
+      status: c.status,
+    };
+  }
+
+  const form = useForm<CustomerEditFormData>({
+    defaultValues: deriveFormFromCustomer(customer),
+    mode: "onSubmit",
+    reValidateMode: "onChange",
   });
 
-  // Reset form when customer changes or dialog opens
-  useEffect(() => {
-    if (open) {
-      setEditForm({
-        firstName: customer.name.split(" ")[0] || "",
-        lastName: customer.name.split(" ").slice(1).join(" ") || "",
-        phone: customer.phone,
-        location: customer.location,
-        tags: customer.tags.join(", "),
-        notes: customer.notes,
-        status: customer.status,
-      });
-    }
-  }, [customer, open]);
+  function handleDialogOpenChange(nextOpen: boolean) {
+    if (nextOpen) form.reset(deriveFormFromCustomer(customer));
+    onOpenChange(nextOpen);
+  }
 
-  const handleSave = () => {
-    if (onSave) {
-      onSave(editForm);
-    }
-    // TODO: Implement API call to save changes
-    console.log("Saving changes:", editForm);
+  const onSubmit = form.handleSubmit((data) => {
+    if (onSave) onSave(data);
+    console.log("Saving changes:", data);
     onOpenChange(false);
-  };
+  });
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleDialogOpenChange}>
       <DialogContent className="max-h-[80vh] overflow-y-auto sm:max-w-[600px]">
         <DialogHeader>
           <DialogTitle>Edit Customer Information</DialogTitle>
-          <DialogDescription>
-            Update customer details. Note: Email and password can only be
-            changed by the customer.
-          </DialogDescription>
+          <DialogDescription>Update customer details.</DialogDescription>
         </DialogHeader>
 
-        <div className="grid gap-4 py-4">
-          {/* Read-only Email */}
-          <div className="grid gap-2">
-            <Label htmlFor="email" className="text-muted-foreground">
-              Email (read-only)
-            </Label>
-            <Input
-              id="email"
-              value={customer.email}
-              disabled
-              className="bg-muted"
-            />
-            <p className="text-muted-foreground text-xs">
-              Email addresses can only be changed by the customer for security
-              reasons.
-            </p>
-          </div>
-
-          {/* Name Fields */}
-          <div className="grid grid-cols-2 gap-4">
+        <Form {...form}>
+          <form onSubmit={onSubmit} className="grid gap-4 py-4">
+            {/* Read-only Email */}
             <div className="grid gap-2">
-              <Label htmlFor="firstName">First Name</Label>
+              <Label htmlFor="email" className="text-muted-foreground">
+                Email
+              </Label>
               <Input
-                id="firstName"
-                value={editForm.firstName}
-                onChange={(e) =>
-                  setEditForm({ ...editForm, firstName: e.target.value })
-                }
+                id="email"
+                value={customer.email}
+                disabled
+                className="bg-muted"
+              />
+              <p className="text-muted-foreground text-xs">
+                Email addresses may only be changed by the customer.
+              </p>
+            </div>
+
+            {/* Name Fields */}
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="firstName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>First Name</FormLabel>
+                    <FormControl>
+                      <Input {...field} id="firstName" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="lastName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Last Name</FormLabel>
+                    <FormControl>
+                      <Input {...field} id="lastName" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="lastName">Last Name</Label>
-              <Input
-                id="lastName"
-                value={editForm.lastName}
-                onChange={(e) =>
-                  setEditForm({ ...editForm, lastName: e.target.value })
-                }
-              />
-            </div>
-          </div>
 
-          {/* Phone */}
-          <div className="grid gap-2">
-            <Label htmlFor="phone">Phone Number</Label>
-            <Input
-              id="phone"
-              value={editForm.phone}
-              onChange={(e) =>
-                setEditForm({ ...editForm, phone: e.target.value })
-              }
+            {/* Phone */}
+            <FormField
+              control={form.control}
+              name="phone"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Phone Number</FormLabel>
+                  <FormControl>
+                    <Input {...field} id="phone" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </div>
 
-          {/* Location */}
-          <div className="grid gap-2">
-            <Label htmlFor="location">Location</Label>
-            <Input
-              id="location"
-              value={editForm.location}
-              onChange={(e) =>
-                setEditForm({ ...editForm, location: e.target.value })
-              }
+            {/* Location */}
+            <FormField
+              control={form.control}
+              name="location"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Location</FormLabel>
+                  <FormControl>
+                    <Input {...field} id="location" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </div>
 
-          {/* Status */}
-          <div className="grid gap-2">
-            <Label htmlFor="status">Account Status</Label>
-            <Select
-              value={editForm.status}
-              onValueChange={(value) =>
-                setEditForm({ ...editForm, status: value })
-              }
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Active">Active</SelectItem>
-                <SelectItem value="Inactive">Inactive</SelectItem>
-                <SelectItem value="Suspended">Suspended</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Tags */}
-          <div className="grid gap-2">
-            <Label htmlFor="tags">Tags (comma-separated)</Label>
-            <Input
-              id="tags"
-              value={editForm.tags}
-              onChange={(e) =>
-                setEditForm({ ...editForm, tags: e.target.value })
-              }
-              placeholder="VIP, Repeat Customer"
+            {/* Status */}
+            <FormField
+              control={form.control}
+              name="status"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Account Status</FormLabel>
+                  <FormControl>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Active">Active</SelectItem>
+                        <SelectItem value="Inactive">Inactive</SelectItem>
+                        <SelectItem value="Suspended">Suspended</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </div>
 
-          {/* Notes */}
-          <div className="grid gap-2">
-            <Label htmlFor="notes">Admin Notes</Label>
-            <Textarea
-              id="notes"
-              value={editForm.notes}
-              onChange={(e) =>
-                setEditForm({ ...editForm, notes: e.target.value })
-              }
-              rows={3}
-              placeholder="Add internal notes about this customer..."
+            {/* Tags */}
+            <FormField
+              control={form.control}
+              name="tags"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Tags (comma-separated)</FormLabel>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      id="tags"
+                      placeholder="VIP, Repeat Customer"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </div>
-        </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button onClick={handleSave}>Save Changes</Button>
-        </DialogFooter>
+            {/* Notes */}
+            <FormField
+              control={form.control}
+              name="notes"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Admin Notes</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      {...field}
+                      id="notes"
+                      rows={3}
+                      placeholder="Add internal notes about this customer..."
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+              >
+                Cancel
+              </Button>
+              <Button type="submit">Save Changes</Button>
+            </DialogFooter>
+          </form>
+        </Form>
       </DialogContent>
     </Dialog>
   );

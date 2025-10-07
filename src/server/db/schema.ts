@@ -1,4 +1,5 @@
 //schemas
+import { sql } from "drizzle-orm";
 import {
   integer,
   pgTable,
@@ -158,10 +159,11 @@ export const userProfiles = pgTable("user_profiles", {
   lastName: varchar({ length: 100 }),
   email: varchar({ length: 255 }).notNull(),
   phone: varchar({ length: 20 }),
-  dateOfBirth: timestamp(),
   // Admin-managed fields
-  location: varchar({ length: 255 }), // Customer location (city, state)
-  tags: text(), // JSON array of customer tags (e.g., ["VIP", "Repeat Customer"])
+  tags: text("tags2")
+    .array()
+    .notNull()
+    .default(sql`ARRAY[]::text[]`), // Array of customer tags
   adminNotes: text(), // Internal admin notes about the customer
   status: varchar({ length: 20 }).notNull().default("Active"), // 'Active', 'Inactive', 'Suspended'
   createdAt: timestamp().defaultNow().notNull(),

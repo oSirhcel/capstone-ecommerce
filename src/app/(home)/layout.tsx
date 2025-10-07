@@ -121,7 +121,7 @@ const Footer = () => {
                 height={32}
                 className="rounded-md"
               />
-              <span className="font-bold">MarketHub</span>
+              <span className="font-bold">Buyio</span>
             </div>
             <p className="text-muted-foreground text-sm">
               The marketplace for unique products from independent creators.

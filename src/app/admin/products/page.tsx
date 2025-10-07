@@ -60,7 +60,7 @@ const columns = [
     accessorKey: "price",
     cell: ({ row }: { row: { original: Product } }) => (
       <span className="font-medium">
-        ${(row.original.price ?? 0 / 100).toFixed(2)}
+        ${((row.original.price ?? 0) / 100).toFixed(2)}
       </span>
     ),
   },

@@ -120,8 +120,8 @@ export function CustomerOrders({ isOverview = false }: CustomerOrdersProps) {
   const { data, isLoading, error } = useCustomerOrdersQuery({
     customerId,
     storeId,
-    page: isOverview ? 1 : undefined,
-    limit: isOverview ? 5 : undefined,
+    page: 1,
+    limit: 5,
   });
 
   return (

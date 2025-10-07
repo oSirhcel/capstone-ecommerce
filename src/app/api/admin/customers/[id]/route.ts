@@ -20,8 +20,9 @@ import { auth } from "@/lib/auth";
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
+  const { id } = await params;
   // Check admin authentication
   const session = await auth();
   if (!session?.user) {
@@ -61,7 +62,7 @@ export async function GET(
     const [hasOrderedFromStore] = await db
       .select({ orderId: orders.id })
       .from(orders)
-      .where(and(eq(orders.userId, params.id), eq(orders.storeId, storeId)))
+      .where(and(eq(orders.userId, id), eq(orders.storeId, storeId)))
       .limit(1);
 
     if (!hasOrderedFromStore) {
@@ -89,7 +90,7 @@ export async function GET(
       })
       .from(users)
       .innerJoin(userProfiles, eq(users.id, userProfiles.userId))
-      .where(eq(users.id, params.id));
+      .where(eq(users.id, id));
 
     if (!customer) {
       return NextResponse.json(
@@ -105,13 +106,13 @@ export async function GET(
         totalSpent: sum(orders.totalAmount),
       })
       .from(orders)
-      .where(and(eq(orders.userId, params.id), eq(orders.storeId, storeId)));
+      .where(and(eq(orders.userId, id), eq(orders.storeId, storeId)));
 
     // Get last order (from THIS store)
     const [lastOrderResult] = await db
       .select({ createdAt: orders.createdAt })
       .from(orders)
-      .where(and(eq(orders.userId, params.id), eq(orders.storeId, storeId)))
+      .where(and(eq(orders.userId, id), eq(orders.storeId, storeId)))
       .orderBy(desc(orders.createdAt))
       .limit(1);
 
@@ -122,7 +123,7 @@ export async function GET(
         state: addresses.state,
       })
       .from(addresses)
-      .where(eq(addresses.userId, params.id))
+      .where(eq(addresses.userId, id))
       .limit(1);
 
     // Calculate average order value
@@ -181,8 +182,9 @@ export async function GET(
  */
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
+  const { id } = await params;
   // Check admin authentication
   const session = await auth();
   if (!session?.user) {
@@ -222,7 +224,7 @@ export async function PATCH(
     const [hasOrderedFromStore] = await db
       .select({ orderId: orders.id })
       .from(orders)
-      .where(and(eq(orders.userId, params.id), eq(orders.storeId, storeId)))
+      .where(and(eq(orders.userId, id), eq(orders.storeId, storeId)))
       .limit(1);
 
     if (!hasOrderedFromStore) {
@@ -241,7 +243,7 @@ export async function PATCH(
     const [existing] = await db
       .select({ id: users.id })
       .from(users)
-      .where(eq(users.id, params.id));
+      .where(eq(users.id, id));
 
     if (!existing) {
       return NextResponse.json(
@@ -273,7 +275,7 @@ export async function PATCH(
     await db
       .update(userProfiles)
       .set(updateObject)
-      .where(eq(userProfiles.userId, params.id));
+      .where(eq(userProfiles.userId, id));
 
     // Fetch and return updated customer data
     const updatedCustomerResponse = await GET(request, { params });

@@ -237,6 +237,68 @@ export const orderDiscounts = pgTable("order_discounts", {
   createdAt: timestamp().defaultNow().notNull(),
 });
 
+// Zero Trust Risk Assessments
+export const zeroTrustAssessments = pgTable("zero_trust_assessments", {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  userId: varchar("userId", { length: 255 })
+    .references(() => users.id),
+  orderId: integer()
+    .references(() => orders.id),
+  paymentIntentId: varchar({ length: 255 }), // Stripe payment intent ID
+  
+  // Risk assessment results
+  riskScore: integer().notNull(), // 0-100
+  decision: varchar({ length: 10 }).notNull(), // 'allow', 'warn', 'deny'
+  confidence: integer().notNull(), // 0-100 (confidence percentage)
+  
+  // Transaction details at time of assessment
+  transactionAmount: integer().notNull(), // Amount in cents
+  currency: varchar({ length: 3 }).notNull().default('aud'),
+  itemCount: integer().notNull().default(0),
+  storeCount: integer().notNull().default(0),
+  
+  // Risk factors (JSON array)
+  riskFactors: text(), // JSON string of risk factors
+  
+  // Request metadata
+  userAgent: text(),
+  ipAddress: varchar({ length: 45 }), // IPv6 compatible
+  
+  // Geographic data
+  shippingCountry: varchar({ length: 2 }),
+  shippingState: varchar({ length: 100 }),
+  shippingCity: varchar({ length: 100 }),
+  
+  createdAt: timestamp().defaultNow().notNull(),
+});
+
+// Zero Trust Verification Tokens
+export const zeroTrustVerifications = pgTable("zero_trust_verifications", {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  token: varchar({ length: 255 }).notNull().unique(),
+  userId: varchar("userId", { length: 255 })
+    .references(() => users.id)
+    .notNull(),
+  
+  // Transaction details to resume after verification
+  paymentData: text().notNull(), // JSON string of original payment request
+  riskScore: integer().notNull(),
+  riskFactors: text(), // JSON string of risk factors
+  
+  // Verification status
+  status: varchar({ length: 20 }).notNull().default('pending'), // 'pending', 'verified', 'expired'
+  verifiedAt: timestamp(),
+  expiresAt: timestamp().notNull(), // Tokens expire after 30 minutes
+  
+  // Email details
+  userEmail: varchar({ length: 255 }).notNull(),
+  emailSent: boolean().notNull().default(false),
+  emailSentAt: timestamp(),
+  
+  createdAt: timestamp().defaultNow().notNull(),
+  updatedAt: timestamp().defaultNow().notNull(),
+});
+
 // Inventory tracking
 export const inventoryLogs = pgTable("inventory_logs", {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),

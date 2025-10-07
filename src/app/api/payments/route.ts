@@ -1,8 +1,9 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { db } from '@/server/db';
-import { paymentTransactions, orders } from '@/server/db/schema';
-import { eq } from 'drizzle-orm';
+import { paymentTransactions, orders, zeroTrustVerifications } from '@/server/db/schema';
+import { eq, and, desc } from 'drizzle-orm';
+import {zeroTrustCheck } from '@/lib/zeroTrustMiddleware';
 import {
   createPaymentIntent,
   createOrRetrieveCustomer,
@@ -24,6 +25,18 @@ interface CreatePaymentRequest {
   savePaymentMethod?: boolean;
 }
 
+interface ZeroTrustAssessment {
+  decision: 'allow' | 'warn' | 'deny';
+  score: number;
+  confidence: number;
+  factors: Array<{
+    factor: string;
+    impact: number;
+    description: string;
+  }>;
+  timestamp: string;
+}
+
 // POST /api/payments - Create payment intent
 export async function POST(request: NextRequest) {
   try {
@@ -35,6 +48,97 @@ export async function POST(request: NextRequest) {
 
     const user = session.user as SessionUser;
     const body = await request.json() as CreatePaymentRequest;
+
+    // Perform zero trust risk assessment
+    const zeroTrustResponse = await zeroTrustCheck(request, body, session);
+    if (zeroTrustResponse.status !== 200) {
+      return zeroTrustResponse;
+    }
+
+    // Parse the zero trust assessment result
+    const zeroTrustData = await zeroTrustResponse.json() as { riskAssessment: ZeroTrustAssessment };
+    const riskAssessment = zeroTrustData.riskAssessment;
+
+    // Handle zero trust decisions
+    if (riskAssessment.decision === 'deny') {
+      console.log(`Payment BLOCKED by Zero Trust: Score ${riskAssessment.score}, User: ${user.id}`);
+      return NextResponse.json({
+        error: 'Transaction blocked for security reasons',
+        errorCode: 'ZERO_TRUST_DENIED',
+        riskScore: riskAssessment.score,
+        riskFactors: riskAssessment.factors.map(f => f.factor),
+        message: 'This transaction has been flagged as high-risk and cannot be processed. Please contact support if you believe this is an error.',
+        supportContact: 'support@yourstore.com'
+      }, { status: 403 });
+    }
+
+    if (riskAssessment.decision === 'warn') {
+      console.log(`Payment FLAGGED by Zero Trust: Score ${riskAssessment.score}, User: ${user.id}`);
+      
+      // Check if user has a recent verified token (within 10 minutes)
+      const [verifiedToken] = await db
+        .select()
+        .from(zeroTrustVerifications)
+        .where(
+          and(
+            eq(zeroTrustVerifications.userId, user.id),
+            eq(zeroTrustVerifications.status, 'verified')
+          )
+        )
+        .orderBy(desc(zeroTrustVerifications.verifiedAt))
+        .limit(1);
+
+      if (verifiedToken && verifiedToken.verifiedAt) {
+        const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+        if (verifiedToken.verifiedAt > tenMinutesAgo) {
+          console.log(`Payment allowed after recent verification: User ${user.id}`);
+          // Continue with normal payment processing
+        } else {
+          // Token is too old, require new verification
+          return await requireNewVerification();
+        }
+      } else {
+        // No verified token found, require verification
+        return await requireNewVerification();
+      }
+
+      async function requireNewVerification() {
+        // Generate verification token for warn transactions
+        const verificationToken = crypto.randomUUID();
+        const expiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes from now
+        
+        // Store verification request in database
+        try {
+          await db.insert(zeroTrustVerifications).values({
+            token: verificationToken,
+            userId: user.id,
+            paymentData: JSON.stringify(body), // Store original payment request
+            riskScore: riskAssessment.score,
+            riskFactors: JSON.stringify(riskAssessment.factors),
+            userEmail: user.email ?? '',
+            expiresAt,
+          });
+        } catch (dbError) {
+          console.error('Failed to store verification token:', dbError);
+          // Fall back to deny if we can't store verification
+          return NextResponse.json({
+            error: 'Transaction blocked - verification system unavailable',
+            errorCode: 'ZERO_TRUST_DENIED',
+            message: 'Unable to process verification. Please try again later or contact support.',
+          }, { status: 503 });
+        }
+        
+        return NextResponse.json({
+          error: 'Transaction requires additional verification',
+          errorCode: 'ZERO_TRUST_VERIFICATION_REQUIRED',
+          riskScore: riskAssessment.score,
+          riskFactors: riskAssessment.factors.map(f => f.factor),
+          verificationToken,
+          message: 'This transaction has been flagged for additional security verification. Please verify your email to proceed.',
+          userEmail: user.email
+        }, { status: 202 }); // 202 Accepted but requires action
+      }
+    }
     
     const {
       amount,

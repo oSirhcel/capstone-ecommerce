@@ -34,6 +34,28 @@ export const processPayment = async (params: {
 
   if (!response.ok) {
     const error = await response.json();
+    
+    // Handle zero trust blocking specially
+    if (error.errorCode === 'ZERO_TRUST_DENIED') {
+      const zeroTrustError = new Error(error.message || 'Transaction blocked for security reasons');
+      (zeroTrustError as any).isZeroTrustBlock = true;
+      (zeroTrustError as any).riskScore = error.riskScore;
+      (zeroTrustError as any).riskFactors = error.riskFactors;
+      (zeroTrustError as any).supportContact = error.supportContact;
+      throw zeroTrustError;
+    }
+    
+    // Handle zero trust verification required
+    if (error.errorCode === 'ZERO_TRUST_VERIFICATION_REQUIRED') {
+      const verificationError = new Error(error.message || 'Transaction requires verification');
+      (verificationError as any).isZeroTrustVerification = true;
+      (verificationError as any).riskScore = error.riskScore;
+      (verificationError as any).riskFactors = error.riskFactors;
+      (verificationError as any).verificationToken = error.verificationToken;
+      (verificationError as any).userEmail = error.userEmail;
+      throw verificationError;
+    }
+    
     throw new Error(error.error || 'Payment processing failed');
   }
 

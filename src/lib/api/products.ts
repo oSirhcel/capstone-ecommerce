@@ -148,6 +148,20 @@ export async function fetchProduct(id: number): Promise<Product> {
   return response.json() as Promise<Product>;
 }
 
+// GET /api/products/[slug] - Fetch a single product by slug
+export async function fetchProductBySlug(slug: string): Promise<Product> {
+  const response = await fetch(`${getBaseUrl()}/api/products/${slug}`);
+
+  if (!response.ok) {
+    if (response.status === 404) {
+      throw new Error("Product not found");
+    }
+    throw new Error(`Failed to fetch product: ${response.statusText}`);
+  }
+
+  return response.json() as Promise<Product>;
+}
+
 // POST /api/products - Create a new product (admin/owner only)
 export async function createProduct(
   productData: CreateProductData,

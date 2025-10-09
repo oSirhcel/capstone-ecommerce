@@ -45,7 +45,7 @@ export function CartItem({ item }: CartItemProps) {
         <div className="flex justify-between">
           <div>
             <Link
-              href={`/product/${item.id}`}
+              href={`/product/${item.slug || item.id}`}
               className="line-clamp-1 font-medium hover:underline"
             >
               {item.name}

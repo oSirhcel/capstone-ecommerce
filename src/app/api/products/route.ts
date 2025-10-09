@@ -42,6 +42,7 @@ export async function GET(request: NextRequest) {
         name: products.name,
         description: products.description,
         price: products.price,
+        slug: products.slug,
         stock: products.stock,
         storeId: products.storeId,
         categoryId: products.categoryId,

@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
-import { fetchProduct, type Product } from "@/lib/api/products";
+import { fetchProductBySlug, type Product } from "@/lib/api/products";
 import { Breadcrumb } from "@/components/product/breadcrumb";
 import { ProductGallery } from "@/components/product/product-gallery";
 import { ProductInfo } from "@/components/product/product-info";
@@ -11,7 +11,7 @@ import { RelatedProducts } from "@/components/product/related-products";
 import { StoreInfo } from "@/components/product/store-info";
 
 interface ProductPageClientProps {
-  productId: number;
+  productSlug: string;
 }
 
 function transform(product: Product) {
@@ -61,10 +61,10 @@ function transform(product: Product) {
   };
 }
 
-export function ProductPageClient({ productId }: ProductPageClientProps) {
+export function ProductPageClient({ productSlug }: ProductPageClientProps) {
   const { data, isLoading, error } = useQuery({
-    queryKey: ["product", productId],
-    queryFn: () => fetchProduct(productId),
+    queryKey: ["product", productSlug],
+    queryFn: () => fetchProductBySlug(productSlug),
   });
 
   if (isLoading) {

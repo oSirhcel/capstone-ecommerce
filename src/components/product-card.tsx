@@ -5,9 +5,11 @@ import Link from "next/link";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { generateSlug } from "@/lib/utils/slug";
 
 interface ProductCardProps {
   id: number;
+  slug?: string;
   name: string;
   price: number;
   image: string;
@@ -18,6 +20,7 @@ interface ProductCardProps {
 
 export function ProductCard({
   id,
+  slug,
   name,
   price,
   image,
@@ -25,8 +28,13 @@ export function ProductCard({
   store,
   category,
 }: ProductCardProps) {
+  // Use slug if available, otherwise generate one from name, or fall back to id
+  const productUrl = slug
+    ? `/product/${slug}`
+    : `/product/${generateSlug(name)}`;
+
   return (
-    <Link href={`/product/${id}`}>
+    <Link href={productUrl}>
       <Card className="overflow-hidden transition-all hover:shadow-md">
         <CardContent className="p-0">
           <div className="relative">

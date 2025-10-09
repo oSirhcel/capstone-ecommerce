@@ -121,7 +121,7 @@ Run database migrations if needed:
 npm run db:push
 ```
 
-## 🚀 Quick Start (Now that CLI is installed)
+### Quick Start (Now that CLI is installed)
 
 You're ready to test! Follow these steps:
 
@@ -181,32 +181,32 @@ You're ready to test! Follow these steps:
 
 ## Features Included
 
-### ✅ Payment Processing
+### Payment Processing
 
 - Secure payment form with Stripe Elements
 - Support for credit cards and Australian bank debits
 - Real-time payment validation
 
-### ✅ Database Integration
+### Database Integration
 
 - Automatic transaction recording
 - Order status updates
 - Payment method saving (optional)
 
-### ✅ Multi-step Checkout
+### Multi-step Checkout
 
 - Contact information collection
 - Shipping address form
 - Payment processing
 - Success confirmation
 
-### ✅ Webhook Handling
+### Webhook Handling
 
 - Automatic payment status updates
 - Order confirmation on successful payment
 - Failed payment handling
 
-### ✅ Error Handling
+### Error Handling
 
 - Payment failures
 - Network errors

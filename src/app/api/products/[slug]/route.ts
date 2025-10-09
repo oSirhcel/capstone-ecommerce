@@ -8,13 +8,17 @@ import {
 } from "@/server/db/schema";
 import { eq, asc } from "drizzle-orm";
 
-// GET /api/products/[id] - Get a specific product by ID
+// GET /api/products/[slug] - Get a specific product by slug or ID
 export async function GET(
   _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
+  { params }: { params: Promise<{ slug: string }> },
 ) {
   try {
-    const { id } = await params;
+    const { slug } = await params;
+
+    // Check if the slug is a numeric ID
+    const isNumericId = /^\d+$/.test(slug);
+    const productId = isNumericId ? parseInt(slug) : null;
 
     // Get product with store and category information
     const productData = await db
@@ -56,7 +60,11 @@ export async function GET(
       .from(products)
       .leftJoin(stores, eq(products.storeId, stores.id))
       .leftJoin(categories, eq(products.categoryId, categories.id))
-      .where(eq(products.id, parseInt(id)))
+      .where(
+        isNumericId 
+          ? eq(products.id, productId!)
+          : eq(products.slug, slug)
+      )
       .limit(1);
 
     if (productData.length === 0) {
@@ -73,7 +81,7 @@ export async function GET(
         displayOrder: productImages.displayOrder,
       })
       .from(productImages)
-      .where(eq(productImages.productId, parseInt(id)))
+      .where(eq(productImages.productId, productData[0].id))
       .orderBy(asc(productImages.displayOrder));
 
     const product = productData[0];
@@ -102,14 +110,34 @@ export async function GET(
   }
 }
 
-// PUT /api/products/[id] - Update a product
+// PUT /api/products/[slug] - Update a product by slug or ID
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
+  { params }: { params: Promise<{ slug: string }> },
 ) {
   try {
-    const { id } = await params;
-    const productId = parseInt(id);
+    const { slug } = await params;
+    
+    // Check if the slug is a numeric ID
+    const isNumericId = /^\d+$/.test(slug);
+    let productId: number;
+    
+    if (isNumericId) {
+      productId = parseInt(slug);
+    } else {
+      // First, get the product ID from the slug
+      const productLookup = await db
+        .select({ id: products.id })
+        .from(products)
+        .where(eq(products.slug, slug))
+        .limit(1);
+      
+      if (productLookup.length === 0) {
+        return NextResponse.json({ error: "Product not found" }, { status: 404 });
+      }
+      
+      productId = productLookup[0].id;
+    }
 
     const body = (await request.json()) as {
       name?: string;
@@ -372,10 +400,10 @@ export async function PUT(
   }
 }
 
-// DELETE /api/products/[id] - Delete a product (placeholder for future implementation)
+// DELETE /api/products/[slug] - Delete a product (placeholder for future implementation)
 export async function DELETE(
   _request: NextRequest,
-  { params: _params }: { params: Promise<{ id: string }> },
+  { params: _params }: { params: Promise<{ slug: string }> },
 ) {
   // TODO: Implement product deletion with proper authentication
   return NextResponse.json(

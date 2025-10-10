@@ -133,10 +133,10 @@ export function CustomerAddresses({ customerId, storeId }: Props) {
                 Add Address
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="sm:max-w-2xl">
               <DialogHeader>
                 <DialogTitle>
-                  {selectedAddress ? "Edit address" : "Add address"}
+                  {selectedAddress ? "Edit address" : "Add an address"}
                 </DialogTitle>
               </DialogHeader>
               <AdminCustomerAddressForm

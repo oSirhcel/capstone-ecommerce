@@ -3,14 +3,7 @@
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
+import { Form, FormControl, FormField } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,6 +14,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field";
 
 const addressFormSchema = z.object({
   type: z.enum(["shipping", "billing"]),
@@ -67,168 +66,225 @@ export function AdminCustomerAddressForm({
     },
   });
 
+  const errors = form.formState.errors;
+  const hasErrors = Object.keys(errors).length > 0;
+
+  const missingFields = Object.keys(errors)
+    .map(
+      (key) =>
+        key.charAt(0).toUpperCase() +
+        key
+          .slice(1)
+          .replace(/([A-Z])/g, " $1")
+          .trim(),
+    )
+    .join(", ");
+
   return (
     <Form {...form}>
-      <form
-        onSubmit={form.handleSubmit((values) => onSubmit(values))}
-        className="grid grid-cols-2 gap-2"
-      >
-        <FormField
-          control={form.control}
-          name="type"
-          render={({ field }) => (
-            <FormItem className="col-span-2">
-              <FormLabel>Type</FormLabel>
-              <Select value={field.value} onValueChange={field.onChange}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="shipping">Shipping</SelectItem>
-                  <SelectItem value="billing">Billing</SelectItem>
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
+      <form onSubmit={form.handleSubmit((values) => onSubmit(values))}>
+        <FieldGroup className="gap-4">
+          {hasErrors && (
+            <div className="border-destructive bg-destructive/10 text-destructive rounded-md border p-3 text-sm">
+              <span className="font-medium">Missing fields:</span>{" "}
+              {missingFields}
+            </div>
           )}
-        />
 
-        <FormField
-          control={form.control}
-          name="firstName"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>First name</FormLabel>
-              <FormControl>
-                <Input {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+          <FormField
+            control={form.control}
+            name="type"
+            render={({ field, fieldState }) => (
+              <Field data-invalid={!!fieldState.error}>
+                <FieldLabel htmlFor="type">Type</FieldLabel>
+                <FormControl>
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger id="type">
+                      <SelectValue placeholder="Select type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="shipping">Shipping</SelectItem>
+                      <SelectItem value="billing">Billing</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </FormControl>
+                <FieldDescription>
+                  Choose whether this is a shipping or billing address
+                </FieldDescription>
+              </Field>
+            )}
+          />
 
-        <FormField
-          control={form.control}
-          name="lastName"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Last name</FormLabel>
-              <FormControl>
-                <Input {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+          <div className="grid grid-cols-2 gap-4">
+            <FormField
+              control={form.control}
+              name="firstName"
+              render={({ field, fieldState }) => (
+                <Field data-invalid={!!fieldState.error}>
+                  <FieldLabel htmlFor="firstName">First name</FieldLabel>
+                  <FormControl>
+                    <Input
+                      id="firstName"
+                      {...field}
+                      aria-invalid={!!fieldState.error}
+                    />
+                  </FormControl>
+                </Field>
+              )}
+            />
 
-        <FormField
-          control={form.control}
-          name="addressLine1"
-          render={({ field }) => (
-            <FormItem className="col-span-2">
-              <FormLabel>Address line 1</FormLabel>
-              <FormControl>
-                <Input {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+            <FormField
+              control={form.control}
+              name="lastName"
+              render={({ field, fieldState }) => (
+                <Field data-invalid={!!fieldState.error}>
+                  <FieldLabel htmlFor="lastName">Last name</FieldLabel>
+                  <FormControl>
+                    <Input
+                      id="lastName"
+                      {...field}
+                      aria-invalid={!!fieldState.error}
+                    />
+                  </FormControl>
+                </Field>
+              )}
+            />
+          </div>
 
-        <FormField
-          control={form.control}
-          name="addressLine2"
-          render={({ field }) => (
-            <FormItem className="col-span-2">
-              <FormLabel>Address line 2</FormLabel>
-              <FormControl>
-                <Input {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+          <FormField
+            control={form.control}
+            name="addressLine1"
+            render={({ field, fieldState }) => (
+              <Field data-invalid={!!fieldState.error}>
+                <FieldLabel htmlFor="addressLine1">Address line 1</FieldLabel>
+                <FormControl>
+                  <Input
+                    id="addressLine1"
+                    {...field}
+                    aria-invalid={!!fieldState.error}
+                    placeholder="Street address, P.O. box"
+                  />
+                </FormControl>
+              </Field>
+            )}
+          />
 
-        <FormField
-          control={form.control}
-          name="city"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>City</FormLabel>
-              <FormControl>
-                <Input {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+          <FormField
+            control={form.control}
+            name="addressLine2"
+            render={({ field, fieldState }) => (
+              <Field data-invalid={!!fieldState.error}>
+                <FieldLabel htmlFor="addressLine2">Address line 2</FieldLabel>
+                <FormControl>
+                  <Input
+                    id="addressLine2"
+                    {...field}
+                    aria-invalid={!!fieldState.error}
+                    placeholder="Apartment, suite, unit, building, floor, etc. (optional)"
+                  />
+                </FormControl>
+              </Field>
+            )}
+          />
 
-        <FormField
-          control={form.control}
-          name="state"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>State</FormLabel>
-              <FormControl>
-                <Input {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+          <div className="grid grid-cols-2 gap-4">
+            <FormField
+              control={form.control}
+              name="city"
+              render={({ field, fieldState }) => (
+                <Field data-invalid={!!fieldState.error}>
+                  <FieldLabel htmlFor="city">City</FieldLabel>
+                  <FormControl>
+                    <Input
+                      id="city"
+                      {...field}
+                      aria-invalid={!!fieldState.error}
+                    />
+                  </FormControl>
+                </Field>
+              )}
+            />
 
-        <FormField
-          control={form.control}
-          name="postalCode"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Postcode</FormLabel>
-              <FormControl>
-                <Input {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+            <FormField
+              control={form.control}
+              name="state"
+              render={({ field, fieldState }) => (
+                <Field data-invalid={!!fieldState.error}>
+                  <FieldLabel htmlFor="state">State</FieldLabel>
+                  <FormControl>
+                    <Input
+                      id="state"
+                      {...field}
+                      aria-invalid={!!fieldState.error}
+                      placeholder="NSW, VIC, QLD, etc."
+                    />
+                  </FormControl>
+                </Field>
+              )}
+            />
+          </div>
 
-        <FormField
-          control={form.control}
-          name="country"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Country</FormLabel>
-              <FormControl>
-                <Input {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+          <div className="grid grid-cols-2 gap-4">
+            <FormField
+              control={form.control}
+              name="postalCode"
+              render={({ field, fieldState }) => (
+                <Field data-invalid={!!fieldState.error}>
+                  <FieldLabel htmlFor="postalCode">Postcode</FieldLabel>
+                  <FormControl>
+                    <Input
+                      id="postalCode"
+                      {...field}
+                      aria-invalid={!!fieldState.error}
+                    />
+                  </FormControl>
+                </Field>
+              )}
+            />
 
-        <FormField
-          control={form.control}
-          name="isDefault"
-          render={({ field }) => (
-            <FormItem className="col-span-2">
-              <div className="flex items-center gap-2">
+            <FormField
+              control={form.control}
+              name="country"
+              render={({ field, fieldState }) => (
+                <Field data-invalid={!!fieldState.error}>
+                  <FieldLabel htmlFor="country">Country</FieldLabel>
+                  <FormControl>
+                    <Input
+                      id="country"
+                      {...field}
+                      aria-invalid={!!fieldState.error}
+                    />
+                  </FormControl>
+                </Field>
+              )}
+            />
+          </div>
+
+          <FormField
+            control={form.control}
+            name="isDefault"
+            render={({ field, fieldState }) => (
+              <Field orientation="horizontal" data-invalid={!!fieldState.error}>
                 <FormControl>
                   <Checkbox
+                    id="isDefault"
                     checked={field.value}
                     onCheckedChange={(v) => field.onChange(Boolean(v))}
                   />
                 </FormControl>
-                <FormLabel className="m-0">Set as default</FormLabel>
-              </div>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+                <FieldLabel htmlFor="isDefault" className="font-normal">
+                  Set as default address
+                </FieldLabel>
+              </Field>
+            )}
+          />
 
-        <div className="col-span-2 mt-2 flex gap-2">
-          <Button type="submit" disabled={isSubmitting}>
-            {submitLabel}
-          </Button>
-        </div>
+          <Field orientation="horizontal">
+            <Button type="submit" disabled={isSubmitting}>
+              {submitLabel}
+            </Button>
+          </Field>
+        </FieldGroup>
       </form>
     </Form>
   );

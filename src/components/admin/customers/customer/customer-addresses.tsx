@@ -27,6 +27,14 @@ import {
   useUpdateCustomerAddress,
   useDeleteCustomerAddress,
 } from "@/hooks/admin/customers/use-customer-addresses";
+import {
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+  EmptyContent,
+} from "@/components/ui/empty";
 
 interface Props {
   customerId: string;
@@ -154,69 +162,94 @@ export function CustomerAddresses({ customerId, storeId }: Props) {
         </div>
       </CardHeader>
       <CardContent>
-        <div className="grid gap-4 md:grid-cols-2">
-          {addresses.map((address) => (
-            <Card key={address.id} className="relative">
-              <CardContent className="p-4">
-                <div className="flex items-start justify-between">
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <Badge
-                        variant={
-                          address.type === "shipping" ? "default" : "secondary"
-                        }
-                      >
-                        {address.type === "shipping" ? "Shipping" : "Billing"}
-                      </Badge>
-                      {address.isDefault && (
-                        <Badge variant="outline" className="text-xs">
-                          Default
+        {addresses.length === 0 ? (
+          <Empty>
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <MapPin />
+              </EmptyMedia>
+              <EmptyTitle>No addresses</EmptyTitle>
+              <EmptyDescription>
+                This customer hasn&apos;t added any addresses yet. Add a
+                shipping or billing address to get started.
+              </EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent>
+              <Button onClick={openCreateDialog}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Address
+              </Button>
+            </EmptyContent>
+          </Empty>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2">
+            {addresses.map((address) => (
+              <Card key={address.id} className="relative">
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Badge
+                          variant={
+                            address.type === "shipping"
+                              ? "default"
+                              : "secondary"
+                          }
+                        >
+                          {address.type === "shipping" ? "Shipping" : "Billing"}
                         </Badge>
-                      )}
-                    </div>
-                    <div className="space-y-1 text-sm">
-                      <p className="font-medium">
-                        {address.firstName} {address.lastName}
-                      </p>
-                      {/* company not available on address type */}
-                      <p className="text-muted-foreground">
-                        {address.addressLine1}
-                      </p>
-                      {address.addressLine2 && (
-                        <p className="text-muted-foreground">
-                          {address.addressLine2}
+                        {address.isDefault && (
+                          <Badge variant="outline" className="text-xs">
+                            Default
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="space-y-1 text-sm">
+                        <p className="font-medium">
+                          {address.firstName} {address.lastName}
                         </p>
-                      )}
-                      <p className="text-muted-foreground">
-                        {address.city}, {address.state} {address.postalCode}
-                      </p>
-                      <p className="text-muted-foreground">{address.country}</p>
-                      {/* phone not available on address type */}
+                        {/* company not available on address type */}
+                        <p className="text-muted-foreground">
+                          {address.addressLine1}
+                        </p>
+                        {address.addressLine2 && (
+                          <p className="text-muted-foreground">
+                            {address.addressLine2}
+                          </p>
+                        )}
+                        <p className="text-muted-foreground">
+                          {address.city}, {address.state} {address.postalCode}
+                        </p>
+                        <p className="text-muted-foreground">
+                          {address.country}
+                        </p>
+                        {/* phone not available on address type */}
+                      </div>
+                    </div>
+                    <div className="flex gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => openEditDialog(address)}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-destructive h-8 w-8"
+                        onClick={() => onDelete(address)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
                   </div>
-                  <div className="flex gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => openEditDialog(address)}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="text-destructive h-8 w-8"
-                      onClick={() => onDelete(address)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
       </CardContent>
     </Card>
   );

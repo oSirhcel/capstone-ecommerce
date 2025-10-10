@@ -8,45 +8,27 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { MessageSquare, Plus, Eye } from "lucide-react";
+import { MessageSquare, Plus, Eye, Star } from "lucide-react";
+import {
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+  EmptyContent,
+} from "@/components/ui/empty";
 
-interface CustomerInteractionsProps {
-  customerId: string;
-}
-
-// Mock support tickets data
-const supportTickets = [
-  {
-    id: "TICK-001",
-    subject: "Issue with order delivery",
-    status: "resolved",
-    priority: "high",
-    createdAt: "2024-01-08",
-    updatedAt: "2024-01-10",
-    assignedTo: "John Support",
-    messages: 5,
-  },
-  {
-    id: "TICK-002",
-    subject: "Product quality question",
-    status: "open",
-    priority: "medium",
-    createdAt: "2024-01-12",
-    updatedAt: "2024-01-12",
-    assignedTo: "Sarah Support",
-    messages: 2,
-  },
-  {
-    id: "TICK-003",
-    subject: "Refund request",
-    status: "closed",
-    priority: "low",
-    createdAt: "2023-12-20",
-    updatedAt: "2023-12-22",
-    assignedTo: "Mike Support",
-    messages: 8,
-  },
-];
+// Mock support tickets data - empty for now to show empty state
+const supportTickets: {
+  id: string;
+  subject: string;
+  status: string;
+  priority: string;
+  createdAt: string;
+  updatedAt: string;
+  assignedTo: string;
+  messages: number;
+}[] = [];
 
 const getStatusBadge = (status: string) => {
   switch (status) {
@@ -109,47 +91,68 @@ export function CustomerInteractions() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {supportTickets.map((ticket) => (
-              <Card key={ticket.id}>
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between">
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <h4 className="font-medium">{ticket.subject}</h4>
-                        {getStatusBadge(ticket.status)}
-                        {getPriorityBadge(ticket.priority)}
+          {supportTickets.length === 0 ? (
+            <Empty>
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <MessageSquare />
+                </EmptyMedia>
+                <EmptyTitle>No support tickets</EmptyTitle>
+                <EmptyDescription>
+                  No support tickets have been created for this customer yet.
+                  Create a ticket to track customer support issues.
+                </EmptyDescription>
+              </EmptyHeader>
+              <EmptyContent>
+                <Button>
+                  <Plus className="mr-2 h-4 w-4" />
+                  New Ticket
+                </Button>
+              </EmptyContent>
+            </Empty>
+          ) : (
+            <div className="space-y-4">
+              {supportTickets.map((ticket) => (
+                <Card key={ticket.id}>
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-medium">{ticket.subject}</h4>
+                          {getStatusBadge(ticket.status)}
+                          {getPriorityBadge(ticket.priority)}
+                        </div>
+                        <div className="text-muted-foreground flex items-center gap-4 text-sm">
+                          <span>#{ticket.id}</span>
+                          <span>•</span>
+                          <span>
+                            Created{" "}
+                            {new Date(ticket.createdAt).toLocaleDateString()}
+                          </span>
+                          <span>•</span>
+                          <span>{ticket.messages} messages</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm">
+                          <Avatar className="h-6 w-6">
+                            <AvatarFallback className="text-xs">
+                              {ticket.assignedTo.charAt(0)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span className="text-muted-foreground">
+                            Assigned to {ticket.assignedTo}
+                          </span>
+                        </div>
                       </div>
-                      <div className="text-muted-foreground flex items-center gap-4 text-sm">
-                        <span>#{ticket.id}</span>
-                        <span>•</span>
-                        <span>
-                          Created{" "}
-                          {new Date(ticket.createdAt).toLocaleDateString()}
-                        </span>
-                        <span>•</span>
-                        <span>{ticket.messages} messages</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm">
-                        <Avatar className="h-6 w-6">
-                          <AvatarFallback className="text-xs">
-                            {ticket.assignedTo.charAt(0)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span className="text-muted-foreground">
-                          Assigned to {ticket.assignedTo}
-                        </span>
-                      </div>
+                      <Button variant="ghost" size="sm">
+                        <Eye className="mr-1 h-3 w-3" />
+                        View
+                      </Button>
                     </div>
-                    <Button variant="ghost" size="sm">
-                      <Eye className="mr-1 h-3 w-3" />
-                      View
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -162,58 +165,18 @@ export function CustomerInteractions() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            <div className="rounded-lg border p-4">
-              <div className="flex items-start justify-between">
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <div className="flex">
-                      {Array.from({ length: 5 }, (_, i) => (
-                        <span key={i} className="text-yellow-400">
-                          ★
-                        </span>
-                      ))}
-                    </div>
-                    <span className="text-muted-foreground text-sm">5.0</span>
-                  </div>
-                  <p className="font-medium">Excellent product quality!</p>
-                  <p className="text-muted-foreground text-sm">
-                    &quot;The ceramic mug I ordered is absolutely beautiful.
-                    Great craftsmanship and fast shipping.&quot;
-                  </p>
-                  <p className="text-muted-foreground text-xs">
-                    January 10, 2024 • Handcrafted Ceramic Mug
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="rounded-lg border p-4">
-              <div className="flex items-start justify-between">
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <div className="flex">
-                      {Array.from({ length: 4 }, (_, i) => (
-                        <span key={i} className="text-yellow-400">
-                          ★
-                        </span>
-                      ))}
-                      <span className="text-gray-300">★</span>
-                    </div>
-                    <span className="text-muted-foreground text-sm">4.0</span>
-                  </div>
-                  <p className="font-medium">Good value for money</p>
-                  <p className="text-muted-foreground text-sm">
-                    &quot;Nice product overall, delivery was a bit slow but the
-                    quality makes up for it.&quot;
-                  </p>
-                  <p className="text-muted-foreground text-xs">
-                    December 28, 2023 • Eco-Friendly Water Bottle
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
+          <Empty>
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <Star />
+              </EmptyMedia>
+              <EmptyTitle>No feedback yet</EmptyTitle>
+              <EmptyDescription>
+                This customer hasn&apos;t left any reviews or feedback yet.
+                Feedback will appear here when submitted.
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
         </CardContent>
       </Card>
     </div>

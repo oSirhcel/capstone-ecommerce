@@ -16,6 +16,14 @@ import { useCustomerDetail } from "@/contexts/customer-detail-context";
 import { useCustomerOrdersQuery } from "@/hooks/admin/customers/use-customer-orders-query";
 import { type CustomerOrder } from "@/lib/api/admin/customers";
 import { useSession } from "next-auth/react";
+import {
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+  EmptyContent,
+} from "@/components/ui/empty";
 
 interface CustomerOrdersProps {
   isOverview?: boolean;
@@ -156,9 +164,23 @@ export function CustomerOrders({ isOverview = false }: CustomerOrdersProps) {
             <p className="text-destructive text-sm">Failed to load orders</p>
           </div>
         ) : !data?.orders.length ? (
-          <div className="flex h-32 items-center justify-center">
-            <p className="text-muted-foreground text-sm">No orders found</p>
-          </div>
+          <Empty>
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <Package />
+              </EmptyMedia>
+              <EmptyTitle>No orders yet</EmptyTitle>
+              <EmptyDescription>
+                This customer hasn&apos;t placed any orders yet. When they do,
+                they&apos;ll appear here.
+              </EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent>
+              <Button asChild>
+                <Link href="/admin/orders/create">Create Order</Link>
+              </Button>
+            </EmptyContent>
+          </Empty>
         ) : (
           <DataTable columns={columns} data={data.orders} />
         )}

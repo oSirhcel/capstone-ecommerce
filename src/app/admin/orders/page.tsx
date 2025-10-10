@@ -13,7 +13,14 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Search, Plus, Eye, Download, RefreshCw } from "lucide-react";
+import {
+  Search,
+  Plus,
+  Eye,
+  Download,
+  RefreshCw,
+  ShoppingCart,
+} from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -24,7 +31,22 @@ import {
 import { DatePickerWithRange } from "@/components/ui/date-range-picker";
 import { OrdersStats } from "@/components/admin/orders/orders-stats";
 
-const orders = [
+interface Order {
+  id: string;
+  customer: {
+    name: string;
+    email: string;
+    avatar: string;
+  };
+  amount: number;
+  status: string;
+  date: string;
+  items: number;
+  paymentStatus: string;
+  shippingAddress: string;
+}
+
+const orders: Order[] = [
   {
     id: "ORD-1234",
     customer: {
@@ -161,7 +183,7 @@ const columns = [
   {
     header: "Order",
     accessorKey: "id",
-    cell: ({ row }: any) => (
+    cell: ({ row }: { row: { original: Order } }) => (
       <div className="font-medium">
         <Link
           href={`/admin/orders/${row.original.id}`}
@@ -178,7 +200,7 @@ const columns = [
   {
     header: "Customer",
     accessorKey: "customer",
-    cell: ({ row }: any) => (
+    cell: ({ row }: { row: { original: Order } }) => (
       <div className="flex items-center gap-3">
         <div className="min-w-0">
           <div className="truncate font-medium">
@@ -194,7 +216,7 @@ const columns = [
   {
     header: "Amount",
     accessorKey: "amount",
-    cell: ({ row }: any) => (
+    cell: ({ row }: { row: { original: Order } }) => (
       <div className="text-right">
         <div className="font-medium">${row.original.amount.toFixed(2)}</div>
         <div className="text-muted-foreground text-xs">
@@ -206,7 +228,7 @@ const columns = [
   {
     header: "Status",
     accessorKey: "status",
-    cell: ({ row }: any) => (
+    cell: ({ row }: { row: { original: Order } }) => (
       <div className="space-y-1">
         {getStatusBadge(row.original.status)}
         <div className="text-xs">
@@ -217,7 +239,7 @@ const columns = [
   },
   {
     header: "Actions",
-    cell: ({ row }: any) => (
+    cell: ({ row }: { row: { original: Order } }) => (
       <div className="flex gap-1">
         <Button variant="ghost" size="sm" asChild>
           <Link href={`/admin/orders/${row.original.id}`}>
@@ -334,7 +356,12 @@ export default function OrdersPage() {
             </Select>
           </div>
 
-          <DataTable columns={columns} data={filteredOrders} />
+          <DataTable
+            columns={columns}
+            data={filteredOrders}
+            emptyMessage="No orders match your filters. Try adjusting your search criteria."
+            emptyIcon={<ShoppingCart className="h-12 w-12 opacity-20" />}
+          />
         </CardContent>
       </Card>
     </div>

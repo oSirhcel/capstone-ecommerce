@@ -18,7 +18,6 @@ export const customerUpdateSchema = z.object({
   firstName: z.string().min(2).max(100).optional(),
   lastName: z.string().min(2).max(100).optional(),
   phone: z.string().max(20).optional(),
-  location: z.string().max(255).optional(),
   tags: z.array(z.string()).optional(),
   adminNotes: z.string().optional(),
   status: z.enum(["Active", "Inactive", "Suspended"]).optional(),
@@ -61,7 +60,6 @@ export interface CustomerListItem {
   name: string;
   email: string;
   status: "Active" | "Inactive" | "Suspended";
-  location: string | null;
   tags: string[];
   joinDate: string;
   totalOrders: number;
@@ -75,12 +73,10 @@ export interface CustomerDetail {
   firstName: string;
   lastName: string;
   phone: string;
-  dateOfBirth?: string;
   status: "Active" | "Inactive" | "Suspended";
   customerSince: string;
   emailVerified: boolean;
   phoneVerified: boolean;
-  location: string;
   tags: string[];
   notes: string;
   totalOrders: number;

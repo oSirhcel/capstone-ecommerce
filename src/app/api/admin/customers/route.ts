@@ -1,6 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
-import { users, userProfiles, orders, stores } from "@/server/db/schema";
+import {
+  users,
+  userProfiles,
+  orders,
+  stores,
+  storeCustomerProfiles,
+} from "@/server/db/schema";
 import { eq, desc, asc, or, like, sql, count, and } from "drizzle-orm";
 import { customersListQuerySchema } from "@/lib/api/admin/customers";
 import { auth } from "@/lib/auth";
@@ -59,15 +65,21 @@ export async function GET(request: NextRequest) {
         firstName: userProfiles.firstName,
         lastName: userProfiles.lastName,
         email: userProfiles.email,
-        status: userProfiles.status,
-        location: userProfiles.location,
-        tags: userProfiles.tags,
+        status: storeCustomerProfiles.status,
+        tags: storeCustomerProfiles.tags,
         joinDate: users.createdAt,
         totalOrders: sql<number>`CAST(COUNT(DISTINCT ${orders.id}) AS INTEGER)`,
         totalSpent: sql<number>`CAST(COALESCE(SUM(${orders.totalAmount}), 0) AS INTEGER)`,
       })
       .from(users)
       .innerJoin(userProfiles, eq(users.id, userProfiles.userId))
+      .leftJoin(
+        storeCustomerProfiles,
+        and(
+          eq(storeCustomerProfiles.userId, users.id),
+          eq(storeCustomerProfiles.storeId, query.storeId),
+        ),
+      )
       .innerJoin(
         orders,
         and(eq(users.id, orders.userId), eq(orders.storeId, query.storeId)),
@@ -81,7 +93,9 @@ export async function GET(request: NextRequest) {
                 like(userProfiles.email, `%${query.search}%`),
               )
             : undefined,
-          query.status ? eq(userProfiles.status, query.status) : undefined,
+          query.status
+            ? eq(storeCustomerProfiles.status, query.status)
+            : undefined,
         ),
       )
       .groupBy(
@@ -90,9 +104,8 @@ export async function GET(request: NextRequest) {
         userProfiles.firstName,
         userProfiles.lastName,
         userProfiles.email,
-        userProfiles.status,
-        userProfiles.location,
-        userProfiles.tags,
+        storeCustomerProfiles.status,
+        storeCustomerProfiles.tags,
         users.createdAt,
       );
 
@@ -119,6 +132,13 @@ export async function GET(request: NextRequest) {
       .select({ total: count(sql`DISTINCT ${users.id}`) })
       .from(users)
       .innerJoin(userProfiles, eq(users.id, userProfiles.userId))
+      .leftJoin(
+        storeCustomerProfiles,
+        and(
+          eq(storeCustomerProfiles.userId, users.id),
+          eq(storeCustomerProfiles.storeId, query.storeId),
+        ),
+      )
       .innerJoin(
         orders,
         and(eq(users.id, orders.userId), eq(orders.storeId, query.storeId)),
@@ -132,7 +152,9 @@ export async function GET(request: NextRequest) {
                 like(userProfiles.email, `%${query.search}%`),
               )
             : undefined,
-          query.status ? eq(userProfiles.status, query.status) : undefined,
+          query.status
+            ? eq(storeCustomerProfiles.status, query.status)
+            : undefined,
         ),
       );
 
@@ -141,9 +163,9 @@ export async function GET(request: NextRequest) {
       id: customer.id,
       name: `${customer.firstName ?? ""} ${customer.lastName ?? ""}`.trim(),
       email: customer.email,
-      status: customer.status,
-      location: customer.location,
-      tags: customer.tags ? (JSON.parse(customer.tags) as string[]) : [],
+      status: customer.status ?? "Active",
+      location: null,
+      tags: (customer.tags as unknown as string[]) ?? [],
       joinDate: customer.joinDate.toISOString(),
       totalOrders: customer.totalOrders,
       totalSpent: customer.totalSpent,

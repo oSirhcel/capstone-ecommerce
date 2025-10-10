@@ -6,7 +6,6 @@ import {
   ArrowLeft,
   Mail,
   Phone,
-  MapPin,
   Edit,
   MoreHorizontal,
   Ban,
@@ -36,21 +35,22 @@ interface CustomerHeaderProps {
     avatar: string;
     status: string;
     customerSince: string;
-    location: string;
     tags: string[];
     notes: string;
     emailVerified: boolean;
     phoneVerified: boolean;
   };
+  storeId: string;
 }
 
-export function CustomerHeader({ customer }: CustomerHeaderProps) {
+export function CustomerHeader({ customer, storeId }: CustomerHeaderProps) {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
   return (
     <>
       <CustomerEditDialog
         customer={customer}
+        storeId={storeId}
         open={isEditDialogOpen}
         onOpenChange={setIsEditDialogOpen}
       />
@@ -126,10 +126,6 @@ export function CustomerHeader({ customer }: CustomerHeaderProps) {
                       orientation="vertical"
                       className="hidden h-4 sm:block"
                     />
-                    <div className="flex items-center gap-1">
-                      <MapPin className="h-4 w-4" />
-                      <span>{customer.location}</span>
-                    </div>
                   </div>
 
                   <div className="text-muted-foreground text-sm">

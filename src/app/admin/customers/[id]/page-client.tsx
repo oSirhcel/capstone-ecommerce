@@ -39,7 +39,6 @@ export default function CustomerDetailPageClient({
       avatar: "/placeholder.svg",
       status: customer.status,
       customerSince: customer.customerSince,
-      location: customer.location,
       tags: customer.tags,
       notes: customer.notes,
       emailVerified: customer.emailVerified,
@@ -76,7 +75,7 @@ export default function CustomerDetailPageClient({
   return (
     <CustomerDetailProvider customerId={customerId}>
       <div className="space-y-6">
-        <CustomerHeader customer={customerHeader} />
+        <CustomerHeader customer={customerHeader} storeId={storeId} />
 
         <CustomerStats customer={customerStats} />
 
@@ -101,7 +100,7 @@ export default function CustomerDetailPageClient({
           </TabsContent>
 
           <TabsContent value="addresses">
-            <CustomerAddresses />
+            <CustomerAddresses customerId={customerId} storeId={storeId} />
           </TabsContent>
 
           <TabsContent value="payments">

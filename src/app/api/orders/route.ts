@@ -1,8 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
-import { db } from '@/server/db';
-import { orders, orderItems, addresses, products } from '@/server/db/schema';
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { type NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
+import { db } from "@/server/db";
+import {
+  orders,
+  orderItems,
+  orderAddresses,
+  products,
+} from "@/server/db/schema";
+import { and, desc, eq, inArray } from "drizzle-orm";
 
 type SessionUser = {
   id: string;
@@ -14,70 +19,60 @@ type SessionUser = {
 export async function POST(request: NextRequest) {
   try {
     const session = await auth();
-    
+
     if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const user = session.user as SessionUser;
     const body = await request.json();
-    
-    const {
-      items,
-      totalAmount,
-      contactData,
-      shippingData,
-    } = body;
+
+    const { items, totalAmount, contactData, shippingData } = body;
 
     // Validate required fields
     if (!items || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json(
-        { error: 'Items are required' },
-        { status: 400 }
+        { error: "Items are required" },
+        { status: 400 },
       );
     }
 
     if (!totalAmount || totalAmount <= 0) {
       return NextResponse.json(
-        { error: 'Valid total amount is required' },
-        { status: 400 }
+        { error: "Valid total amount is required" },
+        { status: 400 },
       );
     }
 
     if (!contactData?.email || !shippingData?.firstName) {
       return NextResponse.json(
-        { error: 'Contact and shipping information are required' },
-        { status: 400 }
+        { error: "Contact and shipping information are required" },
+        { status: 400 },
       );
     }
-
-    // Create shipping address first (match schema fields)
-    const [shippingAddress] = await db
-      .insert(addresses)
-      .values({
-        userId: user.id,
-        type: 'shipping',
-        firstName: shippingData.firstName,
-        lastName: shippingData.lastName,
-        addressLine1: shippingData.address,
-        // addressLine2 not collected on UI; store as null/undefined
-        city: shippingData.city,
-        state: shippingData.state,
-        postalCode: shippingData.postcode,
-        country: shippingData.country || 'AU',
-        isDefault: false,
-      })
-      .returning();
 
     // Create the order
     const [order] = await db
       .insert(orders)
       .values({
         userId: user.id,
-        status: 'pending',
+        status: "pending",
         totalAmount: totalAmount,
       })
       .returning();
+
+    // Persist shipping address snapshot in normalized table
+    await db.insert(orderAddresses).values({
+      orderId: order.id,
+      type: "shipping",
+      firstName: shippingData.firstName,
+      lastName: shippingData.lastName,
+      addressLine1: shippingData.address,
+      city: shippingData.city,
+      state: shippingData.state,
+      postalCode: shippingData.postcode,
+      country: shippingData.country || "AU",
+    });
 
     // Create order items
     // NOTE: schema expects `priceAtTime` (not `price`)
@@ -99,14 +94,23 @@ export async function POST(request: NextRequest) {
         totalAmount: order.totalAmount,
         createdAt: order.createdAt,
       },
-      shippingAddressId: shippingAddress.id,
+      shippingAddress: {
+        type: "shipping",
+        firstName: shippingData.firstName,
+        lastName: shippingData.lastName,
+        addressLine1: shippingData.address,
+        addressLine2: null,
+        city: shippingData.city,
+        state: shippingData.state,
+        postalCode: shippingData.postcode,
+        country: shippingData.country || "AU",
+      },
     });
-
   } catch (error) {
-    console.error('Order creation error:', error);
+    console.error("Order creation error:", error);
     return NextResponse.json(
-      { error: 'Failed to create order' },
-      { status: 500 }
+      { error: "Failed to create order" },
+      { status: 500 },
     );
   }
 }
@@ -115,23 +119,23 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     const session = await auth();
-    
+
     if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const user = session.user as SessionUser;
     const { searchParams } = new URL(request.url);
-    const idParam = searchParams.get('id');
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '10');
+    const idParam = searchParams.get("id");
+    const page = parseInt(searchParams.get("page") || "1");
+    const limit = parseInt(searchParams.get("limit") || "10");
     const offset = (page - 1) * limit;
 
     // If an id is provided, return a single order
     if (idParam) {
       const id = parseInt(idParam);
       if (Number.isNaN(id)) {
-        return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
+        return NextResponse.json({ error: "Invalid id" }, { status: 400 });
       }
 
       const [orderRow] = await db
@@ -146,7 +150,7 @@ export async function GET(request: NextRequest) {
         .where(and(eq(orders.userId, user.id), eq(orders.id, id)));
 
       if (!orderRow) {
-        return NextResponse.json({ error: 'Not found' }, { status: 404 });
+        return NextResponse.json({ error: "Not found" }, { status: 404 });
       }
 
       const items = await db
@@ -169,7 +173,7 @@ export async function GET(request: NextRequest) {
           totalAmount: orderRow.totalAmount,
           createdAt: orderRow.createdAt,
           updatedAt: orderRow.updatedAt,
-          items: items.map(item => ({
+          items: items.map((item) => ({
             id: item.id,
             productId: item.productId,
             productName: item.productName,
@@ -195,8 +199,17 @@ export async function GET(request: NextRequest) {
       .limit(limit)
       .offset(offset);
 
-    const orderIds = orderRows.map(o => o.id);
-    let itemsByOrderId: Record<number, Array<{ id: number; productId: number; quantity: number; priceAtTime: number; productName: string | null }>> = {};
+    const orderIds = orderRows.map((o) => o.id);
+    let itemsByOrderId: Record<
+      number,
+      Array<{
+        id: number;
+        productId: number;
+        quantity: number;
+        priceAtTime: number;
+        productName: string | null;
+      }>
+    > = {};
     if (orderIds.length > 0) {
       const items = await db
         .select({
@@ -212,7 +225,8 @@ export async function GET(request: NextRequest) {
         .where(inArray(orderItems.orderId, orderIds));
 
       for (const item of items) {
-        const bucket = itemsByOrderId[item.orderId] || (itemsByOrderId[item.orderId] = []);
+        const bucket =
+          itemsByOrderId[item.orderId] || (itemsByOrderId[item.orderId] = []);
         bucket.push({
           id: item.id,
           productId: item.productId,
@@ -224,7 +238,7 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({
-      orders: orderRows.map(order => ({
+      orders: orderRows.map((order) => ({
         id: order.id,
         status: order.status,
         totalAmount: order.totalAmount,
@@ -238,12 +252,11 @@ export async function GET(request: NextRequest) {
         hasMore: orderRows.length === limit,
       },
     });
-
   } catch (error) {
-    console.error('Get orders error:', error);
+    console.error("Get orders error:", error);
     return NextResponse.json(
-      { error: 'Failed to get orders' },
-      { status: 500 }
+      { error: "Failed to get orders" },
+      { status: 500 },
     );
   }
 }

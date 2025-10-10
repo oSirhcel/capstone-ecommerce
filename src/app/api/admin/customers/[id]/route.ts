@@ -6,6 +6,7 @@ import {
   orders,
   addresses,
   stores,
+  storeCustomerProfiles,
 } from "@/server/db/schema";
 import { eq, count, sum, desc, and } from "drizzle-orm";
 import {
@@ -82,14 +83,19 @@ export async function GET(
         lastName: userProfiles.lastName,
         email: userProfiles.email,
         phone: userProfiles.phone,
-        dateOfBirth: userProfiles.dateOfBirth,
-        location: userProfiles.location,
-        tags: userProfiles.tags,
-        adminNotes: userProfiles.adminNotes,
-        status: userProfiles.status,
+        tags: storeCustomerProfiles.tags,
+        adminNotes: storeCustomerProfiles.adminNotes,
+        status: storeCustomerProfiles.status,
       })
       .from(users)
       .innerJoin(userProfiles, eq(users.id, userProfiles.userId))
+      .leftJoin(
+        storeCustomerProfiles,
+        and(
+          eq(storeCustomerProfiles.userId, users.id),
+          eq(storeCustomerProfiles.storeId, storeId),
+        ),
+      )
       .where(eq(users.id, id));
 
     if (!customer) {
@@ -116,12 +122,9 @@ export async function GET(
       .orderBy(desc(orders.createdAt))
       .limit(1);
 
-    // Get default address for location fallback
+    // Get default address for potential UI fallback (optional)
     const [defaultAddress] = await db
-      .select({
-        city: addresses.city,
-        state: addresses.state,
-      })
+      .select({ city: addresses.city, state: addresses.state })
       .from(addresses)
       .where(eq(addresses.userId, id))
       .limit(1);
@@ -142,21 +145,17 @@ export async function GET(
       firstName: customer.firstName ?? "",
       lastName: customer.lastName ?? "",
       phone: customer.phone ?? "",
-      dateOfBirth: customer.dateOfBirth?.toISOString(),
-
-      // Account info
-      status: customer.status,
+      // Account info (store-scoped)
+      status: customer.status ?? "Active",
       customerSince: customer.createdAt.toISOString(),
       emailVerified: true, // TODO: Implement email verification tracking
       phoneVerified: false, // TODO: Implement phone verification tracking
 
       // Admin fields
-      location:
-        customer.location ??
-        (defaultAddress
-          ? `${defaultAddress.city}, ${defaultAddress.state}`
-          : ""),
-      tags: customer.tags ? (JSON.parse(customer.tags) as string[]) : [],
+      location: defaultAddress
+        ? `${defaultAddress.city}, ${defaultAddress.state}`
+        : "",
+      tags: (customer.tags as unknown as string[]) ?? [],
       notes: customer.adminNotes ?? "",
 
       // Stats
@@ -262,20 +261,55 @@ export async function PATCH(
     if (updateData.lastName !== undefined)
       updateObject.lastName = updateData.lastName;
     if (updateData.phone !== undefined) updateObject.phone = updateData.phone;
-    if (updateData.location !== undefined)
-      updateObject.location = updateData.location;
-    if (updateData.tags !== undefined)
-      updateObject.tags = JSON.stringify(updateData.tags);
-    if (updateData.adminNotes !== undefined)
-      updateObject.adminNotes = updateData.adminNotes;
-    if (updateData.status !== undefined)
-      updateObject.status = updateData.status;
+    // store-level fields will be updated in storeCustomerProfiles below
 
-    // Update customer profile
+    // Update global user profile (personal fields only)
     await db
       .update(userProfiles)
       .set(updateObject)
       .where(eq(userProfiles.userId, id));
+
+    // Upsert store-scoped profile for tags/adminNotes/status
+    const storeProfileUpdate: Record<string, unknown> = {
+      updatedAt: new Date(),
+    };
+    if (updateData.tags !== undefined)
+      storeProfileUpdate.tags = updateData.tags;
+    if (updateData.adminNotes !== undefined)
+      storeProfileUpdate.adminNotes = updateData.adminNotes;
+    if (updateData.status !== undefined)
+      storeProfileUpdate.status = updateData.status;
+
+    if (Object.keys(storeProfileUpdate).length > 1) {
+      // ensure row exists
+      const [existingStoreProfile] = await db
+        .select({ id: storeCustomerProfiles.id })
+        .from(storeCustomerProfiles)
+        .where(
+          and(
+            eq(storeCustomerProfiles.userId, id),
+            eq(storeCustomerProfiles.storeId, storeId),
+          ),
+        )
+        .limit(1);
+
+      if (existingStoreProfile) {
+        await db
+          .update(storeCustomerProfiles)
+          .set(storeProfileUpdate)
+          .where(eq(storeCustomerProfiles.id, existingStoreProfile.id));
+      } else {
+        await db.insert(storeCustomerProfiles).values({
+          userId: id,
+          storeId,
+          status: (updateData.status as string) ?? "Active",
+          adminNotes: updateData.adminNotes ?? null,
+          tags: updateData.tags ?? [],
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+      }
+    }
 
     // Fetch and return updated customer data
     const updatedCustomerResponse = await GET(request, { params });

@@ -8,6 +8,8 @@ import {
   boolean,
   text,
   decimal,
+  index,
+  unique,
 } from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
@@ -159,16 +161,49 @@ export const userProfiles = pgTable("user_profiles", {
   lastName: varchar({ length: 100 }),
   email: varchar({ length: 255 }).notNull(),
   phone: varchar({ length: 20 }),
-  // Admin-managed fields
-  tags: text("tags2")
-    .array()
-    .notNull()
-    .default(sql`ARRAY[]::text[]`), // Array of customer tags
-  adminNotes: text(), // Internal admin notes about the customer
-  status: varchar({ length: 20 }).notNull().default("Active"), // 'Active', 'Inactive', 'Suspended'
   createdAt: timestamp().defaultNow().notNull(),
   updatedAt: timestamp().defaultNow().notNull(),
 });
+
+// Store-scoped customer profiles for per-store CRM data
+export const storeCustomerProfiles = pgTable(
+  "store_customer_profiles",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    userId: varchar("userId", { length: 255 })
+      .references(() => users.id)
+      .notNull(),
+    storeId: varchar("storeId", { length: 255 })
+      .references(() => stores.id)
+      .notNull(),
+
+    status: varchar({ length: 20 }).notNull().default("Active"),
+    adminNotes: text(),
+    tags: text("tags")
+      .array()
+      .notNull()
+      .default(sql`ARRAY[]::text[]`),
+
+    firstOrderAt: timestamp(),
+    lastOrderAt: timestamp(),
+    orderCount: integer().notNull().default(0),
+    totalSpent: integer().notNull().default(0), //Total spent in cents
+    marketingOptIn: timestamp(),
+
+    createdAt: timestamp().defaultNow().notNull(),
+    updatedAt: timestamp().defaultNow().notNull(),
+  },
+  (table) => [
+    unique("store_customer_profiles_user_store_unique").on(
+      table.userId,
+      table.storeId,
+    ),
+    index("store_customer_profiles_store_idx").on(table.storeId),
+    index("store_customer_profiles_user_idx").on(table.userId),
+    index("store_customer_profiles_status_idx").on(table.status),
+    index("store_customer_profiles_last_order_idx").on(table.lastOrderAt),
+  ],
+);
 
 // Addresses for shipping and billing
 export const addresses = pgTable("addresses", {
@@ -186,6 +221,28 @@ export const addresses = pgTable("addresses", {
   postalCode: varchar({ length: 20 }).notNull(),
   country: varchar({ length: 100 }).notNull(),
   isDefault: boolean().notNull().default(false),
+  // Concurrency and lifecycle
+  version: integer().notNull().default(1),
+  updatedAt: timestamp().defaultNow().notNull(),
+  archivedAt: timestamp(),
+  createdAt: timestamp().defaultNow().notNull(),
+});
+
+// Order address snapshots (normalized, immutable per order)
+export const orderAddresses = pgTable("order_addresses", {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  orderId: integer()
+    .references(() => orders.id)
+    .notNull(),
+  type: varchar({ length: 20 }).notNull(), // 'shipping' | 'billing'
+  firstName: varchar({ length: 100 }).notNull(),
+  lastName: varchar({ length: 100 }).notNull(),
+  addressLine1: varchar({ length: 255 }).notNull(),
+  addressLine2: varchar({ length: 255 }),
+  city: varchar({ length: 100 }).notNull(),
+  state: varchar({ length: 100 }).notNull(),
+  postalCode: varchar({ length: 20 }).notNull(),
+  country: varchar({ length: 100 }).notNull(),
   createdAt: timestamp().defaultNow().notNull(),
 });
 

@@ -10,7 +10,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Search, Filter, MapPin } from "lucide-react";
+import { Search, Filter, MapPin, Users } from "lucide-react";
 import Link from "next/link";
 import { useCustomersQuery } from "@/hooks/admin/customers/use-customers-query";
 import { useSession } from "next-auth/react";
@@ -35,21 +35,6 @@ const columns = [
           <div className="font-medium">{customer.name}</div>
           <div className="text-muted-foreground text-sm">{customer.email}</div>
         </div>
-      );
-    },
-  },
-  {
-    header: "Location",
-    accessorKey: "location",
-    cell: ({ row }: CellContext) => {
-      const customer = row.original;
-      return customer.location ? (
-        <div className="flex items-center gap-1 text-sm">
-          <MapPin className="text-muted-foreground h-3 w-3" />
-          <span>{customer.location}</span>
-        </div>
-      ) : (
-        <span className="text-muted-foreground text-sm">—</span>
       );
     },
   },
@@ -152,13 +137,13 @@ export default function CustomersPage() {
               Filter
             </Button>
           </div>
-          {isLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <p className="text-muted-foreground">Loading customers...</p>
-            </div>
-          ) : (
-            <DataTable columns={columns} data={data?.customers ?? []} />
-          )}
+          <DataTable
+            columns={columns}
+            data={data?.customers ?? []}
+            isLoading={isLoading}
+            emptyMessage="No customers found. New customers will appear here when they place their first order."
+            emptyIcon={<Users className="h-12 w-12 opacity-20" />}
+          />
         </CardContent>
       </Card>
     </div>

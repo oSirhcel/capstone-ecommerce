@@ -1,5 +1,7 @@
 "use client";
 import { useForm } from "react-hook-form";
+import * as z from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -27,6 +29,25 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { toast } from "sonner";
+import { useUpdateCustomer } from "@/hooks/admin/customers/use-customer";
+
+const customerEditSchema = z.object({
+  firstName: z
+    .string()
+    .min(2, "First name must be at least 2 characters")
+    .max(100),
+  lastName: z
+    .string()
+    .min(2, "Last name must be at least 2 characters")
+    .max(100),
+  phone: z.string().max(20).optional(),
+  tags: z.string().optional(),
+  adminNotes: z.string().optional(),
+  status: z.enum(["Active", "Inactive", "Suspended"]),
+});
+
+type CustomerEditFormValues = z.input<typeof customerEditSchema>;
 
 interface CustomerEditDialogProps {
   customer: {
@@ -34,62 +55,72 @@ interface CustomerEditDialogProps {
     name: string;
     email: string;
     phone: string;
-    location: string;
     tags: string[];
     notes: string;
     status: string;
   };
+  storeId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSave?: (data: CustomerEditFormData) => void;
-}
-
-export interface CustomerEditFormData {
-  firstName: string;
-  lastName: string;
-  phone: string;
-  location: string;
-  tags: string;
-  notes: string;
-  status: string;
 }
 
 export function CustomerEditDialog({
   customer,
+  storeId,
   open,
   onOpenChange,
-  onSave,
 }: CustomerEditDialogProps) {
-  function deriveFormFromCustomer(
-    c: CustomerEditDialogProps["customer"],
-  ): CustomerEditFormData {
+  const updateMutation = useUpdateCustomer(customer.id, storeId);
+
+  function deriveFormFromCustomer(): CustomerEditFormValues {
     return {
-      firstName: c.name.split(" ")[0] || "",
-      lastName: c.name.split(" ").slice(1).join(" ") || "",
-      phone: c.phone,
-      location: c.location,
-      tags: c.tags.join(", "),
-      notes: c.notes,
-      status: c.status,
+      firstName: customer.name.split(" ")[0] || "",
+      lastName: customer.name.split(" ").slice(1).join(" ") || "",
+      phone: customer.phone || "",
+      tags: customer.tags.join(", "),
+      adminNotes: customer.notes || "",
+      status: customer.status as "Active" | "Inactive" | "Suspended",
     };
   }
 
-  const form = useForm<CustomerEditFormData>({
-    defaultValues: deriveFormFromCustomer(customer),
+  const form = useForm<CustomerEditFormValues>({
+    resolver: zodResolver(customerEditSchema),
+    defaultValues: deriveFormFromCustomer(),
     mode: "onSubmit",
     reValidateMode: "onChange",
   });
 
   function handleDialogOpenChange(nextOpen: boolean) {
-    if (nextOpen) form.reset(deriveFormFromCustomer(customer));
+    if (nextOpen) form.reset(deriveFormFromCustomer());
     onOpenChange(nextOpen);
   }
 
-  const onSubmit = form.handleSubmit((data) => {
-    if (onSave) onSave(data);
-    console.log("Saving changes:", data);
-    onOpenChange(false);
-  });
+  function onSubmit(data: CustomerEditFormValues) {
+    updateMutation.mutate(
+      {
+        firstName: data.firstName,
+        lastName: data.lastName,
+        phone: data.phone,
+        tags: data.tags
+          ? data.tags
+              .split(",")
+              .map((t) => t.trim())
+              .filter(Boolean)
+          : [],
+        adminNotes: data.adminNotes,
+        status: data.status,
+      },
+      {
+        onSuccess: () => {
+          toast.success("Customer updated successfully");
+          onOpenChange(false);
+        },
+        onError: (error) => {
+          toast.error(error.message || "Failed to update customer");
+        },
+      },
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={handleDialogOpenChange}>
@@ -100,7 +131,10 @@ export function CustomerEditDialog({
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={onSubmit} className="grid gap-4 py-4">
+          <form
+            onSubmit={form.handleSubmit(onSubmit)}
+            className="grid gap-4 py-4"
+          >
             {/* Read-only Email */}
             <div className="grid gap-2">
               <Label htmlFor="email" className="text-muted-foreground">
@@ -162,20 +196,7 @@ export function CustomerEditDialog({
               )}
             />
 
-            {/* Location */}
-            <FormField
-              control={form.control}
-              name="location"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Location</FormLabel>
-                  <FormControl>
-                    <Input {...field} id="location" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {/* Location removed; derived from addresses and not editable here */}
 
             {/* Status */}
             <FormField
@@ -223,14 +244,14 @@ export function CustomerEditDialog({
             {/* Notes */}
             <FormField
               control={form.control}
-              name="notes"
+              name="adminNotes"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Admin Notes</FormLabel>
                   <FormControl>
                     <Textarea
                       {...field}
-                      id="notes"
+                      id="adminNotes"
                       rows={3}
                       placeholder="Add internal notes about this customer..."
                     />
@@ -245,10 +266,13 @@ export function CustomerEditDialog({
                 type="button"
                 variant="outline"
                 onClick={() => onOpenChange(false)}
+                disabled={updateMutation.isPending}
               >
                 Cancel
               </Button>
-              <Button type="submit">Save Changes</Button>
+              <Button type="submit" disabled={updateMutation.isPending}>
+                {updateMutation.isPending ? "Saving..." : "Save Changes"}
+              </Button>
             </DialogFooter>
           </form>
         </Form>

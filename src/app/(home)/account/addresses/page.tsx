@@ -21,74 +21,57 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+// removed Textarea in favor of discrete fields
 import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, MoreVertical, MapPin, Edit, Trash2 } from "lucide-react";
 
 import { toast } from "sonner";
-
-interface Address {
-  id: string;
-  name: string;
-  street: string;
-  city: string;
-  state: string;
-  zipCode: string;
-  country: string;
-  phone?: string;
-  isDefault: boolean;
-}
-
-const mockAddresses: Address[] = [
-  {
-    id: "1",
-    name: "John Smith",
-    street: "42 George Street",
-    city: "Sydney",
-    state: "NSW",
-    zipCode: "2000",
-    country: "Australia",
-    phone: "+61 2 9876 5432",
-    isDefault: true,
-  },
-  {
-    id: "2",
-    name: "John Smith",
-    street: "15 Crown Street",
-    city: "Newcastle",
-    state: "NSW",
-    zipCode: "2300",
-    country: "Australia",
-    phone: "+61 2 4321 8765",
-    isDefault: false,
-  },
-];
+import {
+  type AddressResponse,
+  createAddress,
+  deleteAddress,
+  fetchAddresses,
+  updateAddress,
+} from "@/lib/api/addresses";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 export default function AddressesPage() {
-  const [addresses, setAddresses] = useState<Address[]>(mockAddresses);
+  const queryClient = useQueryClient();
+  const { data, isLoading } = useQuery({
+    queryKey: ["addresses"],
+    queryFn: fetchAddresses,
+  });
+  const addresses = data?.addresses ?? [];
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingAddress, setEditingAddress] = useState<Address | null>(null);
+  const [editingAddress, setEditingAddress] = useState<AddressResponse | null>(
+    null,
+  );
   const [formData, setFormData] = useState({
-    name: "",
-    street: "",
+    type: "shipping" as "shipping" | "billing",
+    firstName: "",
+    lastName: "",
+    addressLine1: "",
+    addressLine2: "",
     city: "",
     state: "",
-    zipCode: "",
-    country: "Australia",
-    phone: "",
+    postalCode: "",
+    country: "AU",
     isDefault: false,
   });
+
 
   const handleAddAddress = () => {
     setEditingAddress(null);
     setFormData({
-      name: "",
-      street: "",
+      type: "shipping",
+      firstName: "",
+      lastName: "",
+      addressLine1: "",
+      addressLine2: "",
       city: "",
       state: "",
-      zipCode: "",
-      country: "Australia",
-      phone: "",
+      postalCode: "",
+      country: "AU",
       isDefault: false,
     });
     setIsDialogOpen(true);
@@ -96,81 +79,66 @@ export default function AddressesPage() {
 
   //TODO: Add validation and API call
 
-  const handleEditAddress = (address: Address) => {
+  const handleEditAddress = (address: AddressResponse) => {
     setEditingAddress(address);
     setFormData({
-      name: address.name,
-      street: address.street,
+      type: address.type as "shipping" | "billing",
+      firstName: address.firstName,
+      lastName: address.lastName,
+      addressLine1: address.addressLine1,
+      addressLine2: address.addressLine2 ?? "",
       city: address.city,
       state: address.state,
-      zipCode: address.zipCode,
+      postalCode: address.postalCode,
       country: address.country,
-      phone: address.phone ?? "",
       isDefault: address.isDefault,
     });
     setIsDialogOpen(true);
   };
 
-  const handleDeleteAddress = (id: string) => {
-    const addressToDelete = addresses.find((addr) => addr.id === id);
-    const updatedAddresses = addresses.filter((addr) => addr.id !== id);
-
-    // If deleting the default address and there are other addresses, make the first one default
-    if (addressToDelete?.isDefault && updatedAddresses.length > 0) {
-      updatedAddresses[0].isDefault = true;
+  const handleDeleteAddress = async (id: number) => {
+    try {
+      await deleteAddress(id);
+      await queryClient.invalidateQueries({ queryKey: ["addresses"] });
+      toast.success("Address deleted successfully");
+    } catch (e) {
+      toast.error("Failed to delete address");
     }
-
-    setAddresses(updatedAddresses);
-    toast.success("Address deleted successfully");
   };
 
-  const handleSetDefault = (id: string) => {
-    setAddresses((prev) =>
-      prev.map((addr) => ({
-        ...addr,
-        isDefault: addr.id === id,
-      })),
-    );
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (editingAddress) {
-      // Update existing address
-      setAddresses((prev) =>
-        prev.map((addr) =>
-          addr.id === editingAddress.id
-            ? { ...addr, ...formData }
-            : formData.isDefault
-              ? { ...addr, isDefault: false }
-              : addr,
-        ),
-      );
-    } else {
-      // Add new address
-      const newAddress: Address = {
-        id: Date.now().toString(),
-        ...formData,
-      };
-
-      setAddresses((prev) => {
-        if (formData.isDefault) {
-          // Make all other addresses non-default
-          return [
-            ...prev.map((addr) => ({ ...addr, isDefault: false })),
-            newAddress,
-          ];
-        }
-        // If this is the first address, make it default
-        if (prev.length === 0) {
-          newAddress.isDefault = true;
-        }
-        return [...prev, newAddress];
+  const handleSetDefault = async (addr: AddressResponse) => {
+    try {
+      await updateAddress(addr.id, {
+        version: addr.version,
+        isDefault: true,
+        type: addr.type as "shipping" | "billing",
       });
+      await queryClient.invalidateQueries({ queryKey: ["addresses"] });
+      toast.success("Default updated");
+    } catch (_e) {
+      toast.error("Failed to set default");
     }
+  };
 
-    setIsDialogOpen(false);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      if (editingAddress) {
+        await updateAddress(editingAddress.id, {
+          version: editingAddress.version,
+          ...formData,
+        });
+        await queryClient.invalidateQueries({ queryKey: ["addresses"] });
+        toast.success("Address updated");
+      } else {
+        await createAddress(formData);
+        await queryClient.invalidateQueries({ queryKey: ["addresses"] });
+        toast.success("Address created");
+      }
+      setIsDialogOpen(false);
+    } catch (_e) {
+      toast.error("Failed to save address");
+    }
   };
 
   return (
@@ -197,29 +165,59 @@ export default function AddressesPage() {
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2">
-                  <Label htmlFor="name">Full Name</Label>
+                <div>
+                  <Label htmlFor="firstName">First Name</Label>
                   <Input
-                    id="name"
-                    value={formData.name}
+                    id="firstName"
+                    value={formData.firstName}
                     onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, name: e.target.value }))
+                      setFormData((prev) => ({
+                        ...prev,
+                        firstName: e.target.value,
+                      }))
+                    }
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="lastName">Last Name</Label>
+                  <Input
+                    id="lastName"
+                    value={formData.lastName}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        lastName: e.target.value,
+                      }))
                     }
                     required
                   />
                 </div>
                 <div className="col-span-2">
-                  <Label htmlFor="street">Street Address</Label>
-                  <Textarea
-                    id="street"
-                    value={formData.street}
+                  <Label htmlFor="addressLine1">Address Line 1</Label>
+                  <Input
+                    id="addressLine1"
+                    value={formData.addressLine1}
                     onChange={(e) =>
                       setFormData((prev) => ({
                         ...prev,
-                        street: e.target.value,
+                        addressLine1: e.target.value,
                       }))
                     }
                     required
+                  />
+                </div>
+                <div className="col-span-2">
+                  <Label htmlFor="addressLine2">Address Line 2</Label>
+                  <Input
+                    id="addressLine2"
+                    value={formData.addressLine2}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        addressLine2: e.target.value,
+                      }))
+                    }
                   />
                 </div>
                 <div>
@@ -248,14 +246,14 @@ export default function AddressesPage() {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="zipCode">ZIP Code</Label>
+                  <Label htmlFor="postalCode">Postcode</Label>
                   <Input
-                    id="zipCode"
-                    value={formData.zipCode}
+                    id="postalCode"
+                    value={formData.postalCode}
                     onChange={(e) =>
                       setFormData((prev) => ({
                         ...prev,
-                        zipCode: e.target.value,
+                        postalCode: e.target.value,
                       }))
                     }
                     required
@@ -273,20 +271,6 @@ export default function AddressesPage() {
                       }))
                     }
                     required
-                  />
-                </div>
-                <div className="col-span-2">
-                  <Label htmlFor="phone">Phone Number (Optional)</Label>
-                  <Input
-                    id="phone"
-                    type="tel"
-                    value={formData.phone}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        phone: e.target.value,
-                      }))
-                    }
                   />
                 </div>
                 <div className="col-span-2 flex items-center space-x-2">
@@ -326,7 +310,9 @@ export default function AddressesPage() {
             <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
               <div className="flex items-center gap-2">
                 <MapPin className="text-muted-foreground h-4 w-4" />
-                <CardTitle className="text-base">{address.name}</CardTitle>
+                <CardTitle className="text-base">
+                  {address.firstName} {address.lastName}
+                </CardTitle>
                 {address.isDefault && (
                   <Badge variant="secondary">Default</Badge>
                 )}
@@ -343,9 +329,7 @@ export default function AddressesPage() {
                     Edit
                   </DropdownMenuItem>
                   {!address.isDefault && (
-                    <DropdownMenuItem
-                      onClick={() => handleSetDefault(address.id)}
-                    >
+                    <DropdownMenuItem onClick={() => handleSetDefault(address)}>
                       <MapPin className="mr-2 h-4 w-4" />
                       Set as Default
                     </DropdownMenuItem>
@@ -362,19 +346,18 @@ export default function AddressesPage() {
             </CardHeader>
             <CardContent>
               <div className="text-muted-foreground space-y-1 text-sm">
-                <p>{address.street}</p>
+                <p>{address.addressLine1}</p>
                 <p>
-                  {address.city}, {address.state} {address.zipCode}
+                  {address.city}, {address.state} {address.postalCode}
                 </p>
                 <p>{address.country}</p>
-                {address.phone && <p>{address.phone}</p>}
               </div>
             </CardContent>
           </Card>
         ))}
       </div>
 
-      {addresses.length === 0 && (
+      {addresses.length === 0 && !isLoading && (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <MapPin className="text-muted-foreground mb-4 h-12 w-12" />

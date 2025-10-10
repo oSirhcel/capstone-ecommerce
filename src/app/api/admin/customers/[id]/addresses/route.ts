@@ -1,215 +1,266 @@
-import { type NextRequest, NextResponse } from "next/server";
-import { db } from "@/server/db";
-import { addresses, orders, stores } from "@/server/db/schema";
-import { eq, and } from "drizzle-orm";
-import {
-  type AddressCreate,
-  addressCreateSchema,
-} from "@/lib/api/admin/customers";
+import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { db } from "@/server/db";
+import { addresses, stores } from "@/server/db/schema";
+import { and, eq, isNull } from "drizzle-orm";
+import { z } from "zod";
 
-/**
- * GET /api/admin/customers/[id]/addresses
- * Get all addresses for a customer
- */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } },
-) {
-  // Check admin authentication
+type Params = { params: Promise<{ id: string }> };
+
+// GET /api/admin/customers/[id]/addresses?storeId=...
+export async function GET(request: NextRequest, { params }: Params) {
   const session = await auth();
-  if (!session?.user) {
+  if (!session?.user)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const { searchParams } = new URL(request.url);
+  const storeId = searchParams.get("storeId");
+  if (!storeId)
+    return NextResponse.json(
+      { error: "Store ID is required" },
+      { status: 400 },
+    );
+  const [store] = await db
+    .select({ ownerId: stores.ownerId })
+    .from(stores)
+    .where(eq(stores.id, storeId));
+  if (!store)
+    return NextResponse.json({ error: "Store not found" }, { status: 404 });
+  if (store.ownerId !== session.user.id)
+    return NextResponse.json(
+      { error: "You do not have access to this store" },
+      { status: 403 },
+    );
 
+  const { id } = await params;
+  const rows = await db
+    .select()
+    .from(addresses)
+    .where(and(eq(addresses.userId, id), isNull(addresses.archivedAt)));
+  return NextResponse.json({ addresses: rows });
+}
+
+// POST /api/admin/customers/[id]/addresses?storeId=...
+export async function POST(request: NextRequest, { params }: Params) {
   try {
-    // Get storeId from query params
+    const session = await auth();
+    if (!session?.user)
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const { searchParams } = new URL(request.url);
     const storeId = searchParams.get("storeId");
-
-    if (!storeId) {
+    if (!storeId)
       return NextResponse.json(
         { error: "Store ID is required" },
         { status: 400 },
       );
-    }
-
-    // Verify user owns the store
     const [store] = await db
       .select({ ownerId: stores.ownerId })
       .from(stores)
       .where(eq(stores.id, storeId));
-
-    if (!store) {
+    if (!store)
       return NextResponse.json({ error: "Store not found" }, { status: 404 });
-    }
-
-    if (store.ownerId !== session.user.id) {
+    if (store.ownerId !== session.user.id)
       return NextResponse.json(
         { error: "You do not have access to this store" },
         { status: 403 },
       );
-    }
 
-    // Verify customer has ordered from this store
-    const [hasOrderedFromStore] = await db
-      .select({ orderId: orders.id })
-      .from(orders)
-      .where(and(eq(orders.userId, params.id), eq(orders.storeId, storeId)))
-      .limit(1);
+    const { id } = await params;
+    const schema = z.object({
+      type: z.enum(["shipping", "billing"]),
+      firstName: z.string().min(1),
+      lastName: z.string().min(1),
+      addressLine1: z.string().min(1),
+      addressLine2: z.string().optional().nullable(),
+      city: z.string().min(1),
+      state: z.string().min(1),
+      postalCode: z.string().min(1),
+      country: z.string().min(2),
+      isDefault: z.boolean().optional(),
+    });
+    const {
+      type,
+      firstName,
+      lastName,
+      addressLine1,
+      addressLine2,
+      city,
+      state,
+      postalCode,
+      country,
+      isDefault,
+    } = schema.parse(await request.json());
 
-    if (!hasOrderedFromStore) {
-      return NextResponse.json(
-        { error: "Customer not found for this store" },
-        { status: 404 },
-      );
-    }
+    const created = await db.transaction(async (tx) => {
+      if (isDefault === true) {
+        await tx
+          .update(addresses)
+          .set({ isDefault: false, updatedAt: new Date() })
+          .where(and(eq(addresses.userId, id), eq(addresses.type, type)));
+      }
+      const [row] = await tx
+        .insert(addresses)
+        .values({
+          userId: id,
+          type,
+          firstName,
+          lastName,
+          addressLine1,
+          addressLine2,
+          city,
+          state,
+          postalCode,
+          country,
+          isDefault: Boolean(isDefault),
+        })
+        .returning();
+      return row;
+    });
 
-    // Get all addresses
-    const customerAddresses = await db
-      .select()
-      .from(addresses)
-      .where(eq(addresses.userId, params.id));
-
-    // Format response
-    const formattedAddresses = customerAddresses.map((addr) => ({
-      id: addr.id,
-      type: addr.type,
-      firstName: addr.firstName,
-      lastName: addr.lastName,
-      addressLine1: addr.addressLine1,
-      addressLine2: addr.addressLine2,
-      city: addr.city,
-      state: addr.state,
-      postalCode: addr.postalCode,
-      country: addr.country,
-      isDefault: addr.isDefault,
-      createdAt: addr.createdAt.toISOString(),
-    }));
-
-    return NextResponse.json({ addresses: formattedAddresses });
+    return NextResponse.json({ address: created }, { status: 201 });
   } catch (error) {
-    console.error("Error fetching addresses:", error);
+    console.error("Admin create address error:", error);
     return NextResponse.json(
-      { error: "Failed to fetch addresses" },
+      { error: "Failed to create address" },
       { status: 500 },
     );
   }
 }
 
-/**
- * POST /api/admin/customers/[id]/addresses
- * Add a new address for a customer
- */
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } },
-) {
-  // Check admin authentication
-  const session = await auth();
-  if (!session?.user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
+// PATCH /api/admin/customers/[id]/addresses?storeId=...&addressId=123
+export async function PATCH(request: NextRequest, { params }: Params) {
   try {
-    // Get storeId from query params
+    const session = await auth();
+    if (!session?.user)
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const { searchParams } = new URL(request.url);
     const storeId = searchParams.get("storeId");
-
-    if (!storeId) {
+    if (!storeId)
       return NextResponse.json(
         { error: "Store ID is required" },
         { status: 400 },
       );
-    }
-
-    // Verify user owns the store
     const [store] = await db
       .select({ ownerId: stores.ownerId })
       .from(stores)
       .where(eq(stores.id, storeId));
-
-    if (!store) {
+    if (!store)
       return NextResponse.json({ error: "Store not found" }, { status: 404 });
-    }
-
-    if (store.ownerId !== session.user.id) {
+    if (store.ownerId !== session.user.id)
       return NextResponse.json(
         { error: "You do not have access to this store" },
         { status: 403 },
       );
-    }
 
-    // Verify customer has ordered from this store
-    const [hasOrderedFromStore] = await db
-      .select({ orderId: orders.id })
-      .from(orders)
-      .where(and(eq(orders.userId, params.id), eq(orders.storeId, storeId)))
-      .limit(1);
+    const { id } = await params;
+    const addressIdStr = searchParams.get("addressId");
+    const addressId = addressIdStr ? parseInt(addressIdStr, 10) : NaN;
+    if (!addressId || Number.isNaN(addressId))
+      return NextResponse.json({ error: "Invalid addressId" }, { status: 400 });
 
-    if (!hasOrderedFromStore) {
-      return NextResponse.json(
-        { error: "Customer not found for this store" },
-        { status: 404 },
-      );
-    }
+    const schema = z
+      .object({
+        version: z.number(),
+        isDefault: z.boolean().optional(),
+        type: z.enum(["shipping", "billing"]).optional(),
+        firstName: z.string().min(1).optional(),
+        lastName: z.string().min(1).optional(),
+        addressLine1: z.string().min(1).optional(),
+        addressLine2: z.string().optional().nullable(),
+        city: z.string().min(1).optional(),
+        state: z.string().min(1).optional(),
+        postalCode: z.string().min(1).optional(),
+        country: z.string().min(2).optional(),
+      })
+      .strict();
+    const parsed = schema.parse(await request.json());
+    const { version, isDefault, ...updates } = parsed;
 
-    const body = (await request.json()) as AddressCreate;
+    const updated = await db.transaction(async (tx) => {
+      if (isDefault === true && updates.type) {
+        await tx
+          .update(addresses)
+          .set({ isDefault: false, updatedAt: new Date() })
+          .where(
+            and(eq(addresses.userId, id), eq(addresses.type, updates.type)),
+          );
+      }
 
-    // Validate request body
-    const addressData = addressCreateSchema.parse(body);
-
-    // If setting as default, unset other defaults of the same type
-    if (addressData.isDefault) {
-      await db
+      const [row] = await tx
         .update(addresses)
-        .set({ isDefault: false })
+        .set({
+          ...updates,
+          isDefault: isDefault === undefined ? undefined : Boolean(isDefault),
+          version: version + 1,
+          updatedAt: new Date(),
+        })
         .where(
           and(
-            eq(addresses.userId, params.id),
-            eq(addresses.type, addressData.type),
+            eq(addresses.id, addressId),
+            eq(addresses.userId, id),
+            eq(addresses.version, version),
           ),
-        );
-    }
+        )
+        .returning();
 
-    // Insert new address
-    const [newAddress] = await db
-      .insert(addresses)
-      .values({
-        userId: params.id,
-        ...addressData,
-      })
-      .returning();
+      return row ?? null;
+    });
 
-    return NextResponse.json(
-      {
-        address: {
-          id: newAddress.id,
-          type: newAddress.type,
-          firstName: newAddress.firstName,
-          lastName: newAddress.lastName,
-          addressLine1: newAddress.addressLine1,
-          addressLine2: newAddress.addressLine2,
-          city: newAddress.city,
-          state: newAddress.state,
-          postalCode: newAddress.postalCode,
-          country: newAddress.country,
-          isDefault: newAddress.isDefault,
-          createdAt: newAddress.createdAt.toISOString(),
-        },
-      },
-      { status: 201 },
-    );
+    if (!updated)
+      return NextResponse.json({ error: "Conflict" }, { status: 409 });
+    return NextResponse.json({ address: updated });
   } catch (error) {
-    if (error instanceof Error && error.name === "ZodError") {
+    console.error("Admin update address error:", error);
+    return NextResponse.json(
+      { error: "Failed to update address" },
+      { status: 500 },
+    );
+  }
+}
+
+// DELETE /api/admin/customers/[id]/addresses?storeId=...&addressId=123
+export async function DELETE(request: NextRequest, { params }: Params) {
+  try {
+    const session = await auth();
+    if (!session?.user)
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const { searchParams } = new URL(request.url);
+    const storeId = searchParams.get("storeId");
+    if (!storeId)
       return NextResponse.json(
-        { error: "Invalid request data" },
+        { error: "Store ID is required" },
         { status: 400 },
       );
-    }
-    console.error("Error creating address:", error);
+    const [store] = await db
+      .select({ ownerId: stores.ownerId })
+      .from(stores)
+      .where(eq(stores.id, storeId));
+    if (!store)
+      return NextResponse.json({ error: "Store not found" }, { status: 404 });
+    if (store.ownerId !== session.user.id)
+      return NextResponse.json(
+        { error: "You do not have access to this store" },
+        { status: 403 },
+      );
+
+    const { id } = await params;
+    const addressIdStr = searchParams.get("addressId");
+    const addressId = addressIdStr ? parseInt(addressIdStr, 10) : NaN;
+    if (!addressId || Number.isNaN(addressId))
+      return NextResponse.json({ error: "Invalid addressId" }, { status: 400 });
+
+    const [row] = await db
+      .update(addresses)
+      .set({ archivedAt: new Date(), updatedAt: new Date() })
+      .where(and(eq(addresses.id, addressId), eq(addresses.userId, id)))
+      .returning();
+
+    if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Admin delete address error:", error);
     return NextResponse.json(
-      { error: "Failed to create address" },
+      { error: "Failed to delete address" },
       { status: 500 },
     );
   }

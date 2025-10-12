@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/contexts/cart-context";
@@ -267,10 +267,6 @@ export function CheckoutClient() {
         (a) => a.id === selectedShippingId,
       );
       if (!address) {
-        console.error(
-          "Selected shipping address not found:",
-          selectedShippingId,
-        );
         throw new Error(
           "Selected shipping address not found. Please try again.",
         );
@@ -287,7 +283,6 @@ export function CheckoutClient() {
     if (useExistingBilling && selectedBillingId) {
       const address = billingAddresses.find((a) => a.id === selectedBillingId);
       if (!address) {
-        console.error("Selected billing address not found:", selectedBillingId);
         throw new Error(
           "Selected billing address not found. Please try again.",
         );
@@ -307,16 +302,6 @@ export function CheckoutClient() {
 
       const finalShipping = getFinalShippingData();
       const finalBilling = getFinalBillingData();
-
-      console.log("Order data:", {
-        useExistingShipping,
-        selectedShippingId,
-        finalShipping,
-        sameAsShipping,
-        useExistingBilling,
-        selectedBillingId,
-        finalBilling,
-      });
 
       if (
         !finalShipping.firstName ||
@@ -358,8 +343,6 @@ export function CheckoutClient() {
         shippingAddress: finalShipping,
         billingAddress: finalBilling,
       };
-
-      console.log("Sending order payload:", orderPayload);
 
       const response = await fetch("/api/orders", {
         method: "POST",
@@ -484,7 +467,7 @@ export function CheckoutClient() {
         />
 
         {/* Header */}
-        <div className="mt-6 mb-8">
+        <div className="mb-8 mt-6">
           <div className="mb-4 flex items-center gap-4">
             <Button variant="ghost" size="sm" asChild>
               <Link href="/cart" className="flex items-center gap-2">

@@ -1,3 +1,5 @@
+"use client";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -8,12 +10,21 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Mail, RefreshCw, Truck, AlertCircle } from "lucide-react";
+import { useState } from "react";
+import { useOrderMutations } from "@/hooks/admin/orders/use-order-mutations";
+import { useSession } from "next-auth/react";
+import type { OrderUpdate } from "@/lib/api/admin/orders";
 
 interface OrderActionsProps {
   orderId: string;
 }
 
 export function OrderActions({ orderId }: OrderActionsProps) {
+  const { data: session } = useSession();
+  const storeId = session?.store?.id ?? "";
+  const { updateStatus } = useOrderMutations(storeId);
+  const [status, setStatus] = useState<string | undefined>(undefined);
+
   return (
     <Card>
       <CardHeader>
@@ -24,7 +35,7 @@ export function OrderActions({ orderId }: OrderActionsProps) {
           <label className="mb-2 block text-sm font-medium">
             Update Status
           </label>
-          <Select>
+          <Select value={status} onValueChange={setStatus}>
             <SelectTrigger>
               <SelectValue placeholder="Select status" />
             </SelectTrigger>
@@ -32,10 +43,28 @@ export function OrderActions({ orderId }: OrderActionsProps) {
               <SelectItem value="pending">Pending</SelectItem>
               <SelectItem value="processing">Processing</SelectItem>
               <SelectItem value="shipped">Shipped</SelectItem>
-              <SelectItem value="delivered">Delivered</SelectItem>
+              <SelectItem value="completed">Completed</SelectItem>
               <SelectItem value="cancelled">Cancelled</SelectItem>
+              <SelectItem value="refunded">Refunded</SelectItem>
+              <SelectItem value="on-hold">On hold</SelectItem>
+              <SelectItem value="failed">Failed</SelectItem>
             </SelectContent>
           </Select>
+          <div className="mt-2">
+            <Button
+              disabled={!status || updateStatus.isPending}
+              size="sm"
+              onClick={() =>
+                status &&
+                updateStatus.mutate({
+                  id: Number(orderId),
+                  data: { status } as OrderUpdate,
+                })
+              }
+            >
+              {updateStatus.isPending ? "Updating..." : "Apply"}
+            </Button>
+          </div>
         </div>
 
         <div className="space-y-2">

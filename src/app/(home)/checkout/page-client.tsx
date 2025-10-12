@@ -46,7 +46,7 @@ export function CheckoutClient() {
     "contact" | "shipping" | "payment"
   >("contact");
   const [contactData, setContactData] = useState({
-    email: session?.user?.email || "",
+    email: session?.user?.email ?? "",
     phone: "",
   });
   const [shippingData, setShippingData] = useState({

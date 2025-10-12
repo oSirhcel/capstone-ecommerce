@@ -10,6 +10,7 @@ import { ProductSelectionForm } from "@/components/admin/orders/product-selectio
 import { OrderSummaryForm } from "@/components/admin/orders/order-summary-form";
 import { PaymentForm } from "@/components/admin/orders/payment-form";
 import { toast } from "sonner";
+import { useSession } from "next-auth/react";
 
 export type OrderItem = {
   id: string;
@@ -50,6 +51,8 @@ export type PaymentData = {
 export default function CreateOrderPage() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const session = useSession();
+  const storeId = session?.data?.store?.id ?? "";
 
   // Order state
   const [customer, setCustomer] = useState<CustomerData | null>(null);
@@ -112,27 +115,31 @@ export default function CreateOrderPage() {
     setIsSubmitting(true);
 
     try {
-      const orderData = {
-        customer,
-        items: orderItems,
+      const payload = {
+        storeId,
+        customerId: customer.id,
+        items: orderItems.map((i) => ({
+          productId: Number(i.id),
+          quantity: i.quantity,
+          priceAtTime: Math.round(i.price * 100),
+        })),
+        totalAmount: Math.round(total * 100),
+        // placeholders for now
         shippingAddress,
-        payment: paymentData,
         notes: orderNotes,
-        subtotal,
-        shipping,
-        tax,
-        total,
       };
 
-      console.log("Creating order:", orderData);
-
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      toast.success("Order Created Successfully", {
-        description: `Order has been created and assigned ID ORD-${Date.now()}`,
+      const res = await fetch("/api/admin/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
       });
+      if (!res.ok) {
+        const err = (await res.json()) as { error?: string };
+        throw new Error(err.error ?? "Failed to create order");
+      }
 
+      toast.success("Order Created Successfully");
       router.push("/admin/orders");
     } catch (error) {
       toast.error("Error Creating Order", {

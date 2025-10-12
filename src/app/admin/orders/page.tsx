@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { DataTable } from "@/components/admin/data-table";
 import { Button } from "@/components/ui/button";
@@ -30,94 +30,18 @@ import {
 } from "@/components/ui/select";
 import { DatePickerWithRange } from "@/components/ui/date-range-picker";
 import { OrdersStats } from "@/components/admin/orders/orders-stats";
+import { useSession } from "next-auth/react";
+import { useOrdersQuery } from "@/hooks/admin/orders/use-orders-query";
 
-interface Order {
-  id: string;
-  customer: {
-    name: string;
-    email: string;
-    avatar: string;
-  };
+type OrdersListRow = {
+  id: number;
+  customer: { name: string; email: string };
   amount: number;
   status: string;
   date: string;
   items: number;
   paymentStatus: string;
-  shippingAddress: string;
-}
-
-const orders: Order[] = [
-  {
-    id: "ORD-1234",
-    customer: {
-      name: "John Doe",
-      email: "john@example.com",
-      avatar: "/placeholder.svg?height=32&width=32",
-    },
-    amount: 89.99,
-    status: "completed",
-    date: "2024-01-15",
-    items: 3,
-    paymentStatus: "paid",
-    shippingAddress: "123 Main St, New York, NY 10001",
-  },
-  {
-    id: "ORD-1235",
-    customer: {
-      name: "Sarah Johnson",
-      email: "sarah@example.com",
-      avatar: "/placeholder.svg?height=32&width=32",
-    },
-    amount: 156.5,
-    status: "processing",
-    date: "2024-01-15",
-    items: 2,
-    paymentStatus: "paid",
-    shippingAddress: "456 Oak Ave, Los Angeles, CA 90210",
-  },
-  {
-    id: "ORD-1236",
-    customer: {
-      name: "Mike Chen",
-      email: "mike@example.com",
-      avatar: "/placeholder.svg?height=32&width=32",
-    },
-    amount: 45.0,
-    status: "shipped",
-    date: "2024-01-14",
-    items: 1,
-    paymentStatus: "paid",
-    shippingAddress: "789 Pine St, Chicago, IL 60601",
-  },
-  {
-    id: "ORD-1237",
-    customer: {
-      name: "Emily Rodriguez",
-      email: "emily@example.com",
-      avatar: "/placeholder.svg?height=32&width=32",
-    },
-    amount: 234.99,
-    status: "pending",
-    date: "2024-01-14",
-    items: 5,
-    paymentStatus: "pending",
-    shippingAddress: "321 Elm St, Miami, FL 33101",
-  },
-  {
-    id: "ORD-1238",
-    customer: {
-      name: "David Wilson",
-      email: "david@example.com",
-      avatar: "/placeholder.svg?height=32&width=32",
-    },
-    amount: 67.5,
-    status: "cancelled",
-    date: "2024-01-13",
-    items: 2,
-    paymentStatus: "refunded",
-    shippingAddress: "654 Maple Dr, Seattle, WA 98101",
-  },
-];
+};
 
 const getStatusBadge = (status: string) => {
   switch (status) {
@@ -183,7 +107,7 @@ const columns = [
   {
     header: "Order",
     accessorKey: "id",
-    cell: ({ row }: { row: { original: Order } }) => (
+    cell: ({ row }: { row: { original: OrdersListRow } }) => (
       <div className="font-medium">
         <Link
           href={`/admin/orders/${row.original.id}`}
@@ -200,7 +124,7 @@ const columns = [
   {
     header: "Customer",
     accessorKey: "customer",
-    cell: ({ row }: { row: { original: Order } }) => (
+    cell: ({ row }: { row: { original: OrdersListRow } }) => (
       <div className="flex items-center gap-3">
         <div className="min-w-0">
           <div className="truncate font-medium">
@@ -216,7 +140,7 @@ const columns = [
   {
     header: "Amount",
     accessorKey: "amount",
-    cell: ({ row }: { row: { original: Order } }) => (
+    cell: ({ row }: { row: { original: OrdersListRow } }) => (
       <div className="text-right">
         <div className="font-medium">${row.original.amount.toFixed(2)}</div>
         <div className="text-muted-foreground text-xs">
@@ -228,7 +152,7 @@ const columns = [
   {
     header: "Status",
     accessorKey: "status",
-    cell: ({ row }: { row: { original: Order } }) => (
+    cell: ({ row }: { row: { original: OrdersListRow } }) => (
       <div className="space-y-1">
         {getStatusBadge(row.original.status)}
         <div className="text-xs">
@@ -239,7 +163,7 @@ const columns = [
   },
   {
     header: "Actions",
-    cell: ({ row }: { row: { original: Order } }) => (
+    cell: ({ row }: { row: { original: OrdersListRow } }) => (
       <div className="flex gap-1">
         <Button variant="ghost" size="sm" asChild>
           <Link href={`/admin/orders/${row.original.id}`}>
@@ -253,23 +177,35 @@ const columns = [
 ];
 
 export default function OrdersPage() {
+  const session = useSession();
+  const storeId = session?.data?.store?.id ?? "";
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  type StatusFilter =
+    | "all"
+    | "pending"
+    | "processing"
+    | "shipped"
+    | "completed"
+    | "cancelled"
+    | "refunded"
+    | "on-hold"
+    | "failed";
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [paymentFilter, setPaymentFilter] = useState("all");
+  // For now, keep date picker uncontrolled to avoid prop mismatch
 
-  const filteredOrders = orders.filter((order) => {
-    const matchesSearch =
-      order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.customer.email.toLowerCase().includes(searchTerm.toLowerCase());
-
-    const matchesStatus =
-      statusFilter === "all" || order.status === statusFilter;
-    const matchesPayment =
-      paymentFilter === "all" || order.paymentStatus === paymentFilter;
-
-    return matchesSearch && matchesStatus && matchesPayment;
+  const { data, isLoading, refetch } = useOrdersQuery({
+    storeId,
+    page: 1,
+    limit: 10,
+    search: searchTerm || undefined,
+    status: statusFilter === "all" ? undefined : statusFilter,
   });
+
+  const filteredOrders = useMemo<OrdersListRow[]>(
+    () => data?.orders ?? [],
+    [data],
+  );
 
   return (
     <div className="space-y-6">
@@ -286,7 +222,7 @@ export default function OrdersPage() {
             <Download className="mr-2 h-4 w-4" />
             Export
           </Button>
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" onClick={() => void refetch()}>
             <RefreshCw className="mr-2 h-4 w-4" />
             Refresh
           </Button>
@@ -329,7 +265,10 @@ export default function OrdersPage() {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <Select
+              value={statusFilter}
+              onValueChange={(v) => setStatusFilter(v as StatusFilter)}
+            >
               <SelectTrigger className="w-[140px]">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
@@ -359,6 +298,7 @@ export default function OrdersPage() {
           <DataTable
             columns={columns}
             data={filteredOrders}
+            isLoading={isLoading}
             emptyMessage="No orders match your filters. Try adjusting your search criteria."
             emptyIcon={<ShoppingCart className="h-12 w-12 opacity-20" />}
           />

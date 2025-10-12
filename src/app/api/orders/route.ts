@@ -22,12 +22,18 @@ export async function POST(request: NextRequest) {
     const user = session.user as SessionUser;
     const body = await request.json();
     
+    console.log("Received order request body:", JSON.stringify(body, null, 2));
+    
     const {
       items,
       totalAmount,
       contactData,
-      shippingData,
+      shippingAddress: shippingData,
+      billingAddress: billingData,
     } = body;
+
+    console.log("Extracted shipping data:", shippingData);
+    console.log("Extracted billing data:", billingData);
 
     // Validate required fields
     if (!items || !Array.isArray(items) || items.length === 0) {
@@ -51,23 +57,60 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create shipping address first (match schema fields)
-    const [shippingAddress] = await db
-      .insert(addresses)
-      .values({
-        userId: user.id,
-        type: 'shipping',
-        firstName: shippingData.firstName,
-        lastName: shippingData.lastName,
-        addressLine1: shippingData.address,
-        // addressLine2 not collected on UI; store as null/undefined
-        city: shippingData.city,
-        state: shippingData.state,
-        postalCode: shippingData.postcode,
-        country: shippingData.country || 'AU',
-        isDefault: false,
-      })
-      .returning();
+    // Helper function to normalize address data (handles both old and new formats)
+    const normalizeAddress = (addr: any) => ({
+      firstName: addr.firstName,
+      lastName: addr.lastName,
+      addressLine1: addr.addressLine1 || addr.address, // Support both formats
+      addressLine2: addr.addressLine2 || null,
+      city: addr.city,
+      state: addr.state,
+      postalCode: addr.postalCode || addr.postcode, // Support both formats
+      country: addr.country || 'AU',
+    });
+
+    // Create or reference shipping address
+    let shippingAddressId: number;
+    
+    // If the shipping address already has an ID, it's a saved address - just use it
+    if (shippingData.id) {
+      shippingAddressId = shippingData.id;
+    } else {
+      // Create new shipping address
+      const normalizedShipping = normalizeAddress(shippingData);
+      const [shippingAddress] = await db
+        .insert(addresses)
+        .values({
+          userId: user.id,
+          type: 'shipping',
+          ...normalizedShipping,
+          isDefault: false,
+        })
+        .returning();
+      shippingAddressId = shippingAddress.id;
+    }
+
+    // Handle billing address
+    let billingAddressId: number | null = null;
+    if (billingData) {
+      // If the billing address already has an ID, it's a saved address
+      if (billingData.id) {
+        billingAddressId = billingData.id;
+      } else {
+        // Create new billing address
+        const normalizedBilling = normalizeAddress(billingData);
+        const [billingAddress] = await db
+          .insert(addresses)
+          .values({
+            userId: user.id,
+            type: 'billing',
+            ...normalizedBilling,
+            isDefault: false,
+          })
+          .returning();
+        billingAddressId = billingAddress.id;
+      }
+    }
 
     // Create the order
     const [order] = await db
@@ -99,7 +142,8 @@ export async function POST(request: NextRequest) {
         totalAmount: order.totalAmount,
         createdAt: order.createdAt,
       },
-      shippingAddressId: shippingAddress.id,
+      shippingAddressId,
+      billingAddressId,
     });
 
   } catch (error) {

@@ -1,8 +1,8 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { db } from "@/server/db";
-import { orderItems, products, cartItems, carts, zeroTrustAssessments } from "@/server/db/schema";
-import { eq } from "drizzle-orm";
+import { orderItems, products, cartItems, carts, zeroTrustAssessments, users, stores, orders } from "@/server/db/schema";
+import { eq, and, sql } from "drizzle-orm";
 
 export type RiskDecision = "allow" | "deny" | "warn";
 
@@ -68,11 +68,6 @@ export interface RiskPayload {
     ipAddress: string | null;
     timestamp: string;
     
-    // Geographic/shipping data
-    shippingCountry?: string;
-    shippingState?: string;
-    shippingCity?: string;
-    
     // Store distribution (multi-vendor risk)
     uniqueStoreCount: number;
     storeDistribution: Array<{
@@ -81,6 +76,22 @@ export interface RiskPayload {
         itemCount: number;
         subtotal: number;
     }>;
+    
+    // Session & account security factors (NEW)
+    sessionTokenAge?: number; // Age of session token in seconds
+    concurrentSessions?: number; // Number of active sessions for this user
+    failedLoginAttempts?: number; // Recent failed login attempts (last 24h)
+    accountAge?: number; // Age of account in seconds
+    accountRole?: string; // 'customer', 'vendor', 'admin'
+    
+    // Transaction history factors (NEW)
+    totalPastTransactions?: number; // Total transactions user has made
+    successfulPastTransactions?: number; // Number of successful transactions
+    transactionSuccessRate?: number; // Percentage (0-100)
+    
+    // Recent activity factors (NEW)
+    recentTransactionFailures?: number; // Failed transactions in last hour
+    sessionPaymentMethodCount?: number; // Number of different payment methods tried in this session
 }
 
 export interface RiskScore {
@@ -101,19 +112,46 @@ const RISK_THRESHOLDS = {
     DENY_MIN: 51      // 51-100: Deny (much lower threshold)
 };
 
-// Risk factors and their maximum impact scores - More aggressive scoring
+// Risk factors and their maximum impact scores - Enhanced session & behavioral scoring
 const RISK_FACTORS = {
-    HIGH_AMOUNT: { max: 30, threshold: 30000 }, // $300+ AUD in cents (lowered from $500)
-    UNUSUAL_ITEM_COUNT: { max: 35, threshold: 5 }, // 5+ items (lowered from 10, increased impact)
+    // Transaction-based factors
+    HIGH_AMOUNT: { max: 30, threshold: 30000 }, // $300+ AUD in cents
+    UNUSUAL_ITEM_COUNT: { max: 35, threshold: 5 }, // 5+ items
     EXTREME_ITEM_COUNT: { max: 50, threshold: 30 }, // 30+ items - immediate high risk
-    BULK_SINGLE_ITEM: { max: 40, threshold: 10 }, // 10+ of single item (lowered from 20, increased impact)
+    BULK_SINGLE_ITEM: { max: 40, threshold: 10 }, // 10+ of single item
     EXTREME_BULK_SINGLE: { max: 45, threshold: 50 }, // 50+ of single item - extreme risk
-    MULTIPLE_STORES: { max: 25, threshold: 2 }, // 2+ stores (lowered from 3)
+    MULTIPLE_STORES: { max: 25, threshold: 2 }, // 2+ stores in single transaction
+    
+    // Technical/session factors
     SUSPICIOUS_USER_AGENT: { max: 15 },
     NEW_PAYMENT_METHOD: { max: 20 },
-    GEOGRAPHIC_MISMATCH: { max: 25 },
-    VELOCITY_CHECK: { max: 35 }, // Future: multiple transactions in short time
-    ANONYMOUS_USER: { max: 30 }
+    OLD_SESSION_TOKEN: { max: 20, threshold: 172800 }, // 48+ hours old (in seconds)
+    AGED_SESSION_TOKEN: { max: 10, threshold: 86400 }, // 24-48 hours old (in seconds)
+    
+    // Account security factors
+    CONCURRENT_SESSIONS: { max: 25, threshold: 4 }, // 4+ active sessions
+    MODERATE_CONCURRENT_SESSIONS: { max: 10, threshold: 3 }, // 3 active sessions
+    FAILED_LOGIN_ATTEMPTS: { max: 30, threshold: 6 }, // 6+ recent failed logins
+    SOME_FAILED_LOGINS: { max: 15, threshold: 3 }, // 3-5 failed logins
+    FEW_FAILED_LOGINS: { max: 5, threshold: 1 }, // 1-2 failed logins
+    
+    // Transaction history factors
+    POOR_TRANSACTION_HISTORY: { max: 25, threshold: 50 }, // <50% success rate
+    MODERATE_TRANSACTION_HISTORY: { max: 10, threshold: 70 }, // 50-70% success rate
+    GOOD_TRANSACTION_HISTORY: { bonus: -15, threshold: 90 }, // 90%+ success rate (reduces risk)
+    
+    // Recent activity factors
+    RECENT_TRANSACTION_FAILURES: { max: 40, threshold: 5 }, // 5+ failures in last hour
+    MULTIPLE_TRANSACTION_FAILURES: { max: 25, threshold: 3 }, // 3-4 failures in last hour
+    SINGLE_TRANSACTION_FAILURE: { max: 10, threshold: 1 }, // 1-2 failures in last hour
+    
+    // Payment behavior factors
+    MULTIPLE_PAYMENT_METHODS: { max: 25, threshold: 3 }, // 3+ different payment methods in session
+    TWO_PAYMENT_METHODS: { max: 10, threshold: 2 }, // 2 payment methods in session
+    
+    // Role-based factors
+    NEW_ACCOUNT: { max: 15, threshold: 604800 }, // Account < 7 days old (in seconds)
+    TRUSTED_ROLE: { bonus: -10 }, // Vendor/admin accounts (negative = reduces risk)
 };
 
 /*
@@ -205,8 +243,96 @@ export async function zeroTrustCheck(
             }
         }
 
-        // Extract shipping information if available
-        const shippingData = body.shippingData ?? {};
+        // NEW: Collect session and account security metrics
+        let sessionTokenAge: number | undefined;
+        let concurrentSessions: number | undefined;
+        let failedLoginAttempts: number | undefined;
+        let accountAge: number | undefined;
+        let accountRole: string | undefined;
+        let totalPastTransactions: number | undefined;
+        let successfulPastTransactions: number | undefined;
+        let transactionSuccessRate: number | undefined;
+        let recentTransactionFailures: number | undefined;
+        let sessionPaymentMethodCount: number | undefined;
+
+        if (userId) {
+            try {
+                // Get user account details
+                const [user] = await db
+                    .select({
+                        createdAt: users.createdAt,
+                    })
+                    .from(users)
+                    .where(eq(users.id, userId))
+                    .limit(1);
+
+                if (user) {
+                    // Calculate account age in seconds
+                    accountAge = Math.floor((Date.now() - user.createdAt.getTime()) / 1000);
+                }
+
+                // Determine account role (check if user owns a store = vendor)
+                const [store] = await db
+                    .select()
+                    .from(stores)
+                    .where(eq(stores.ownerId, userId))
+                    .limit(1);
+                
+                accountRole = store ? 'vendor' : 'customer';
+
+                // Calculate transaction success rate
+                const orderStats = await db
+                    .select({
+                        total: sql<number>`count(*)`,
+                        successful: sql<number>`count(case when ${orders.status} = 'completed' then 1 end)`,
+                    })
+                    .from(orders)
+                    .where(eq(orders.userId, userId));
+
+                if (orderStats.length > 0 && orderStats[0].total > 0) {
+                    totalPastTransactions = orderStats[0].total;
+                    successfulPastTransactions = orderStats[0].successful;
+                    transactionSuccessRate = (successfulPastTransactions / totalPastTransactions) * 100;
+                }
+
+                // Count recent failed transactions (last hour)
+                const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+                const failedTransactions = await db
+                    .select({ count: sql<number>`count(*)` })
+                    .from(orders)
+                    .where(
+                        and(
+                            eq(orders.userId, userId),
+                            eq(orders.status, 'failed'),
+                            sql`${orders.createdAt} >= ${oneHourAgo}`
+                        )
+                    );
+
+                if (failedTransactions.length > 0) {
+                    recentTransactionFailures = failedTransactions[0].count;
+                }
+
+                // TODO: Implement session token age calculation
+                // This would require JWT decoding to get 'iat' (issued at) claim
+                // Example: sessionTokenAge = Math.floor(Date.now() / 1000) - session.iat;
+                
+                // TODO: Implement concurrent sessions tracking
+                // This would require a sessions table to track active sessions
+                // Example: SELECT COUNT(*) FROM sessions WHERE userId = ? AND expiresAt > NOW()
+                
+                // TODO: Implement failed login attempts tracking
+                // This would require a login_attempts table
+                // Example: SELECT COUNT(*) FROM login_attempts WHERE userId = ? AND success = false AND createdAt > NOW() - INTERVAL '24 hours'
+                
+                // TODO: Implement session payment method count
+                // This could be tracked in session storage or a temporary table
+                // Example: Track payment method IDs tried in this session
+
+            } catch (error) {
+                console.error('Failed to collect session/account metrics for zero trust:', error);
+                // Continue without these metrics rather than failing the whole check
+            }
+        }
         
         // Calculate store distribution using enriched items
         const storeMap = new Map<string, {
@@ -272,14 +398,25 @@ export async function zeroTrustCheck(
             ipAddress: req.headers.get("x-forwarded-for") ?? req.headers.get("x-real-ip"),
             timestamp: new Date().toISOString(),
             
-            // Geographic/shipping data
-            shippingCountry: shippingData.country,
-            shippingState: shippingData.state,
-            shippingCity: shippingData.city,
-            
             // Store distribution
             uniqueStoreCount: storeDistribution.length,
-            storeDistribution
+            storeDistribution,
+            
+            // Session & account security factors (NEW)
+            sessionTokenAge,
+            concurrentSessions,
+            failedLoginAttempts,
+            accountAge,
+            accountRole,
+            
+            // Transaction history factors (NEW)
+            totalPastTransactions,
+            successfulPastTransactions,
+            transactionSuccessRate,
+            
+            // Recent activity factors (NEW)
+            recentTransactionFailures,
+            sessionPaymentMethodCount,
         };
 
         // Calculate risk score
@@ -300,9 +437,6 @@ export async function zeroTrustCheck(
                 riskFactors: JSON.stringify(riskScore.factors),
                 userAgent: riskPayload.userAgent,
                 ipAddress: riskPayload.ipAddress,
-                shippingCountry: riskPayload.shippingCountry,
-                shippingState: riskPayload.shippingState,
-                shippingCity: riskPayload.shippingCity,
             });
         } catch (dbError) {
             console.error('Failed to log zero trust assessment to database:', dbError);
@@ -438,14 +572,25 @@ function calculateRiskScore(payload: RiskPayload): RiskScore {
         totalScore += impact;
     }
 
-    // Factor 5: Anonymous/unauthenticated user
-    if (!payload.userId) {
+    // Factor 5: Session token age (old sessions may be hijacked)
+    if (payload.sessionTokenAge !== undefined) {
+        if (payload.sessionTokenAge >= RISK_FACTORS.OLD_SESSION_TOKEN.threshold) {
+            const impact = RISK_FACTORS.OLD_SESSION_TOKEN.max;
+            factors.push({
+                factor: "OLD_SESSION_TOKEN",
+                impact,
+                description: `Session token is ${Math.round(payload.sessionTokenAge / 3600)} hours old (potential hijack risk)`
+            });
+            totalScore += impact;
+        } else if (payload.sessionTokenAge >= RISK_FACTORS.AGED_SESSION_TOKEN.threshold) {
+            const impact = RISK_FACTORS.AGED_SESSION_TOKEN.max;
         factors.push({
-            factor: "ANONYMOUS_USER",
-            impact: RISK_FACTORS.ANONYMOUS_USER.max,
-            description: "Transaction from unauthenticated user"
-        });
-        totalScore += RISK_FACTORS.ANONYMOUS_USER.max;
+                factor: "AGED_SESSION_TOKEN",
+                impact,
+                description: `Session token is ${Math.round(payload.sessionTokenAge / 3600)} hours old`
+            });
+            totalScore += impact;
+        }
     }
 
     // Factor 6: Suspicious user agent patterns
@@ -475,14 +620,160 @@ function calculateRiskScore(payload: RiskPayload): RiskScore {
         totalScore += RISK_FACTORS.NEW_PAYMENT_METHOD.max;
     }
 
-    // Factor 8: Geographic inconsistencies (basic check)
-    if (payload.shippingCountry && payload.shippingCountry !== 'AU') {
+    // Factor 8: Concurrent sessions (multiple active logins)
+    if (payload.concurrentSessions !== undefined) {
+        if (payload.concurrentSessions >= RISK_FACTORS.CONCURRENT_SESSIONS.threshold) {
+            const impact = RISK_FACTORS.CONCURRENT_SESSIONS.max;
+            factors.push({
+                factor: "CONCURRENT_SESSIONS",
+                impact,
+                description: `User has ${payload.concurrentSessions} active sessions (possible account compromise)`
+            });
+            totalScore += impact;
+        } else if (payload.concurrentSessions >= RISK_FACTORS.MODERATE_CONCURRENT_SESSIONS.threshold) {
+            const impact = RISK_FACTORS.MODERATE_CONCURRENT_SESSIONS.max;
+            factors.push({
+                factor: "MODERATE_CONCURRENT_SESSIONS",
+                impact,
+                description: `User has ${payload.concurrentSessions} active sessions`
+            });
+            totalScore += impact;
+        }
+    }
+
+    // Factor 9: Failed login attempts (brute force/credential stuffing)
+    if (payload.failedLoginAttempts !== undefined && payload.failedLoginAttempts > 0) {
+        if (payload.failedLoginAttempts >= RISK_FACTORS.FAILED_LOGIN_ATTEMPTS.threshold) {
+            const impact = RISK_FACTORS.FAILED_LOGIN_ATTEMPTS.max;
+            factors.push({
+                factor: "FAILED_LOGIN_ATTEMPTS",
+                impact,
+                description: `${payload.failedLoginAttempts} failed login attempts in last 24 hours (credential stuffing risk)`
+            });
+            totalScore += impact;
+        } else if (payload.failedLoginAttempts >= RISK_FACTORS.SOME_FAILED_LOGINS.threshold) {
+            const impact = RISK_FACTORS.SOME_FAILED_LOGINS.max;
+            factors.push({
+                factor: "SOME_FAILED_LOGINS",
+                impact,
+                description: `${payload.failedLoginAttempts} failed login attempts in last 24 hours`
+            });
+            totalScore += impact;
+        } else if (payload.failedLoginAttempts >= RISK_FACTORS.FEW_FAILED_LOGINS.threshold) {
+            const impact = RISK_FACTORS.FEW_FAILED_LOGINS.max;
+            factors.push({
+                factor: "FEW_FAILED_LOGINS",
+                impact,
+                description: `${payload.failedLoginAttempts} failed login attempt(s) in last 24 hours`
+            });
+            totalScore += impact;
+        }
+    }
+
+    // Factor 10: Account age (new accounts are higher risk)
+    if (payload.accountAge !== undefined) {
+        if (payload.accountAge < RISK_FACTORS.NEW_ACCOUNT.threshold) {
+            const impact = RISK_FACTORS.NEW_ACCOUNT.max;
+            const daysOld = Math.round(payload.accountAge / 86400);
+            factors.push({
+                factor: "NEW_ACCOUNT",
+                impact,
+                description: `Account is only ${daysOld} day(s) old`
+            });
+            totalScore += impact;
+        }
+    }
+
+    // Factor 11: Account role (vendors/admins are more trusted)
+    if (payload.accountRole) {
+        if (payload.accountRole === 'vendor' || payload.accountRole === 'admin') {
+            const impact = RISK_FACTORS.TRUSTED_ROLE.bonus;
+            factors.push({
+                factor: "TRUSTED_ROLE",
+                impact,
+                description: `Account has trusted role: ${payload.accountRole}`
+            });
+            totalScore += impact; // This is negative, so it reduces risk
+        }
+    }
+
+    // Factor 12: Transaction success rate (trust evolution)
+    if (payload.transactionSuccessRate !== undefined && payload.totalPastTransactions !== undefined && payload.totalPastTransactions > 0) {
+        if (payload.transactionSuccessRate >= RISK_FACTORS.GOOD_TRANSACTION_HISTORY.threshold) {
+            const impact = RISK_FACTORS.GOOD_TRANSACTION_HISTORY.bonus;
+            factors.push({
+                factor: "GOOD_TRANSACTION_HISTORY",
+                impact,
+                description: `Excellent transaction history: ${payload.transactionSuccessRate.toFixed(1)}% success rate over ${payload.totalPastTransactions} transactions`
+            });
+            totalScore += impact; // This is negative, so it reduces risk
+        } else if (payload.transactionSuccessRate < RISK_FACTORS.POOR_TRANSACTION_HISTORY.threshold) {
+            const impact = RISK_FACTORS.POOR_TRANSACTION_HISTORY.max;
+            factors.push({
+                factor: "POOR_TRANSACTION_HISTORY",
+                impact,
+                description: `Poor transaction history: only ${payload.transactionSuccessRate.toFixed(1)}% success rate`
+            });
+            totalScore += impact;
+        } else if (payload.transactionSuccessRate < RISK_FACTORS.MODERATE_TRANSACTION_HISTORY.threshold) {
+            const impact = RISK_FACTORS.MODERATE_TRANSACTION_HISTORY.max;
+            factors.push({
+                factor: "MODERATE_TRANSACTION_HISTORY",
+                impact,
+                description: `Moderate transaction history: ${payload.transactionSuccessRate.toFixed(1)}% success rate`
+            });
+            totalScore += impact;
+        }
+    }
+
+    // Factor 13: Recent transaction failures (card testing)
+    if (payload.recentTransactionFailures !== undefined && payload.recentTransactionFailures > 0) {
+        if (payload.recentTransactionFailures >= RISK_FACTORS.RECENT_TRANSACTION_FAILURES.threshold) {
+            const impact = RISK_FACTORS.RECENT_TRANSACTION_FAILURES.max;
+            factors.push({
+                factor: "RECENT_TRANSACTION_FAILURES",
+                impact,
+                description: `${payload.recentTransactionFailures} failed transactions in last hour (card testing suspected)`
+            });
+            totalScore += impact;
+        } else if (payload.recentTransactionFailures >= RISK_FACTORS.MULTIPLE_TRANSACTION_FAILURES.threshold) {
+            const impact = RISK_FACTORS.MULTIPLE_TRANSACTION_FAILURES.max;
+            factors.push({
+                factor: "MULTIPLE_TRANSACTION_FAILURES",
+                impact,
+                description: `${payload.recentTransactionFailures} failed transactions in last hour`
+            });
+            totalScore += impact;
+        } else if (payload.recentTransactionFailures >= RISK_FACTORS.SINGLE_TRANSACTION_FAILURE.threshold) {
+            const impact = RISK_FACTORS.SINGLE_TRANSACTION_FAILURE.max;
+            factors.push({
+                factor: "SINGLE_TRANSACTION_FAILURE",
+                impact,
+                description: `${payload.recentTransactionFailures} failed transaction(s) in last hour`
+            });
+            totalScore += impact;
+        }
+    }
+
+    // Factor 14: Multiple payment methods in session (testing stolen cards)
+    if (payload.sessionPaymentMethodCount !== undefined && payload.sessionPaymentMethodCount > 1) {
+        if (payload.sessionPaymentMethodCount >= RISK_FACTORS.MULTIPLE_PAYMENT_METHODS.threshold) {
+            const impact = RISK_FACTORS.MULTIPLE_PAYMENT_METHODS.max;
+            factors.push({
+                factor: "MULTIPLE_PAYMENT_METHODS",
+                impact,
+                description: `Tried ${payload.sessionPaymentMethodCount} different payment methods in this session (card testing suspected)`
+            });
+            totalScore += impact;
+        } else if (payload.sessionPaymentMethodCount >= RISK_FACTORS.TWO_PAYMENT_METHODS.threshold) {
+            const impact = RISK_FACTORS.TWO_PAYMENT_METHODS.max;
         factors.push({
-            factor: "GEOGRAPHIC_MISMATCH",
-            impact: RISK_FACTORS.GEOGRAPHIC_MISMATCH.max,
-            description: `International shipping to ${payload.shippingCountry}`
-        });
-        totalScore += RISK_FACTORS.GEOGRAPHIC_MISMATCH.max;
+                factor: "TWO_PAYMENT_METHODS",
+                impact,
+                description: `Tried ${payload.sessionPaymentMethodCount} different payment methods in this session`
+            });
+            totalScore += impact;
+        }
     }
 
     // Normalize score to 0-100 range

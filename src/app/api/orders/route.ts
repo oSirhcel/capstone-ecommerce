@@ -122,27 +122,35 @@ export async function POST(request: NextRequest) {
     if (billingData) {
       // If the billing address already has an ID, verify ownership before using it
       if (billingData.id) {
-        // Verify the address belongs to this user
-        const [existingAddress] = await db
-          .select()
-          .from(addresses)
-          .where(
-            and(
-              eq(addresses.id, billingData.id),
-              eq(addresses.userId, user.id),
-              eq(addresses.type, 'billing')
+        // Check if it's the same as shipping address (when "same as shipping" is checked)
+        const isSameAsShipping = billingData.id === shippingAddressId;
+        
+        if (isSameAsShipping) {
+          // If using shipping address for billing, just reference it
+          billingAddressId = shippingAddressId;
+        } else {
+          // Verify the address belongs to this user (type should be 'billing')
+          const [existingAddress] = await db
+            .select()
+            .from(addresses)
+            .where(
+              and(
+                eq(addresses.id, billingData.id),
+                eq(addresses.userId, user.id),
+                eq(addresses.type, 'billing')
+              )
             )
-          )
-          .limit(1);
-        
-        if (!existingAddress) {
-          return NextResponse.json(
-            { error: 'Billing address not found or does not belong to you' },
-            { status: 403 }
-          );
+            .limit(1);
+          
+          if (!existingAddress) {
+            return NextResponse.json(
+              { error: 'Billing address not found or does not belong to you' },
+              { status: 403 }
+            );
+          }
+          
+          billingAddressId = billingData.id;
         }
-        
-        billingAddressId = billingData.id;
       } else {
         // Create new billing address
         const normalizedBilling = normalizeAddress(billingData);

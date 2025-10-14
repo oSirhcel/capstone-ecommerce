@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/server/db";
 import { orderItems, products, cartItems, carts, zeroTrustAssessments, users, stores, orders } from "@/server/db/schema";
 import { eq, and, sql } from "drizzle-orm";
+import { generateJustificationBackground } from "@/lib/api/risk-justification";
 
 export type RiskDecision = "allow" | "deny" | "warn";
 
@@ -422,9 +423,10 @@ export async function zeroTrustCheck(
         // Calculate risk score
         const riskScore = calculateRiskScore(riskPayload);
         
-        // Log the risk assessment to database
+        // Log the risk assessment to database and get the inserted ID
+        let assessmentId: number | null = null;
         try {
-            await db.insert(zeroTrustAssessments).values({
+            const [insertedAssessment] = await db.insert(zeroTrustAssessments).values({
                 userId: riskPayload.userId,
                 orderId: riskPayload.orderId,
                 riskScore: riskScore.score,
@@ -437,7 +439,17 @@ export async function zeroTrustCheck(
                 riskFactors: JSON.stringify(riskScore.factors),
                 userAgent: riskPayload.userAgent,
                 ipAddress: riskPayload.ipAddress,
-            });
+            }).returning({ id: zeroTrustAssessments.id });
+            
+            assessmentId = insertedAssessment?.id ?? null;
+            
+            // Generate AI justification in the background (non-blocking)
+            // This won't slow down the transaction response
+            if (assessmentId) {
+                generateJustificationBackground(assessmentId, riskScore, riskPayload).catch(err => {
+                    console.error(`Background AI generation failed for assessment ${assessmentId}:`, err);
+                });
+            }
         } catch (dbError) {
             console.error('Failed to log zero trust assessment to database:', dbError);
         }

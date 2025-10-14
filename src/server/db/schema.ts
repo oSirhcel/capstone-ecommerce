@@ -260,6 +260,10 @@ export const zeroTrustAssessments = pgTable("zero_trust_assessments", {
   // Risk factors (JSON array)
   riskFactors: text(), // JSON string of risk factors
   
+  // AI-generated justification (NEW)
+  aiJustification: text(), // AI-generated explanation of the risk assessment
+  justificationGeneratedAt: timestamp(), // When the AI justification was generated
+  
   // Request metadata
   userAgent: text(),
   ipAddress: varchar({ length: 45 }), // IPv6 compatible

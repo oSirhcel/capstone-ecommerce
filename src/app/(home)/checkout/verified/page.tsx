@@ -44,20 +44,15 @@ function VerifiedContent() {
         throw new Error("Verification not completed");
       }
 
-      // Get payment data from verification
-      const verifyResponse = await fetch("/api/verification/verify-otp", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ token, otp: "verified" }), // Already verified, just retrieving data
-      });
-
-      if (!verifyResponse.ok) {
+      // Get payment data for verified token
+      const dataResponse = await fetch(
+        `/api/verification/payment-data?token=${token}`,
+      );
+      if (!dataResponse.ok) {
         throw new Error("Failed to retrieve payment data");
       }
 
-      const { paymentData } = await verifyResponse.json();
+      const { paymentData } = await dataResponse.json();
 
       // Now process the payment with the original payment data
       const paymentResponse = await fetch("/api/payments", {
@@ -65,7 +60,7 @@ function VerifiedContent() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(paymentData),
+        body: JSON.stringify({ ...paymentData, verificationToken: token }),
       });
 
       if (!paymentResponse.ok) {

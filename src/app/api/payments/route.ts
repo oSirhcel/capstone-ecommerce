@@ -23,6 +23,7 @@ interface CreatePaymentRequest {
   orderId?: number;
   paymentMethodId?: string;
   savePaymentMethod?: boolean;
+  verificationToken?: string; // required for 'warn' flows
 }
 
 interface ZeroTrustAssessment {
@@ -75,31 +76,53 @@ export async function POST(request: NextRequest) {
     if (riskAssessment.decision === 'warn') {
       console.log(`Payment FLAGGED by Zero Trust: Score ${riskAssessment.score}, User: ${user.id}`);
       
-      // Check if user has a recent verified token (within 10 minutes)
-      const [verifiedToken] = await db
+      // Enforce presence of a verification token
+      if (!body.verificationToken) {
+        return await requireNewVerification();
+      }
+
+      // Validate the provided token belongs to the user, is verified, fresh, and matches payload
+      const [verification] = await db
         .select()
         .from(zeroTrustVerifications)
         .where(
           and(
+            eq(zeroTrustVerifications.token, body.verificationToken),
             eq(zeroTrustVerifications.userId, user.id),
-            eq(zeroTrustVerifications.status, 'verified')
+            eq(zeroTrustVerifications.status, 'verified'),
           )
         )
-        .orderBy(desc(zeroTrustVerifications.verifiedAt))
         .limit(1);
 
-      if (verifiedToken && verifiedToken.verifiedAt) {
-        const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
-        if (verifiedToken.verifiedAt > tenMinutesAgo) {
-          console.log(`Payment allowed after recent verification: User ${user.id}`);
-          // Continue with normal payment processing
-        } else {
-          // Token is too old, require new verification
-          return await requireNewVerification();
-        }
-      } else {
-        // No verified token found, require verification
+      if (!verification || !verification.verifiedAt) {
         return await requireNewVerification();
+      }
+
+      // Check expiry window (10 minutes)
+      const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+      if (verification.verifiedAt <= tenMinutesAgo) {
+        return await requireNewVerification();
+      }
+
+      // Ensure payment data integrity: stored paymentData must match current body
+      try {
+        const stored = JSON.parse(verification.paymentData || '{}');
+        const keysToCompare: Array<keyof CreatePaymentRequest> = ['amount', 'currency', 'orderId', 'paymentMethodId', 'savePaymentMethod'];
+        const mismatch = keysToCompare.some((k) => {
+          const a = (stored as any)[k];
+          const b = (body as any)[k];
+          return (a ?? undefined) !== (b ?? undefined);
+        });
+        if (mismatch) {
+          return NextResponse.json({
+            error: 'Payment data mismatch. Please restart verification.',
+            errorCode: 'ZERO_TRUST_DATA_MISMATCH',
+          }, { status: 409 });
+        }
+      } catch {
+        return NextResponse.json({
+          error: 'Invalid stored verification data',
+        }, { status: 500 });
       }
 
       async function requireNewVerification() {
@@ -145,6 +168,7 @@ export async function POST(request: NextRequest) {
       orderId,
       paymentMethodId,
       savePaymentMethod = false,
+      verificationToken,
     } = body;
 
     // Validate required fields

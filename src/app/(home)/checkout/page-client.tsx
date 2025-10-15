@@ -439,14 +439,13 @@ export function CheckoutClient() {
     if (error instanceof Error && (error as any).isZeroTrustVerification) {
       const verificationError = error as any;
 
-      // Redirect to verification page with details
+      // Redirect to OTP verification page
       const params = new URLSearchParams();
       params.set("token", verificationError.verificationToken || "");
       params.set("score", verificationError.riskScore?.toString() || "0");
-      params.set("factors", verificationError.riskFactors?.join(",") || "");
       params.set("email", verificationError.userEmail || "");
 
-      router.push(`/checkout/verify?${params.toString()}`);
+      router.push(`/checkout/verify-otp?${params.toString()}`);
       return;
     }
 

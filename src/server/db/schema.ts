@@ -284,6 +284,9 @@ export const zeroTrustVerifications = pgTable("zero_trust_verifications", {
     .references(() => users.id)
     .notNull(),
   
+  // OTP code for verification
+  otpHash: varchar({ length: 255 }), // Hashed OTP code
+  
   // Transaction details to resume after verification
   paymentData: text().notNull(), // JSON string of original payment request
   riskScore: integer().notNull(),
@@ -292,7 +295,7 @@ export const zeroTrustVerifications = pgTable("zero_trust_verifications", {
   // Verification status
   status: varchar({ length: 20 }).notNull().default('pending'), // 'pending', 'verified', 'expired'
   verifiedAt: timestamp(),
-  expiresAt: timestamp().notNull(), // Tokens expire after 30 minutes
+  expiresAt: timestamp().notNull(), // Tokens expire after 10 minutes
   
   // Email details
   userEmail: varchar({ length: 255 }).notNull(),

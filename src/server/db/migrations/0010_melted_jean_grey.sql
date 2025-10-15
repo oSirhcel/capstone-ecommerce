@@ -1,0 +1,1 @@
+ALTER TABLE "zero_trust_verifications" ADD COLUMN "otpHash" varchar(255);

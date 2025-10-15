@@ -418,9 +418,21 @@ export function CheckoutClient() {
 
   // Handle payment error
   const handlePaymentError = (error: string | Error) => {
+    console.log("handlePaymentError called with:", error);
+    console.log("Error type:", typeof error);
+    console.log("Is Error instance:", error instanceof Error);
+
+    if (error instanceof Error) {
+      console.log("Error properties:", {
+        isZeroTrustBlock: (error as any).isZeroTrustBlock,
+        isZeroTrustVerification: (error as any).isZeroTrustVerification,
+      });
+    }
+
     // Check if this is a zero trust block
     if (error instanceof Error && (error as any).isZeroTrustBlock) {
       const zeroTrustError = error as any;
+      console.log("Redirecting to blocked page");
 
       // Redirect to blocked page with risk details
       const params = new URLSearchParams();
@@ -438,6 +450,8 @@ export function CheckoutClient() {
     // Check if this is a zero trust verification required
     if (error instanceof Error && (error as any).isZeroTrustVerification) {
       const verificationError = error as any;
+      console.log("Redirecting to OTP verification page");
+      console.log("Verification token:", verificationError.verificationToken);
 
       // Redirect to OTP verification page
       const params = new URLSearchParams();
@@ -450,6 +464,7 @@ export function CheckoutClient() {
     }
 
     // Handle regular payment errors
+    console.log("Handling as regular payment error");
     const errorMessage = error instanceof Error ? error.message : error;
     toast.error("Payment failed", {
       description: errorMessage,

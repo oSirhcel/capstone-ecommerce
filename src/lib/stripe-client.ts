@@ -32,8 +32,11 @@ export const processPayment = async (params: {
     body: JSON.stringify(params),
   });
 
-  if (!response.ok) {
+  // Handle 202 Accepted (verification required) as an error case
+  if (response.status === 202 || !response.ok) {
     const error = await response.json();
+    
+    console.log('Payment API response:', { status: response.status, error });
     
     // Handle zero trust blocking specially
     if (error.errorCode === 'ZERO_TRUST_DENIED') {
@@ -45,8 +48,9 @@ export const processPayment = async (params: {
       throw zeroTrustError;
     }
     
-    // Handle zero trust verification required
-    if (error.errorCode === 'ZERO_TRUST_VERIFICATION_REQUIRED') {
+    // Handle zero trust verification required (202 status)
+    if (error.errorCode === 'ZERO_TRUST_VERIFICATION_REQUIRED' || response.status === 202) {
+      console.log('Creating verification error with:', error);
       const verificationError = new Error(error.message || 'Transaction requires verification');
       (verificationError as any).isZeroTrustVerification = true;
       (verificationError as any).riskScore = error.riskScore;
@@ -54,6 +58,7 @@ export const processPayment = async (params: {
       (verificationError as any).verificationToken = error.verificationToken;
       (verificationError as any).expiresAt = error.expiresAt;
       (verificationError as any).userEmail = error.userEmail;
+      console.log('Throwing verification error:', verificationError);
       throw verificationError;
     }
     

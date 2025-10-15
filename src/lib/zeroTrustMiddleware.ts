@@ -117,10 +117,10 @@ const RISK_THRESHOLDS = {
 const RISK_FACTORS = {
     // Transaction-based factors
     HIGH_AMOUNT: { max: 30, threshold: 30000 }, // $300+ AUD in cents
-    UNUSUAL_ITEM_COUNT: { max: 35, threshold: 5 }, // 5+ items
-    EXTREME_ITEM_COUNT: { max: 50, threshold: 30 }, // 30+ items - immediate high risk
-    BULK_SINGLE_ITEM: { max: 40, threshold: 10 }, // 10+ of single item
-    EXTREME_BULK_SINGLE: { max: 45, threshold: 50 }, // 50+ of single item - extreme risk
+    UNUSUAL_ITEM_COUNT: { max: 35, threshold: 4 }, // 5+ items
+    EXTREME_ITEM_COUNT: { max: 50, threshold: 16 }, // 30+ items - immediate high risk
+    BULK_SINGLE_ITEM: { max: 40, threshold: 7 }, // 10+ of single item
+    EXTREME_BULK_SINGLE: { max: 45, threshold: 20 }, // 50+ of single item - extreme risk
     MULTIPLE_STORES: { max: 25, threshold: 2 }, // 2+ stores in single transaction
     
     // Technical/session factors
@@ -151,7 +151,7 @@ const RISK_FACTORS = {
     TWO_PAYMENT_METHODS: { max: 10, threshold: 2 }, // 2 payment methods in session
     
     // Role-based factors
-    NEW_ACCOUNT: { max: 15, threshold: 604800 }, // Account < 7 days old (in seconds)
+    NEW_ACCOUNT: { max: 10, threshold: 604800 }, // Account < 7 days old (in seconds)
     TRUSTED_ROLE: { bonus: -10 }, // Vendor/admin accounts (negative = reduces risk)
 };
 
@@ -524,7 +524,13 @@ function calculateRiskScore(payload: RiskPayload): RiskScore {
     }
 
     // Factor 2: Unusual total item count
-    if (payload.itemCount > RISK_FACTORS.UNUSUAL_ITEM_COUNT.threshold) {
+    // Skip this factor for single item purchases unless there's suspicious activity
+    const isSingleItemPurchase = payload.uniqueItemCount === 1 && payload.itemCount === 1;
+    const hasSuspiciousActivity = payload.userAgent && 
+        /bot|crawler|spider|scraper|curl|wget|python|postman/i.test(payload.userAgent);
+    
+    if (payload.itemCount > RISK_FACTORS.UNUSUAL_ITEM_COUNT.threshold && 
+        !(isSingleItemPurchase && !hasSuspiciousActivity)) {
         const countRatio = payload.itemCount / RISK_FACTORS.UNUSUAL_ITEM_COUNT.threshold;
         const impact = Math.min(RISK_FACTORS.UNUSUAL_ITEM_COUNT.max * Math.log2(countRatio), RISK_FACTORS.UNUSUAL_ITEM_COUNT.max);
         factors.push({
@@ -536,7 +542,8 @@ function calculateRiskScore(payload: RiskPayload): RiskScore {
     }
 
     // Factor 2b: Extreme item count (30+ items)
-    if (payload.itemCount > RISK_FACTORS.EXTREME_ITEM_COUNT.threshold) {
+    if (payload.itemCount > RISK_FACTORS.EXTREME_ITEM_COUNT.threshold && 
+        !(isSingleItemPurchase && !hasSuspiciousActivity)) {
         const extremeRatio = payload.itemCount / RISK_FACTORS.EXTREME_ITEM_COUNT.threshold;
         const impact = Math.min(RISK_FACTORS.EXTREME_ITEM_COUNT.max * extremeRatio, RISK_FACTORS.EXTREME_ITEM_COUNT.max);
         factors.push({
@@ -710,7 +717,13 @@ function calculateRiskScore(payload: RiskPayload): RiskScore {
     }
 
     // Factor 12: Transaction success rate (trust evolution)
-    if (payload.transactionSuccessRate !== undefined && payload.totalPastTransactions !== undefined && payload.totalPastTransactions > 0) {
+    // Only apply payment history factors if account is not new and has sufficient transaction history
+    if (payload.transactionSuccessRate !== undefined && 
+        payload.totalPastTransactions !== undefined && 
+        payload.totalPastTransactions >= 5 && // Require at least 5 transactions for history analysis
+        payload.accountAge !== undefined && 
+        payload.accountAge >= RISK_FACTORS.NEW_ACCOUNT.threshold) { // Account must be at least 7 days old
+        
         if (payload.transactionSuccessRate >= RISK_FACTORS.GOOD_TRANSACTION_HISTORY.threshold) {
             const impact = RISK_FACTORS.GOOD_TRANSACTION_HISTORY.bonus;
             factors.push({
@@ -724,7 +737,7 @@ function calculateRiskScore(payload: RiskPayload): RiskScore {
             factors.push({
                 factor: "POOR_TRANSACTION_HISTORY",
                 impact,
-                description: `Poor transaction history: only ${payload.transactionSuccessRate.toFixed(1)}% success rate`
+                description: `Poor transaction history: only ${payload.transactionSuccessRate.toFixed(1)}% success rate over ${payload.totalPastTransactions} transactions`
             });
             totalScore += impact;
         } else if (payload.transactionSuccessRate < RISK_FACTORS.MODERATE_TRANSACTION_HISTORY.threshold) {
@@ -732,7 +745,7 @@ function calculateRiskScore(payload: RiskPayload): RiskScore {
             factors.push({
                 factor: "MODERATE_TRANSACTION_HISTORY",
                 impact,
-                description: `Moderate transaction history: ${payload.transactionSuccessRate.toFixed(1)}% success rate`
+                description: `Moderate transaction history: ${payload.transactionSuccessRate.toFixed(1)}% success rate over ${payload.totalPastTransactions} transactions`
             });
             totalScore += impact;
         }

@@ -21,8 +21,9 @@ interface StripePaymentFormProps {
   currency?: string;
   orderId?: number;
   onSuccess: (paymentResult: any) => void;
-  onError: (error: string) => void;
+  onError: (error: string | Error) => void;
   onCreateOrder?: () => Promise<number>;
+  orderData?: any; // Order data for verification flow
 }
 
 function PaymentForm({
@@ -32,6 +33,7 @@ function PaymentForm({
   onSuccess,
   onError,
   onCreateOrder,
+  orderData,
 }: StripePaymentFormProps) {
   const stripe = useStripe();
   const elements = useElements();
@@ -63,7 +65,22 @@ function PaymentForm({
         return;
       }
 
-      // Create order if not provided and callback exists
+      // Create payment intent first (without order ID for risk assessment)
+      let paymentData;
+      try {
+        paymentData = await processPayment({
+          amount: Math.round(amount * 100), // Convert to cents for API
+          currency,
+          orderId: undefined, // Don't create order until after risk assessment
+          savePaymentMethod,
+          orderData, // Include order data for verification flow
+        });
+      } catch (paymentError) {
+        // If this is a zero trust verification or block error, it will be handled in the outer catch
+        throw paymentError;
+      }
+
+      // Create order only after successful risk assessment (pass result)
       let currentOrderId = orderId;
       if (!currentOrderId && onCreateOrder) {
         try {
@@ -75,20 +92,6 @@ function PaymentForm({
           onError("Failed to create order");
           return;
         }
-      }
-
-      // Create payment intent
-      let paymentData;
-      try {
-        paymentData = await processPayment({
-          amount: Math.round(amount * 100), // Convert to cents for API
-          currency,
-          orderId: currentOrderId,
-          savePaymentMethod,
-        });
-      } catch (paymentError) {
-        // If this is a zero trust verification or block error, it will be handled in the outer catch
-        throw paymentError;
       }
 
       const { clientSecret, paymentIntentId } = paymentData;
@@ -109,6 +112,36 @@ function PaymentForm({
         onError(error.message || "Payment failed");
       } else if (paymentIntent && paymentIntent.status === "succeeded") {
         console.log("Payment succeeded:", paymentIntent);
+
+        // Create payment transaction record for pass results
+        if (currentOrderId && paymentIntentId) {
+          try {
+            const transactionResponse = await fetch(
+              "/api/payments/create-transaction",
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  paymentIntentId: paymentIntentId,
+                  orderId: currentOrderId,
+                  amount: paymentIntent.amount,
+                  currency: paymentIntent.currency,
+                }),
+              },
+            );
+
+            if (!transactionResponse.ok) {
+              console.error("Failed to create payment transaction record");
+            } else {
+              console.log("Payment transaction record created successfully");
+            }
+          } catch (error) {
+            console.error("Error creating payment transaction record:", error);
+          }
+        }
+
         toast.success("Payment successful!");
         onSuccess({
           paymentIntent,

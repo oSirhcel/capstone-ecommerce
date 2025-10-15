@@ -54,13 +54,64 @@ function VerifiedContent() {
 
       const { paymentData } = await dataResponse.json();
 
-      // Now process the payment with the original payment data
+      // Handle order creation for warn transactions
+      let orderId = paymentData.orderId;
+      if (paymentData.orderData && !orderId) {
+        // If still no orderId, check if an order already exists for this user with the same data
+        if (!orderId) {
+          const checkOrderResponse = await fetch("/api/orders/check-existing", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              totalAmount: paymentData.orderData.totalAmount,
+              items: paymentData.orderData.items,
+            }),
+          });
+
+          if (checkOrderResponse.ok) {
+            const checkResult = await checkOrderResponse.json();
+            if (checkResult.existingOrderId) {
+              // Use existing order
+              orderId = checkResult.existingOrderId;
+              console.log("Using existing order from check:", orderId);
+            }
+          }
+        }
+
+        // Only create a new order if no existing order was found
+        if (!orderId) {
+          const orderResponse = await fetch("/api/orders", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(paymentData.orderData),
+          });
+
+          if (!orderResponse.ok) {
+            const errorData = await orderResponse.json();
+            throw new Error(errorData.error || "Failed to create order");
+          }
+
+          const orderResult = await orderResponse.json();
+          orderId = orderResult.orderId;
+          console.log("Created new order:", orderId);
+        }
+      }
+
+      // Now process the payment with the original payment data and order ID
       const paymentResponse = await fetch("/api/payments", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ ...paymentData, verificationToken: token }),
+        body: JSON.stringify({
+          ...paymentData,
+          verificationToken: token,
+          orderId,
+        }),
       });
 
       if (!paymentResponse.ok) {
@@ -70,6 +121,35 @@ function VerifiedContent() {
 
       const result = await paymentResponse.json();
 
+      // Create payment transaction record with order ID
+      if (orderId && result.paymentIntentId) {
+        try {
+          const transactionResponse = await fetch(
+            "/api/payments/create-transaction",
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                paymentIntentId: result.paymentIntentId,
+                orderId: orderId,
+                amount: paymentData.amount,
+                currency: paymentData.currency || "aud",
+              }),
+            },
+          );
+
+          if (!transactionResponse.ok) {
+            console.error("Failed to create payment transaction record");
+          } else {
+            console.log("Payment transaction record created successfully");
+          }
+        } catch (error) {
+          console.error("Error creating payment transaction record:", error);
+        }
+      }
+
       // Payment successful
       setStatus("success");
 
@@ -77,15 +157,19 @@ function VerifiedContent() {
         description: "Redirecting to confirmation page...",
       });
 
-      // Redirect to success page
+      // Redirect to success page after a short delay to ensure transaction record is created
       setTimeout(() => {
         const params = new URLSearchParams();
         params.set("payment_intent", result.paymentIntentId);
-        if (paymentData.orderId) {
-          params.set("order_id", paymentData.orderId.toString());
+        if (orderId) {
+          params.set("order_id", orderId.toString());
         }
+        console.log(
+          "Redirecting to success page with params:",
+          params.toString(),
+        );
         router.push(`/checkout/success?${params.toString()}`);
-      }, 2000);
+      }, 3000); // Increased delay to 3 seconds
     } catch (error) {
       console.error("Verified payment processing error:", error);
       setStatus("error");

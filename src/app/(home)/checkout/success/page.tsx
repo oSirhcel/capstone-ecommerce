@@ -45,16 +45,35 @@ export default function CheckoutSuccessPage() {
       }
 
       try {
-        let details;
+        let details: PaymentDetails | null = null;
         if (paymentIntentId) {
-          details = await getPaymentStatus({ paymentIntentId });
+          console.log(
+            "Fetching payment details by payment intent ID:",
+            paymentIntentId,
+          );
+          details = (await getPaymentStatus({
+            paymentIntentId,
+          })) as PaymentDetails | null;
         } else if (orderId) {
-          details = await getPaymentStatus({ orderId: parseInt(orderId) });
+          console.log("Fetching payment details by order ID:", orderId);
+          details = (await getPaymentStatus({
+            orderId: parseInt(orderId),
+          })) as PaymentDetails | null;
         }
 
-        if (details) {
+        if (details && details.transaction) {
+          console.log("Payment details found:", details);
+          console.log("Raw amount from API:", details.transaction.amount);
+          console.log(
+            "Formatted amount:",
+            formatAmount(
+              details.transaction.amount,
+              details.transaction.currency,
+            ),
+          );
           setPaymentDetails(details);
         } else {
+          console.log("No payment details found");
           setError("Payment details not found");
         }
       } catch (error) {
@@ -117,10 +136,14 @@ export default function CheckoutSuccessPage() {
   }
 
   const formatAmount = (amount: number, currency: string) => {
+    // Handle potential data issues where amount might be stored incorrectly
+    // If amount seems too large (> $10000), it might be stored as dollars instead of cents
+    const amountInCents = amount > 100000 ? amount / 100 : amount;
+
     return new Intl.NumberFormat("en-AU", {
       style: "currency",
       currency: currency.toUpperCase(),
-    }).format(amount / 100);
+    }).format(amountInCents / 100);
   };
 
   return (

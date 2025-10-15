@@ -24,6 +24,7 @@ interface CreatePaymentRequest {
   paymentMethodId?: string;
   savePaymentMethod?: boolean;
   verificationToken?: string; // required for 'warn' flows
+  orderData?: any; // Order data for verification flow
 }
 
 interface ZeroTrustAssessment {
@@ -59,6 +60,9 @@ export async function POST(request: NextRequest) {
     // Parse the zero trust assessment result
     const zeroTrustData = await zeroTrustResponse.json() as { riskAssessment: ZeroTrustAssessment };
     const riskAssessment = zeroTrustData.riskAssessment;
+
+    // Extract orderData early for use in verification
+    const { orderData } = body;
 
     // Handle zero trust decisions
     if (riskAssessment.decision === 'deny') {
@@ -105,9 +109,10 @@ export async function POST(request: NextRequest) {
       }
 
       // Ensure payment data integrity: stored paymentData must match current body
+      // For verified payments, orderId may be added after order creation, so exclude it from comparison
       try {
         const stored = JSON.parse(verification.paymentData || '{}');
-        const keysToCompare: Array<keyof CreatePaymentRequest> = ['amount', 'currency', 'orderId', 'paymentMethodId', 'savePaymentMethod'];
+        const keysToCompare: Array<keyof CreatePaymentRequest> = ['amount', 'currency', 'paymentMethodId', 'savePaymentMethod'];
         const mismatch = keysToCompare.some((k) => {
           const a = (stored as any)[k];
           const b = (body as any)[k];
@@ -134,7 +139,7 @@ export async function POST(request: NextRequest) {
             userId: user.id,
             userEmail: user.email ?? '',
             userName: user.name ?? undefined,
-            paymentData: body,
+            paymentData: { ...body, orderData }, // Include order data for verification flow
             riskScore: riskAssessment.score,
             riskFactors: riskAssessment.factors,
             transactionAmount: body.amount,
@@ -202,11 +207,12 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // If orderId provided, create a pending transaction record
+    // Only create transaction record if orderId is provided
+    // For warn results, order will be created after OTP verification
     if (orderId) {
       await db.insert(paymentTransactions).values({
         orderId: orderId,
-        amount: formatAmountForStripe(amount),
+        amount: amount, // Amount is already in cents from the order
         currency,
         status: 'pending',
         transactionId: paymentIntent.id,

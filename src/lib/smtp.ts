@@ -33,9 +33,6 @@ export function createTransporter() {
     port: SMTP_CONFIG.port,
     secure: SMTP_CONFIG.secure,
     auth: SMTP_CONFIG.auth,
-    // Enable debugging if needed
-    debug: process.env.NODE_ENV === 'development',
-    logger: process.env.NODE_ENV === 'development',
   });
 }
 
@@ -216,13 +213,7 @@ export async function sendOTPEmail(
       text: getOTPEmailPlainText(otp, options?.userName, options?.transactionAmount),
     };
 
-    const info = await transporter.sendMail(mailOptions);
-
-    console.log('OTP email sent successfully:', {
-      messageId: info.messageId,
-      to,
-      timestamp: new Date().toISOString(),
-    });
+    await transporter.sendMail(mailOptions);
   } catch (error) {
     console.error('Failed to send OTP email:', error);
     throw new Error('Failed to send verification email. Please try again or contact support.');
@@ -242,7 +233,6 @@ export async function verifySmtpConfig(): Promise<boolean> {
 
     const transporter = createTransporter();
     await transporter.verify();
-    console.log('SMTP configuration verified successfully');
     return true;
   } catch (error) {
     console.error('SMTP configuration verification failed:', error);

@@ -389,6 +389,27 @@ export function CheckoutClient() {
     }
   };
 
+  // Prepare order data for verification flow
+  const getOrderDataForVerification = () => {
+    const finalShipping = getFinalShippingData();
+    const finalBilling = getFinalBillingData();
+
+    return {
+      items: items.map((item) => ({
+        productId:
+          typeof item.id === "string"
+            ? parseInt((item.id as unknown as string) || "", 10)
+            : item.id,
+        quantity: item.quantity,
+        price: item.price,
+      })),
+      totalAmount: Math.round(total * 100), // Convert to cents
+      contactData,
+      shippingAddress: finalShipping,
+      billingAddress: finalBilling,
+    };
+  };
+
   // Handle successful payment
   const handlePaymentSuccess = async (paymentResult: any) => {
     try {
@@ -515,7 +536,7 @@ export function CheckoutClient() {
         />
 
         {/* Header */}
-        <div className="mb-8 mt-6">
+        <div className="mt-6 mb-8">
           <div className="mb-4 flex items-center gap-4">
             <Button variant="ghost" size="sm" asChild>
               <Link href="/cart" className="flex items-center gap-2">
@@ -1133,6 +1154,7 @@ export function CheckoutClient() {
                   onSuccess={handlePaymentSuccess}
                   onError={handlePaymentError}
                   onCreateOrder={handlePaymentInit}
+                  orderData={getOrderDataForVerification()}
                 />
               </>
             )}

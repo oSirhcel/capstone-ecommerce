@@ -91,7 +91,7 @@ async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent)
           status: paymentIntent.status,
           paymentMethod: paymentIntent.payment_method,
           charges: paymentIntent.charges,
-          receiptUrl: paymentIntent.charges.data[0]?.receipt_url,
+          receiptUrl: paymentIntent.charges?.data?.[0]?.receipt_url,
         }),
         updatedAt: new Date(),
       })

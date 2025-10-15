@@ -23,6 +23,7 @@ export const processPayment = async (params: {
   currency?: string;
   orderId?: number;
   savePaymentMethod?: boolean;
+  orderData?: any;
 }) => {
   const response = await fetch('/api/payments', {
     method: 'POST',

@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { db } from '@/server/db';
 import { orders, orderItems, addresses, products } from '@/server/db/schema';
@@ -26,7 +27,8 @@ export async function POST(request: NextRequest) {
       items,
       totalAmount,
       contactData,
-      shippingData,
+      shippingAddress: shippingData,
+      billingAddress: billingData,
     } = body;
 
     // Validate required fields
@@ -51,23 +53,119 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create shipping address first (match schema fields)
-    const [shippingAddress] = await db
-      .insert(addresses)
-      .values({
-        userId: user.id,
-        type: 'shipping',
-        firstName: shippingData.firstName,
-        lastName: shippingData.lastName,
-        addressLine1: shippingData.address,
-        // addressLine2 not collected on UI; store as null/undefined
-        city: shippingData.city,
-        state: shippingData.state,
-        postalCode: shippingData.postcode,
-        country: shippingData.country || 'AU',
-        isDefault: false,
-      })
-      .returning();
+    // Helper function to normalize address data (handles both old and new formats)
+    const normalizeAddress = (addr: {
+      firstName?: string;
+      lastName?: string;
+      addressLine1?: string;
+      addressLine2?: string;
+      address?: string;
+      city?: string;
+      state?: string;
+      postalCode?: string;
+      postcode?: string;
+      country?: string;
+    }) => ({
+      firstName: addr.firstName ?? '',
+      lastName: addr.lastName ?? '',
+      addressLine1: addr.addressLine1 ?? addr.address ?? '',
+      addressLine2: addr.addressLine2 ?? null,
+      city: addr.city ?? '',
+      state: addr.state ?? '',
+      postalCode: addr.postalCode ?? addr.postcode ?? '',
+      country: addr.country ?? 'AU',
+    });
+
+    // Create or reference shipping address
+    let shippingAddressId: number;
+    
+    // If the shipping address already has an ID, verify ownership before using it
+    if (shippingData.id) {
+      // Verify the address belongs to this user
+      const [existingAddress] = await db
+        .select()
+        .from(addresses)
+        .where(
+          and(
+            eq(addresses.id, shippingData.id),
+            eq(addresses.userId, user.id),
+            eq(addresses.type, 'shipping')
+          )
+        )
+        .limit(1);
+      
+      if (!existingAddress) {
+        return NextResponse.json(
+          { error: 'Shipping address not found or does not belong to you' },
+          { status: 403 }
+        );
+      }
+      
+      shippingAddressId = shippingData.id;
+    } else {
+      // Create new shipping address
+      const normalizedShipping = normalizeAddress(shippingData);
+      const [shippingAddress] = await db
+        .insert(addresses)
+        .values({
+          userId: user.id,
+          type: 'shipping',
+          ...normalizedShipping,
+          isDefault: false,
+        })
+        .returning();
+      shippingAddressId = shippingAddress.id;
+    }
+
+    // Handle billing address
+    let billingAddressId: number | null = null;
+    if (billingData) {
+      // If the billing address already has an ID, verify ownership before using it
+      if (billingData.id) {
+        // Check if it's the same as shipping address (when "same as shipping" is checked)
+        const isSameAsShipping = billingData.id === shippingAddressId;
+        
+        if (isSameAsShipping) {
+          // If using shipping address for billing, just reference it
+          billingAddressId = shippingAddressId;
+        } else {
+          // Verify the address belongs to this user (type should be 'billing')
+          const [existingAddress] = await db
+            .select()
+            .from(addresses)
+            .where(
+              and(
+                eq(addresses.id, billingData.id),
+                eq(addresses.userId, user.id),
+                eq(addresses.type, 'billing')
+              )
+            )
+            .limit(1);
+          
+          if (!existingAddress) {
+            return NextResponse.json(
+              { error: 'Billing address not found or does not belong to you' },
+              { status: 403 }
+            );
+          }
+          
+          billingAddressId = billingData.id;
+        }
+      } else {
+        // Create new billing address
+        const normalizedBilling = normalizeAddress(billingData);
+        const [billingAddress] = await db
+          .insert(addresses)
+          .values({
+            userId: user.id,
+            type: 'billing',
+            ...normalizedBilling,
+            isDefault: false,
+          })
+          .returning();
+        billingAddressId = billingAddress.id;
+      }
+    }
 
     // Create the order
     const [order] = await db
@@ -81,7 +179,11 @@ export async function POST(request: NextRequest) {
 
     // Create order items
     // NOTE: schema expects `priceAtTime` (not `price`)
-    const orderItemsData = items.map((item: any) => ({
+    const orderItemsData = items.map((item: {
+      productId: number;
+      quantity: number;
+      price: number;
+    }) => ({
       orderId: order.id,
       productId: item.productId,
       quantity: item.quantity,
@@ -99,7 +201,8 @@ export async function POST(request: NextRequest) {
         totalAmount: order.totalAmount,
         createdAt: order.createdAt,
       },
-      shippingAddressId: shippingAddress.id,
+      shippingAddressId,
+      billingAddressId,
     });
 
   } catch (error) {
@@ -196,7 +299,7 @@ export async function GET(request: NextRequest) {
       .offset(offset);
 
     const orderIds = orderRows.map(o => o.id);
-    let itemsByOrderId: Record<number, Array<{ id: number; productId: number; quantity: number; priceAtTime: number; productName: string | null }>> = {};
+    const itemsByOrderId: Record<number, Array<{ id: number; productId: number; quantity: number; priceAtTime: number; productName: string | null }>> = {};
     if (orderIds.length > 0) {
       const items = await db
         .select({

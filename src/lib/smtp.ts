@@ -28,7 +28,7 @@ export function createTransporter() {
     throw new Error('SMTP credentials not configured. Please set SMTP_USER and SMTP_PASSWORD environment variables.');
   }
 
-  return nodemailer.createTransporter({
+  return nodemailer.createTransport({
     host: SMTP_CONFIG.host,
     port: SMTP_CONFIG.port,
     secure: SMTP_CONFIG.secure,

@@ -103,40 +103,39 @@ export async function POST(request: NextRequest) {
       }
 
       async function requireNewVerification() {
-        // Generate verification token for warn transactions
-        const verificationToken = crypto.randomUUID();
-        const expiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes from now
-        
-        // Store verification request in database
+        // Use OTP verification system for warn transactions
         try {
-          await db.insert(zeroTrustVerifications).values({
-            token: verificationToken,
+          const { createOTPVerification } = await import('@/lib/api/otp-verification');
+          
+          const { token: verificationToken, expiresAt } = await createOTPVerification({
             userId: user.id,
-            paymentData: JSON.stringify(body), // Store original payment request
-            riskScore: riskAssessment.score,
-            riskFactors: JSON.stringify(riskAssessment.factors),
             userEmail: user.email ?? '',
-            expiresAt,
+            userName: user.name ?? undefined,
+            paymentData: body,
+            riskScore: riskAssessment.score,
+            riskFactors: riskAssessment.factors,
+            transactionAmount: body.amount,
           });
-        } catch (dbError) {
-          console.error('Failed to store verification token:', dbError);
-          // Fall back to deny if we can't store verification
+          
+          return NextResponse.json({
+            error: 'Transaction requires additional verification',
+            errorCode: 'ZERO_TRUST_VERIFICATION_REQUIRED',
+            riskScore: riskAssessment.score,
+            riskFactors: riskAssessment.factors.map(f => f.factor),
+            verificationToken,
+            expiresAt: expiresAt.toISOString(),
+            message: 'A verification code has been sent to your email. Please enter it to complete your transaction.',
+            userEmail: user.email
+          }, { status: 202 }); // 202 Accepted but requires action
+        } catch (error) {
+          console.error('Failed to create OTP verification:', error);
+          // Fall back to deny if we can't send OTP
           return NextResponse.json({
             error: 'Transaction blocked - verification system unavailable',
             errorCode: 'ZERO_TRUST_DENIED',
-            message: 'Unable to process verification. Please try again later or contact support.',
+            message: 'Unable to send verification code. Please try again later or contact support.',
           }, { status: 503 });
         }
-        
-        return NextResponse.json({
-          error: 'Transaction requires additional verification',
-          errorCode: 'ZERO_TRUST_VERIFICATION_REQUIRED',
-          riskScore: riskAssessment.score,
-          riskFactors: riskAssessment.factors.map(f => f.factor),
-          verificationToken,
-          message: 'This transaction has been flagged for additional security verification. Please verify your email to proceed.',
-          userEmail: user.email
-        }, { status: 202 }); // 202 Accepted but requires action
       }
     }
     

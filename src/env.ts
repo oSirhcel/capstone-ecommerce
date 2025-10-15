@@ -15,6 +15,12 @@ export const env = createEnv({
     GOOGLE_CLIENT_SECRET: z.string().min(1),
     UPLOADTHING_TOKEN: z.string().min(1),
     GOOGLE_GENERATIVE_AI_API_KEY: z.string().min(1),
+    SMTP_HOST: z.string().min(1),
+    SMTP_PORT: z.number(),
+    SMTP_USER: z.string().min(1),
+    SMTP_PASSWORD: z.string().min(1),
+    SMTP_FROM: z.string().min(1),
+    SMTP_FROM_NAME: z.string().min(1),
   },
   /**
    * Specify your client-side environment variables schema here. This way you can ensure the app
@@ -34,6 +40,12 @@ export const env = createEnv({
     GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
     UPLOADTHING_TOKEN: process.env.UPLOADTHING_TOKEN,
     GOOGLE_GENERATIVE_AI_API_KEY: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
+    SMTP_HOST: process.env.SMTP_HOST,
+    SMTP_PORT: process.env.SMTP_PORT,
+    SMTP_USER: process.env.SMTP_USER,
+    SMTP_PASSWORD: process.env.SMTP_PASSWORD,
+    SMTP_FROM: process.env.SMTP_FROM,
+    SMTP_FROM_NAME: process.env.SMTP_FROM_NAME,
     //NEXT_PUBLIC_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_PUBLISHABLE_KEY,
   },
 });

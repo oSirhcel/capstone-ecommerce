@@ -52,6 +52,7 @@ export const processPayment = async (params: {
       (verificationError as any).riskScore = error.riskScore;
       (verificationError as any).riskFactors = error.riskFactors;
       (verificationError as any).verificationToken = error.verificationToken;
+      (verificationError as any).expiresAt = error.expiresAt;
       (verificationError as any).userEmail = error.userEmail;
       throw verificationError;
     }

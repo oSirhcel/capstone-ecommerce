@@ -543,8 +543,9 @@ export function CheckoutClient() {
                           })
                         }
                       />
-                      <p className="text-xs text-muted-foreground">
-                        Security codes will be sent to your account email: {session?.user?.email}
+                      <p className="text-muted-foreground text-xs">
+                        Security codes will be sent to your account email:{" "}
+                        {session?.user?.email}
                       </p>
                     </div>
                     <div className="space-y-2">

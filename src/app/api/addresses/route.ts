@@ -2,8 +2,9 @@ import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/server/db";
 import { addresses } from "@/server/db/schema";
-import { and, eq, isNull } from "drizzle-orm";
-import { z } from "zod";
+import { eq, and } from "drizzle-orm";
+
+export const runtime = "nodejs";
 
 type SessionUser = {
   id: string;
@@ -21,7 +22,7 @@ export async function GET(_request: NextRequest) {
     const rows = await db
       .select()
       .from(addresses)
-      .where(and(eq(addresses.userId, user.id), isNull(addresses.archivedAt)));
+      .where(eq(addresses.userId, user.id));
 
     return NextResponse.json({ addresses: rows });
   } catch (error) {
@@ -42,20 +43,93 @@ export async function POST(request: NextRequest) {
     }
 
     const user = session.user as SessionUser;
-    const createSchema = z.object({
-      type: z.enum(["shipping", "billing"]),
-      firstName: z.string().min(1),
-      lastName: z.string().min(1),
-      addressLine1: z.string().min(1),
-      addressLine2: z.string().optional().nullable(),
-      city: z.string().min(1),
-      state: z.string().min(1),
-      postalCode: z.string().min(1),
-      country: z.string().min(2),
-      isDefault: z.boolean().optional(),
-    });
+    const body = await request.json();
 
+    // Validate required fields
     const {
+      type,
+      firstName,
+      lastName,
+      addressLine1,
+      city,
+      state,
+      postalCode,
+      country,
+      isDefault,
+    } = body;
+
+    if (
+      !type ||
+      !firstName ||
+      !lastName ||
+      !addressLine1 ||
+      !city ||
+      !state ||
+      !postalCode ||
+      !country
+    ) {
+      return NextResponse.json(
+        { error: "Missing required fields" },
+        { status: 400 },
+      );
+    }
+
+    // Validate address type
+    if (type !== "shipping" && type !== "billing") {
+      return NextResponse.json(
+        { error: "Invalid address type. Must be 'shipping' or 'billing'" },
+        { status: 400 },
+      );
+    }
+
+    // If this address is being set as default, unset all other default addresses of the same type
+    if (isDefault) {
+      await db
+        .update(addresses)
+        .set({ isDefault: false })
+        .where(and(eq(addresses.userId, user.id), eq(addresses.type, type)));
+    }
+
+    // Create the new address
+    const [newAddress] = await db
+      .insert(addresses)
+      .values({
+        userId: user.id,
+        type,
+        firstName,
+        lastName,
+        addressLine1,
+        addressLine2: body.addressLine2 || null,
+        city,
+        state,
+        postalCode,
+        country,
+        isDefault: isDefault || false,
+      })
+      .returning();
+
+    return NextResponse.json({ address: newAddress }, { status: 201 });
+  } catch (error) {
+    console.error("Create address error:", error);
+    return NextResponse.json(
+      { error: "Failed to create address" },
+      { status: 500 },
+    );
+  }
+}
+
+// PUT /api/addresses - Update an existing address
+export async function PUT(request: NextRequest) {
+  try {
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const user = session.user as SessionUser;
+    const body = await request.json();
+    const {
+      id,
       type,
       firstName,
       lastName,
@@ -66,122 +140,64 @@ export async function POST(request: NextRequest) {
       postalCode,
       country,
       isDefault,
-    } = createSchema.parse(await request.json());
+    } = body;
 
-    // If setting as default, unset other defaults of same type for this user in a transaction
-    const result = await db.transaction(async (tx) => {
-      if (isDefault === true) {
-        await tx
-          .update(addresses)
-          .set({ isDefault: false, updatedAt: new Date() })
-          .where(and(eq(addresses.userId, user.id), eq(addresses.type, type)));
-      }
-
-      const [row] = await tx
-        .insert(addresses)
-        .values({
-          userId: user.id,
-          type,
-          firstName,
-          lastName,
-          addressLine1,
-          addressLine2,
-          city,
-          state,
-          postalCode,
-          country,
-          isDefault: Boolean(isDefault),
-        })
-        .returning();
-      return row;
-    });
-
-    return NextResponse.json({ address: result }, { status: 201 });
-  } catch (error) {
-    console.error("Create address error:", error);
-    return NextResponse.json(
-      { error: "Failed to create address" },
-      { status: 500 },
-    );
-  }
-}
-
-// PATCH /api/addresses?id=123 - Update an address with optimistic concurrency
-export async function PATCH(request: NextRequest) {
-  try {
-    const session = await auth();
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!id) {
+      return NextResponse.json(
+        { error: "Address ID is required" },
+        { status: 400 },
+      );
     }
 
-    const user = session.user as SessionUser;
-    const { searchParams } = new URL(request.url);
-    const idParam = searchParams.get("id");
-    const id = idParam ? parseInt(idParam, 10) : NaN;
-    if (!id || Number.isNaN(id)) {
-      return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+    // Validate that the address belongs to the user
+    const existingAddress = await db
+      .select()
+      .from(addresses)
+      .where(and(eq(addresses.id, id), eq(addresses.userId, user.id)))
+      .limit(1);
+
+    if (!existingAddress.length) {
+      return NextResponse.json({ error: "Address not found" }, { status: 404 });
     }
 
-    const updateSchema = z
-      .object({
-        version: z.number(),
-        isDefault: z.boolean().optional(),
-        type: z.enum(["shipping", "billing"]).optional(),
-        firstName: z.string().min(1).optional(),
-        lastName: z.string().min(1).optional(),
-        addressLine1: z.string().min(1).optional(),
-        addressLine2: z.string().optional().nullable(),
-        city: z.string().min(1).optional(),
-        state: z.string().min(1).optional(),
-        postalCode: z.string().min(1).optional(),
-        country: z.string().min(2).optional(),
-      })
-      .strict();
+    // Validate address type if provided
+    if (type && type !== "shipping" && type !== "billing") {
+      return NextResponse.json(
+        { error: "Invalid address type. Must be 'shipping' or 'billing'" },
+        { status: 400 },
+      );
+    }
 
-    const parsed = updateSchema.parse(await request.json());
-    const { version, isDefault, ...updates } = parsed;
-
-    const updated = await db.transaction(async (tx) => {
-      if (isDefault === true && updates.type) {
-        await tx
-          .update(addresses)
-          .set({ isDefault: false, updatedAt: new Date() })
-          .where(
-            and(
-              eq(addresses.userId, user.id),
-              eq(addresses.type, updates.type),
-            ),
-          );
-      }
-
-      const [row] = await tx
+    // If this address is being set as default, unset all other default addresses of the same type
+    if (isDefault) {
+      const addressType = type || existingAddress[0].type;
+      await db
         .update(addresses)
-        .set({
-          ...updates,
-          isDefault: isDefault === undefined ? undefined : Boolean(isDefault),
-          version: version + 1,
-          updatedAt: new Date(),
-        })
+        .set({ isDefault: false })
         .where(
-          and(
-            eq(addresses.id, id),
-            eq(addresses.userId, user.id),
-            eq(addresses.version, version),
-          ),
-        )
-        .returning();
-
-      if (!row) {
-        return null;
-      }
-      return row;
-    });
-
-    if (!updated) {
-      return NextResponse.json({ error: "Conflict" }, { status: 409 });
+          and(eq(addresses.userId, user.id), eq(addresses.type, addressType)),
+        );
     }
 
-    return NextResponse.json({ address: updated });
+    // Update the address
+    const [updatedAddress] = await db
+      .update(addresses)
+      .set({
+        ...(type && { type }),
+        ...(firstName && { firstName }),
+        ...(lastName && { lastName }),
+        ...(addressLine1 && { addressLine1 }),
+        ...(addressLine2 !== undefined && { addressLine2 }),
+        ...(city && { city }),
+        ...(state && { state }),
+        ...(postalCode && { postalCode }),
+        ...(country && { country }),
+        ...(isDefault !== undefined && { isDefault }),
+      })
+      .where(and(eq(addresses.id, id), eq(addresses.userId, user.id)))
+      .returning();
+
+    return NextResponse.json({ address: updatedAddress });
   } catch (error) {
     console.error("Update address error:", error);
     return NextResponse.json(
@@ -191,7 +207,7 @@ export async function PATCH(request: NextRequest) {
   }
 }
 
-// DELETE /api/addresses?id=123 - Soft delete (archive) an address
+// DELETE /api/addresses - Delete an address
 export async function DELETE(request: NextRequest) {
   try {
     const session = await auth();
@@ -201,29 +217,58 @@ export async function DELETE(request: NextRequest) {
 
     const user = session.user as SessionUser;
     const { searchParams } = new URL(request.url);
-    const idParam = searchParams.get("id");
-    const id = idParam ? parseInt(idParam, 10) : NaN;
-    if (!id || Number.isNaN(id)) {
-      return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+    const id = searchParams.get("id");
+
+    if (!id) {
+      return NextResponse.json(
+        { error: "Address ID is required" },
+        { status: 400 },
+      );
     }
 
-    const [row] = await db
-      .update(addresses)
-      .set({ archivedAt: new Date(), updatedAt: new Date() })
+    // Get the address to check if it's default
+    const [addressToDelete] = await db
+      .select()
+      .from(addresses)
+      .where(and(eq(addresses.id, parseInt(id)), eq(addresses.userId, user.id)))
+      .limit(1);
+
+    if (!addressToDelete) {
+      return NextResponse.json({ error: "Address not found" }, { status: 404 });
+    }
+
+    // Delete the address
+    await db
+      .delete(addresses)
       .where(
-        and(
-          eq(addresses.id, id),
-          eq(addresses.userId, user.id),
-          isNull(addresses.archivedAt),
-        ),
-      )
-      .returning();
+        and(eq(addresses.id, parseInt(id)), eq(addresses.userId, user.id)),
+      );
 
-    if (!row) {
-      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    // If the deleted address was default, set another address of the same type as default
+    if (addressToDelete.isDefault) {
+      const [nextAddress] = await db
+        .select()
+        .from(addresses)
+        .where(
+          and(
+            eq(addresses.userId, user.id),
+            eq(addresses.type, addressToDelete.type),
+          ),
+        )
+        .limit(1);
+
+      if (nextAddress) {
+        await db
+          .update(addresses)
+          .set({ isDefault: true })
+          .where(eq(addresses.id, nextAddress.id));
+      }
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({
+      success: true,
+      message: "Address deleted successfully",
+    });
   } catch (error) {
     console.error("Delete address error:", error);
     return NextResponse.json(

@@ -3,7 +3,7 @@ import { getBaseUrl } from "./config";
 export type AddressResponse = {
   id: number;
   userId: string;
-  type: string;
+  type: "shipping" | "billing";
   firstName: string;
   lastName: string;
   addressLine1: string;
@@ -20,17 +20,9 @@ export type AddressResponse = {
   updatedAt: string;
 };
 
-export async function fetchAddresses(): Promise<{
-  addresses: AddressResponse[];
-}> {
-  const base = getBaseUrl();
-  const url = new URL("/api/addresses", base);
-  const res = await fetch(url.toString(), { credentials: "include" });
-  if (!res.ok) throw new Error(`Failed to fetch addresses: ${res.status}`);
-  return res.json() as Promise<{ addresses: AddressResponse[] }>;
-}
-
-export interface AddressCreateInput {
+export interface AddressDTO {
+  id: number;
+  userId: string;
   type: "shipping" | "billing";
   firstName: string;
   lastName: string;
@@ -40,127 +32,115 @@ export interface AddressCreateInput {
   state: string;
   postalCode: string;
   country: string;
-  isDefault?: boolean;
+  isDefault: boolean;
+  version: number;
+  isArchived: boolean;
+  archivedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
-export interface AddressUpdateInput extends Partial<AddressCreateInput> {
-  version: number;
+export type CreateAddressInput = {
+  type: "shipping" | "billing";
+  firstName: string;
+  lastName: string;
+  addressLine1: string;
+  addressLine2?: string;
+  city: string;
+  state: string;
+  postalCode: string;
+  country: string;
+  isDefault?: boolean;
+};
+
+export type UpdateAddressInput = {
+  id: number;
+  type?: "shipping" | "billing";
+  firstName?: string;
+  lastName?: string;
+  addressLine1?: string;
+  addressLine2?: string;
+  city?: string;
+  state?: string;
+  postalCode?: string;
+  country?: string;
+  isDefault?: boolean;
+};
+
+export async function fetchAddresses(): Promise<{ addresses: AddressDTO[] }> {
+  const base = getBaseUrl();
+  const url = new URL("/api/addresses", base);
+  const res = await fetch(url.toString(), { credentials: "include" });
+  if (!res.ok) throw new Error(`Failed to fetch addresses: ${res.status}`);
+  return res.json();
 }
 
 export async function createAddress(
-  input: AddressCreateInput,
-): Promise<{ address: AddressResponse }> {
+  data: CreateAddressInput,
+): Promise<{ address: AddressDTO }> {
   const base = getBaseUrl();
   const url = new URL("/api/addresses", base);
   const res = await fetch(url.toString(), {
     method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
     credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
+    body: JSON.stringify(data),
   });
-  if (!res.ok) throw new Error(`Failed to create address: ${res.status}`);
-  return res.json() as Promise<{ address: AddressResponse }>;
+  if (!res.ok) {
+    const error = await res
+      .json()
+      .catch(() => ({ error: "Failed to create address" }));
+    throw new Error(error.error || "Failed to create address");
+  }
+  return res.json();
 }
 
 export async function updateAddress(
+  data: UpdateAddressInput,
+): Promise<{ address: AddressDTO }> {
+  const base = getBaseUrl();
+  const url = new URL("/api/addresses", base);
+  const res = await fetch(url.toString(), {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    credentials: "include",
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const error = await res
+      .json()
+      .catch(() => ({ error: "Failed to update address" }));
+    throw new Error(error.error || "Failed to update address");
+  }
+  return res.json();
+}
+
+export async function deleteAddress(
   id: number,
-  input: AddressUpdateInput,
-): Promise<{ address: AddressResponse }> {
+): Promise<{ success: boolean; message: string }> {
   const base = getBaseUrl();
   const url = new URL("/api/addresses", base);
-  url.searchParams.set("id", String(id));
-  const res = await fetch(url.toString(), {
-    method: "PATCH",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
-  });
-  if (res.status === 409) throw new Error("Conflict");
-  if (!res.ok) throw new Error(`Failed to update address: ${res.status}`);
-  return res.json() as Promise<{ address: AddressResponse }>;
-}
-
-export async function deleteAddress(id: number): Promise<{ success: boolean }> {
-  const base = getBaseUrl();
-  const url = new URL("/api/addresses", base);
-  url.searchParams.set("id", String(id));
+  url.searchParams.set("id", id.toString());
   const res = await fetch(url.toString(), {
     method: "DELETE",
     credentials: "include",
   });
-  if (!res.ok) throw new Error(`Failed to delete address: ${res.status}`);
-  return res.json() as Promise<{ success: boolean }>;
+  if (!res.ok) {
+    const error = await res
+      .json()
+      .catch(() => ({ error: "Failed to delete address" }));
+    throw new Error(error.error || "Failed to delete address");
+  }
+  return res.json();
 }
 
-// Admin endpoints
-export async function adminFetchCustomerAddresses(
-  customerId: string,
-  storeId: string,
-): Promise<{ addresses: AddressResponse[] }> {
-  const base = getBaseUrl();
-  const url = new URL(`/api/admin/customers/${customerId}/addresses`, base);
-  url.searchParams.set("storeId", storeId);
-  const res = await fetch(url.toString(), { credentials: "include" });
-  if (!res.ok)
-    throw new Error(`Failed to fetch customer addresses: ${res.status}`);
-  return res.json() as Promise<{ addresses: AddressResponse[] }>;
-}
-
-export async function adminCreateCustomerAddress(
-  customerId: string,
-  storeId: string,
-  input: AddressCreateInput,
-): Promise<{ address: AddressResponse }> {
-  const base = getBaseUrl();
-  const url = new URL(`/api/admin/customers/${customerId}/addresses`, base);
-  url.searchParams.set("storeId", storeId);
-  const res = await fetch(url.toString(), {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
-  });
-  if (!res.ok)
-    throw new Error(`Failed to create customer address: ${res.status}`);
-  return res.json() as Promise<{ address: AddressResponse }>;
-}
-
-export async function adminUpdateCustomerAddress(
-  customerId: string,
-  storeId: string,
-  addressId: number,
-  input: AddressUpdateInput,
-): Promise<{ address: AddressResponse }> {
-  const base = getBaseUrl();
-  const url = new URL(`/api/admin/customers/${customerId}/addresses`, base);
-  url.searchParams.set("storeId", storeId);
-  url.searchParams.set("addressId", String(addressId));
-  const res = await fetch(url.toString(), {
-    method: "PATCH",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
-  });
-  if (res.status === 409) throw new Error("Conflict");
-  if (!res.ok)
-    throw new Error(`Failed to update customer address: ${res.status}`);
-  return res.json() as Promise<{ address: AddressResponse }>;
-}
-
-export async function adminDeleteCustomerAddress(
-  customerId: string,
-  storeId: string,
-  addressId: number,
-): Promise<{ success: boolean }> {
-  const base = getBaseUrl();
-  const url = new URL(`/api/admin/customers/${customerId}/addresses`, base);
-  url.searchParams.set("storeId", storeId);
-  url.searchParams.set("addressId", String(addressId));
-  const res = await fetch(url.toString(), {
-    method: "DELETE",
-    credentials: "include",
-  });
-  if (!res.ok)
-    throw new Error(`Failed to delete customer address: ${res.status}`);
-  return res.json() as Promise<{ success: boolean }>;
+export async function setDefaultAddress(
+  id: number,
+  type: "shipping" | "billing",
+): Promise<{ address: AddressDTO }> {
+  return updateAddress({ id, isDefault: true, type });
 }

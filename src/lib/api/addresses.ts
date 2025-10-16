@@ -1,6 +1,6 @@
 import { getBaseUrl } from "./config";
 
-export type AddressResponse = {
+export type Address = {
   id: number;
   userId: string;
   type: "shipping" | "billing";
@@ -19,26 +19,6 @@ export type AddressResponse = {
   createdAt: string;
   updatedAt: string;
 };
-
-export interface AddressDTO {
-  id: number;
-  userId: string;
-  type: "shipping" | "billing";
-  firstName: string;
-  lastName: string;
-  addressLine1: string;
-  addressLine2?: string | null;
-  city: string;
-  state: string;
-  postalCode: string;
-  country: string;
-  isDefault: boolean;
-  version: number;
-  isArchived: boolean;
-  archivedAt?: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
 
 export type CreateAddressInput = {
   type: "shipping" | "billing";
@@ -67,18 +47,22 @@ export type UpdateAddressInput = {
   isDefault?: boolean;
 };
 
-export async function fetchAddresses(): Promise<{ addresses: AddressDTO[] }> {
+export async function fetchAddresses(): Promise<{
+  addresses: Address[];
+}> {
   const base = getBaseUrl();
   const url = new URL("/api/addresses", base);
   const res = await fetch(url.toString(), { credentials: "include" });
   if (!res.ok) throw new Error(`Failed to fetch addresses: ${res.status}`);
-  const data = (await res.json()) as unknown;
-  return data as { addresses: AddressDTO[] };
+
+  const data = (await res.json()) as { addresses: Address[] };
+
+  return data;
 }
 
 export async function createAddress(
   data: CreateAddressInput,
-): Promise<{ address: AddressDTO }> {
+): Promise<{ address: Address }> {
   const base = getBaseUrl();
   const url = new URL("/api/addresses", base);
   const res = await fetch(url.toString(), {
@@ -89,15 +73,16 @@ export async function createAddress(
     credentials: "include",
     body: JSON.stringify(data),
   });
+
   if (!res.ok) {
     throw new Error("Failed to create address");
   }
-  return res.json() as Promise<{ address: AddressDTO }>;
+  return res.json() as Promise<{ address: Address }>;
 }
 
 export async function updateAddress(
   data: UpdateAddressInput,
-): Promise<{ address: AddressDTO }> {
+): Promise<{ address: Address }> {
   const base = getBaseUrl();
   const url = new URL("/api/addresses", base);
   const res = await fetch(url.toString(), {
@@ -112,7 +97,7 @@ export async function updateAddress(
   if (!res.ok) {
     throw new Error("Failed to update address");
   }
-  return res.json() as Promise<{ address: AddressDTO }>;
+  return res.json() as Promise<{ address: Address }>;
 }
 
 export async function deleteAddress(
@@ -134,6 +119,6 @@ export async function deleteAddress(
 export async function setDefaultAddress(
   id: number,
   type: "shipping" | "billing",
-): Promise<{ address: AddressDTO }> {
+): Promise<{ address: Address }> {
   return updateAddress({ id, isDefault: true, type });
 }

@@ -4,9 +4,11 @@ import {
   adminDeleteCustomerAddress,
   adminFetchCustomerAddresses,
   adminUpdateCustomerAddress,
-  type AddressCreateInput,
-  type AddressResponse,
-  type AddressUpdateInput,
+} from "@/lib/api/admin/addresses";
+import {
+  type CreateAddressInput,
+  type Address,
+  type UpdateAddressInput,
 } from "@/lib/api/addresses";
 
 export function addressesQueryKey(customerId: string, storeId: string) {
@@ -24,7 +26,7 @@ export function useCustomerAddresses(customerId: string, storeId: string) {
 export function useCreateCustomerAddress(customerId: string, storeId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (values: AddressCreateInput) =>
+    mutationFn: (values: CreateAddressInput) =>
       adminCreateCustomerAddress(customerId, storeId, values),
     onSuccess: () => {
       void queryClient.invalidateQueries({
@@ -37,7 +39,7 @@ export function useCreateCustomerAddress(customerId: string, storeId: string) {
 export function useUpdateCustomerAddress(customerId: string, storeId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (payload: { id: number; values: AddressUpdateInput }) =>
+    mutationFn: (payload: { id: number; values: UpdateAddressInput }) =>
       adminUpdateCustomerAddress(
         customerId,
         storeId,
@@ -55,7 +57,7 @@ export function useUpdateCustomerAddress(customerId: string, storeId: string) {
 export function useDeleteCustomerAddress(customerId: string, storeId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (addr: AddressResponse) =>
+    mutationFn: (addr: Address) =>
       adminDeleteCustomerAddress(customerId, storeId, addr.id),
     onSuccess: () => {
       void queryClient.invalidateQueries({

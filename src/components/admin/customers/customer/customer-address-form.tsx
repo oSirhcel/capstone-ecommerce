@@ -212,12 +212,23 @@ export function AdminCustomerAddressForm({
                 <Field data-invalid={!!fieldState.error}>
                   <FieldLabel htmlFor="state">State</FieldLabel>
                   <FormControl>
-                    <Input
-                      id="state"
-                      {...field}
-                      aria-invalid={!!fieldState.error}
-                      placeholder="NSW, VIC, QLD, etc."
-                    />
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger id="state">
+                        <SelectValue placeholder="Select state" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="NSW">New South Wales</SelectItem>
+                        <SelectItem value="VIC">Victoria</SelectItem>
+                        <SelectItem value="QLD">Queensland</SelectItem>
+                        <SelectItem value="WA">Western Australia</SelectItem>
+                        <SelectItem value="SA">South Australia</SelectItem>
+                        <SelectItem value="TAS">Tasmania</SelectItem>
+                        <SelectItem value="ACT">
+                          Australian Capital Territory
+                        </SelectItem>
+                        <SelectItem value="NT">Northern Territory</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </FormControl>
                 </Field>
               )}

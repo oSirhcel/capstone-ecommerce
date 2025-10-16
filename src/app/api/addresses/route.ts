@@ -44,6 +44,7 @@ export async function POST(request: NextRequest) {
     }
 
     const user = session.user as SessionUser;
+
     const CreateAddressSchema = z.object({
       type: z.enum(["shipping", "billing"]),
       firstName: z.string().min(1),
@@ -56,10 +57,15 @@ export async function POST(request: NextRequest) {
       country: z.string().min(1),
       isDefault: z.boolean().optional(),
     });
+
     const createParsed = CreateAddressSchema.safeParse(await request.json());
+
     if (!createParsed.success) {
       return NextResponse.json(
-        { error: "Validation error", details: createParsed.error.flatten() },
+        {
+          error: "Validation error",
+          details: z.treeifyError(createParsed.error),
+        },
         { status: 400 },
       );
     }
@@ -135,9 +141,13 @@ export async function PUT(request: NextRequest) {
       isDefault: z.boolean().optional(),
     });
     const updateParsed = UpdateAddressSchema.safeParse(await request.json());
+
     if (!updateParsed.success) {
       return NextResponse.json(
-        { error: "Validation error", details: updateParsed.error.flatten() },
+        {
+          error: "Validation error",
+          details: z.treeifyError(updateParsed.error),
+        },
         { status: 400 },
       );
     }
@@ -223,27 +233,17 @@ export async function DELETE(request: NextRequest) {
 
     const user = session.user as SessionUser;
     const { searchParams } = new URL(request.url);
-    const IdSchema = z.object({
-      id: z
-        .string()
-        .transform((v) => parseInt(v, 10))
-        .pipe(z.number().int().positive()),
-    });
-    const idParsed = IdSchema.safeParse({ id: searchParams.get("id") ?? "" });
-    if (!idParsed.success) {
-      return NextResponse.json(
-        { error: "Invalid id", details: idParsed.error.flatten() },
-        { status: 400 },
-      );
+    const id = Number(searchParams.get("id"));
+
+    if (isNaN(id)) {
+      return NextResponse.json({ error: "Invalid id" }, { status: 400 });
     }
 
     // Get the address to check if it's default
     const [addressToDelete] = await db
       .select()
       .from(addresses)
-      .where(
-        and(eq(addresses.id, idParsed.data.id), eq(addresses.userId, user.id)),
-      )
+      .where(and(eq(addresses.id, id), eq(addresses.userId, user.id)))
       .limit(1);
 
     if (!addressToDelete) {
@@ -253,9 +253,7 @@ export async function DELETE(request: NextRequest) {
     // Delete the address
     await db
       .delete(addresses)
-      .where(
-        and(eq(addresses.id, idParsed.data.id), eq(addresses.userId, user.id)),
-      );
+      .where(and(eq(addresses.id, id), eq(addresses.userId, user.id)));
 
     // If the deleted address was default, set another address of the same type as default
     if (addressToDelete.isDefault) {

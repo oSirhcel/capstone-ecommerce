@@ -9,7 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { type AddressResponse } from "@/lib/api/addresses";
+import { type Address } from "@/lib/api/addresses";
 import { useState } from "react";
 import {
   Dialog,
@@ -43,8 +43,7 @@ interface Props {
 
 export function CustomerAddresses({ customerId, storeId }: Props) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [selectedAddress, setSelectedAddress] =
-    useState<AddressResponse | null>(null);
+  const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
 
   const { data } = useCustomerAddresses(customerId, storeId);
   const addresses = data?.addresses ?? [];
@@ -53,7 +52,7 @@ export function CustomerAddresses({ customerId, storeId }: Props) {
   const updateMutation = useUpdateCustomerAddress(customerId, storeId);
   const deleteMutation = useDeleteCustomerAddress(customerId, storeId);
 
-  function onDelete(addr: AddressResponse) {
+  function onDelete(addr: Address) {
     deleteMutation.mutate(addr, {
       onSuccess: () => toast.success("Address deleted"),
       onError: () => toast.error("Failed to delete address"),
@@ -65,7 +64,7 @@ export function CustomerAddresses({ customerId, storeId }: Props) {
     setIsDialogOpen(true);
   }
 
-  function openEditDialog(addr: AddressResponse) {
+  function openEditDialog(addr: Address) {
     setSelectedAddress(addr);
     setIsDialogOpen(true);
   }
@@ -75,7 +74,7 @@ export function CustomerAddresses({ customerId, storeId }: Props) {
       updateMutation.mutate(
         {
           id: selectedAddress.id,
-          values: { ...values, version: selectedAddress.version },
+          values: { ...values, id: selectedAddress.id },
         },
         {
           onSuccess: () => {

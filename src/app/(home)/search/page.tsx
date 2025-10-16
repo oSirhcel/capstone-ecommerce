@@ -328,7 +328,7 @@ export default function SearchPage() {
                     className="transition-shadow hover:shadow-md"
                   >
                     <CardContent className="p-4">
-                      <Link href={`/product/${product.id}`}>
+                      <Link href={`/product/${product.slug || product.id}`}>
                         <div className="relative mb-3 aspect-square overflow-hidden rounded-md">
                           <Image
                             src={

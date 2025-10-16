@@ -2,16 +2,15 @@ import { notFound } from "next/navigation";
 import { ProductPageClient } from "./page-client";
 
 interface ProductPageProps {
-  params: Promise<{ id: string }>;
+  params: Promise<{ slug: string }>;
 }
 
 export default async function ProductPage({ params }: ProductPageProps) {
-  const { id } = await params;
-  const productId = parseInt(id);
+  const { slug } = await params;
 
-  if (isNaN(productId)) {
+  if (!slug || slug.trim() === "") {
     notFound();
   }
 
-  return <ProductPageClient productId={productId} />;
+  return <ProductPageClient productSlug={slug} />;
 }

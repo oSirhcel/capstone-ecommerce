@@ -58,17 +58,19 @@ async function main() {
 
     // Create two store owners
     const passwordHash = bcrypt.hashSync("Test123", 10);
+    const ownerAId = "default-store-id";
+    const ownerBId = uuidv4();
+
     const ownerA: NewUser = {
-      id: "default-store-id",
+      id: ownerAId,
       username: "owner_alpha",
       password: passwordHash,
     };
     const ownerB: NewUser = {
-      id: uuidv4(),
+      id: ownerBId,
       username: "owner_beta",
       password: passwordHash,
     };
-
     await db.insert(users).values([ownerA, ownerB]);
 
     // Categories
@@ -765,6 +767,6 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error("❌ Seed failed:", err);
+  console.error("Seed failed:", err);
   process.exit(1);
 });

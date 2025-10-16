@@ -18,8 +18,8 @@ export function CartDrawer() {
 
   return (
     <Sheet open={isOpen} onOpenChange={(open) => !open && closeCart()}>
-      <SheetContent className="flex w-full flex-col p-6 sm:max-w-lg">
-        <SheetHeader className="space-y-2.5 pr-6">
+      <SheetContent className="flex w-full flex-col p-0 sm:max-w-lg">
+        <SheetHeader className="flex-shrink-0 space-y-2.5 p-6 pb-0">
           <SheetTitle className="flex items-center justify-between">
             Your Cart ({itemCount} {itemCount === 1 ? "item" : "items"})
             {getStoreCount() > 1 && (
@@ -32,8 +32,8 @@ export function CartDrawer() {
 
         {items.length > 0 ? (
           <>
-            <ScrollArea className="flex-1 py-6">
-              <div className="space-y-6">
+            <ScrollArea className="min-h-0 flex-1">
+              <div className="space-y-6 p-6 pt-4">
                 {storeGroups.map((storeGroup) => (
                   <div key={storeGroup.storeId} className="space-y-4">
                     {getStoreCount() > 1 && (
@@ -60,10 +60,12 @@ export function CartDrawer() {
                 ))}
               </div>
             </ScrollArea>
-            <CartSummary />
+            <div className="bg-background flex-shrink-0 border-t p-6">
+              <CartSummary />
+            </div>
           </>
         ) : (
-          <div className="flex h-full flex-col items-center justify-center space-y-4">
+          <div className="flex h-full flex-col items-center justify-center space-y-4 p-6">
             <div className="text-center">
               <p className="text-lg font-medium">Your cart is empty</p>
               <p className="text-muted-foreground text-sm">

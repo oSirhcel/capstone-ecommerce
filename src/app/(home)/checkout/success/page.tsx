@@ -9,7 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { CheckCircle, Package, Mail, ArrowRight } from "lucide-react";
 import Link from "next/link";
-import { getPaymentStatus } from "@/lib/stripe-client";
+// Note: We intentionally avoid getPaymentStatus here so we can inspect HTTP status codes
+// and implement retry logic if the transaction record is not yet available.
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface PaymentDetails {
@@ -25,7 +26,7 @@ interface PaymentDetails {
 }
 
 export default function CheckoutSuccessPage() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const searchParams = useSearchParams();
   const paymentIntentId = searchParams.get("payment_intent");
   const orderId = searchParams.get("order_id");
@@ -35,57 +36,103 @@ export default function CheckoutSuccessPage() {
   );
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [attempts, setAttempts] = useState(0);
 
   useEffect(() => {
-    const fetchPaymentDetails = async () => {
+    let isActive = true;
+
+    const fetchWithRetry = async () => {
+      // Wait for authenticated session before calling API to avoid 401
+      if (status !== "authenticated") {
+        return;
+      }
       if (!paymentIntentId && !orderId) {
         setError("No payment or order information found");
         setIsLoading(false);
         return;
       }
 
-      try {
-        let details: PaymentDetails | null = null;
-        if (paymentIntentId) {
-          console.log(
-            "Fetching payment details by payment intent ID:",
-            paymentIntentId,
-          );
-          details = (await getPaymentStatus({
-            paymentIntentId,
-          })) as PaymentDetails | null;
-        } else if (orderId) {
-          console.log("Fetching payment details by order ID:", orderId);
-          details = (await getPaymentStatus({
-            orderId: parseInt(orderId),
-          })) as PaymentDetails | null;
-        }
+      // Build URL to query payment status
+      const params = new URLSearchParams();
+      if (paymentIntentId) params.set("paymentIntentId", paymentIntentId);
+      if (orderId) params.set("orderId", orderId);
 
-        if (details && details.transaction) {
-          console.log("Payment details found:", details);
-          console.log("Raw amount from API:", details.transaction.amount);
-          console.log(
-            "Formatted amount:",
-            formatAmount(
-              details.transaction.amount,
-              details.transaction.currency,
-            ),
-          );
-          setPaymentDetails(details);
-        } else {
-          console.log("No payment details found");
-          setError("Payment details not found");
+      const maxAttempts = 10; // up to ~10 seconds
+      const baseDelayMs = 1000;
+      let attempt = 0;
+
+      while (isActive && attempt < maxAttempts) {
+        try {
+          const res = await fetch(`/api/payments?${params.toString()}`, {
+            cache: "no-store",
+            credentials: "include",
+          });
+
+          if (res.ok) {
+            const data = (await res.json()) as PaymentDetails;
+            if (!isActive) return;
+            setPaymentDetails(data);
+            setIsLoading(false);
+            setError(null);
+            return;
+          }
+
+          // If transaction not yet created, retry
+          if (res.status === 404) {
+            attempt += 1;
+            setAttempts(attempt);
+            await new Promise((r) => setTimeout(r, baseDelayMs));
+            continue;
+          }
+
+          // Any other error: surface message and stop
+          const errJson: unknown = await res
+            .json()
+            .catch(() => ({ error: "Failed to load payment details" }));
+          if (!isActive) return;
+          const message =
+            (errJson as { error?: string }).error ??
+            "Failed to load payment details";
+          setError(message);
+          setIsLoading(false);
+          return;
+        } catch (e) {
+          console.error("Payment status fetch error:", e);
+          // Network or unexpected error: retry a few times
+          attempt += 1;
+          setAttempts(attempt);
+          await new Promise((r) => setTimeout(r, baseDelayMs));
         }
-      } catch (error) {
-        console.error("Failed to fetch payment details:", error);
-        setError("Failed to load payment details");
-      } finally {
-        setIsLoading(false);
+      }
+
+      // After retries, show generic confirmation even without details
+      if (!isActive) return;
+      setIsLoading(false);
+      if (!paymentDetails) {
+        setError(null); // do not block UI; render generic confirmation below
       }
     };
 
-    fetchPaymentDetails();
-  }, [paymentIntentId, orderId]);
+    void fetchWithRetry();
+    return () => {
+      isActive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paymentIntentId, orderId, status]);
+
+  if (status === "loading") {
+    return (
+      <div className="bg-background min-h-screen">
+        <div className="container mx-auto px-4 py-12 md:px-6">
+          <div className="mx-auto max-w-2xl space-y-6">
+            <Skeleton className="mx-auto h-8 w-64" />
+            <Skeleton className="h-64 w-full" />
+            <Skeleton className="h-32 w-full" />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!session) {
     return (
@@ -155,9 +202,15 @@ export default function CheckoutSuccessPage() {
             <CheckCircle className="mx-auto h-16 w-16 text-green-500" />
             <h1 className="mt-4 text-3xl font-bold">Payment Successful!</h1>
             <p className="text-muted-foreground mt-2">
-              Thank you for your order. We've received your payment and your
-              order is being processed.
+              Thank you for your order. We&apos;ve received your payment and
+              your order is being processed.
             </p>
+            {!paymentDetails && (
+              <p className="text-muted-foreground mt-2 text-sm">
+                Preparing your confirmation
+                {attempts > 0 ? ` (attempt ${attempts})` : ""}...
+              </p>
+            )}
           </div>
 
           {/* Order Summary */}
@@ -236,8 +289,8 @@ export default function CheckoutSuccessPage() {
                   <div>
                     <h4 className="font-medium">Order Confirmation</h4>
                     <p className="text-muted-foreground text-sm">
-                      You'll receive an email confirmation shortly with your
-                      order details.
+                      You&apos;ll receive an email confirmation shortly with
+                      your order details.
                     </p>
                   </div>
                 </div>
@@ -262,7 +315,8 @@ export default function CheckoutSuccessPage() {
                   <div>
                     <h4 className="font-medium">Shipping Updates</h4>
                     <p className="text-muted-foreground text-sm">
-                      You'll receive tracking information once your order ships.
+                      You&apos;ll receive tracking information once your order
+                      ships.
                     </p>
                   </div>
                 </div>

@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/server/db";
 import { addresses } from "@/server/db/schema";
 import { eq, and } from "drizzle-orm";
+import { z } from "zod";
 
 export const runtime = "nodejs";
 
@@ -43,44 +44,37 @@ export async function POST(request: NextRequest) {
     }
 
     const user = session.user as SessionUser;
-    const body = await request.json();
-
-    // Validate required fields
+    const CreateAddressSchema = z.object({
+      type: z.enum(["shipping", "billing"]),
+      firstName: z.string().min(1),
+      lastName: z.string().min(1),
+      addressLine1: z.string().min(1),
+      addressLine2: z.string().optional().nullable(),
+      city: z.string().min(1),
+      state: z.string().min(1),
+      postalCode: z.string().min(1),
+      country: z.string().min(1),
+      isDefault: z.boolean().optional(),
+    });
+    const createParsed = CreateAddressSchema.safeParse(await request.json());
+    if (!createParsed.success) {
+      return NextResponse.json(
+        { error: "Validation error", details: createParsed.error.flatten() },
+        { status: 400 },
+      );
+    }
     const {
       type,
       firstName,
       lastName,
       addressLine1,
+      addressLine2,
       city,
       state,
       postalCode,
       country,
       isDefault,
-    } = body;
-
-    if (
-      !type ||
-      !firstName ||
-      !lastName ||
-      !addressLine1 ||
-      !city ||
-      !state ||
-      !postalCode ||
-      !country
-    ) {
-      return NextResponse.json(
-        { error: "Missing required fields" },
-        { status: 400 },
-      );
-    }
-
-    // Validate address type
-    if (type !== "shipping" && type !== "billing") {
-      return NextResponse.json(
-        { error: "Invalid address type. Must be 'shipping' or 'billing'" },
-        { status: 400 },
-      );
-    }
+    } = createParsed.data;
 
     // If this address is being set as default, unset all other default addresses of the same type
     if (isDefault) {
@@ -99,12 +93,12 @@ export async function POST(request: NextRequest) {
         firstName,
         lastName,
         addressLine1,
-        addressLine2: body.addressLine2 || null,
+        addressLine2: addressLine2 ?? null,
         city,
         state,
         postalCode,
         country,
-        isDefault: isDefault || false,
+        isDefault: isDefault ?? false,
       })
       .returning();
 
@@ -127,7 +121,26 @@ export async function PUT(request: NextRequest) {
     }
 
     const user = session.user as SessionUser;
-    const body = await request.json();
+    const UpdateAddressSchema = z.object({
+      id: z.number().int().positive(),
+      type: z.enum(["shipping", "billing"]).optional(),
+      firstName: z.string().min(1).optional(),
+      lastName: z.string().min(1).optional(),
+      addressLine1: z.string().min(1).optional(),
+      addressLine2: z.string().optional().nullable(),
+      city: z.string().min(1).optional(),
+      state: z.string().min(1).optional(),
+      postalCode: z.string().min(1).optional(),
+      country: z.string().min(1).optional(),
+      isDefault: z.boolean().optional(),
+    });
+    const updateParsed = UpdateAddressSchema.safeParse(await request.json());
+    if (!updateParsed.success) {
+      return NextResponse.json(
+        { error: "Validation error", details: updateParsed.error.flatten() },
+        { status: 400 },
+      );
+    }
     const {
       id,
       type,
@@ -140,14 +153,7 @@ export async function PUT(request: NextRequest) {
       postalCode,
       country,
       isDefault,
-    } = body;
-
-    if (!id) {
-      return NextResponse.json(
-        { error: "Address ID is required" },
-        { status: 400 },
-      );
-    }
+    } = updateParsed.data;
 
     // Validate that the address belongs to the user
     const existingAddress = await db
@@ -170,7 +176,7 @@ export async function PUT(request: NextRequest) {
 
     // If this address is being set as default, unset all other default addresses of the same type
     if (isDefault) {
-      const addressType = type || existingAddress[0].type;
+      const addressType = type ?? existingAddress[0].type;
       await db
         .update(addresses)
         .set({ isDefault: false })
@@ -217,11 +223,16 @@ export async function DELETE(request: NextRequest) {
 
     const user = session.user as SessionUser;
     const { searchParams } = new URL(request.url);
-    const id = searchParams.get("id");
-
-    if (!id) {
+    const IdSchema = z.object({
+      id: z
+        .string()
+        .transform((v) => parseInt(v, 10))
+        .pipe(z.number().int().positive()),
+    });
+    const idParsed = IdSchema.safeParse({ id: searchParams.get("id") ?? "" });
+    if (!idParsed.success) {
       return NextResponse.json(
-        { error: "Address ID is required" },
+        { error: "Invalid id", details: idParsed.error.flatten() },
         { status: 400 },
       );
     }
@@ -230,7 +241,9 @@ export async function DELETE(request: NextRequest) {
     const [addressToDelete] = await db
       .select()
       .from(addresses)
-      .where(and(eq(addresses.id, parseInt(id)), eq(addresses.userId, user.id)))
+      .where(
+        and(eq(addresses.id, idParsed.data.id), eq(addresses.userId, user.id)),
+      )
       .limit(1);
 
     if (!addressToDelete) {
@@ -241,7 +254,7 @@ export async function DELETE(request: NextRequest) {
     await db
       .delete(addresses)
       .where(
-        and(eq(addresses.id, parseInt(id)), eq(addresses.userId, user.id)),
+        and(eq(addresses.id, idParsed.data.id), eq(addresses.userId, user.id)),
       );
 
     // If the deleted address was default, set another address of the same type as default

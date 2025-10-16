@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/server/db";
 import { orders, orderItems, addresses, products } from "@/server/db/schema";
 import { and, desc, eq, inArray } from "drizzle-orm";
+import { z } from "zod";
 
 type SessionUser = {
   id: string;
@@ -21,38 +22,48 @@ export async function POST(request: NextRequest) {
     }
 
     const user = session.user as SessionUser;
-    const body = (await request.json()) as {
-      items: Array<{ productId: number; quantity: number; price: number }>;
-      totalAmount: number;
-      contactData: { email: string; firstName?: string };
-      storeId: string;
-      shippingAddress: {
-        id?: number;
-        firstName?: string;
-        lastName?: string;
-        addressLine1?: string;
-        addressLine2?: string;
-        address?: string;
-        city?: string;
-        state?: string;
-        postalCode?: string;
-        postcode?: string;
-        country?: string;
-      };
-      billingAddress?: {
-        id?: number;
-        firstName?: string;
-        lastName?: string;
-        addressLine1?: string;
-        addressLine2?: string;
-        address?: string;
-        city?: string;
-        state?: string;
-        postalCode?: string;
-        postcode?: string;
-        country?: string;
-      };
-    };
+    const AddressSchema = z.object({
+      id: z.number().int().positive().optional(),
+      firstName: z.string().min(1).optional(),
+      lastName: z.string().min(1).optional(),
+      addressLine1: z.string().min(1).optional(),
+      addressLine2: z.string().optional(),
+      address: z.string().optional(),
+      city: z.string().min(1).optional(),
+      state: z.string().min(1).optional(),
+      postalCode: z.string().optional(),
+      postcode: z.string().optional(),
+      country: z.string().min(1).optional(),
+    });
+
+    const CreateOrderSchema = z.object({
+      items: z
+        .array(
+          z.object({
+            productId: z.number().int().positive(),
+            quantity: z.number().int().positive(),
+            price: z.number().positive(),
+          }),
+        )
+        .min(1),
+      totalAmount: z.number().positive(),
+      contactData: z.object({
+        email: z.string().email(),
+        firstName: z.string().optional(),
+      }),
+      storeId: z.string().min(1),
+      shippingAddress: AddressSchema,
+      billingAddress: AddressSchema.optional(),
+    });
+
+    const parsed = CreateOrderSchema.safeParse(await request.json());
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Validation error", details: parsed.error.flatten() },
+        { status: 400 },
+      );
+    }
+    const body = parsed.data;
 
     const {
       items,
@@ -64,26 +75,7 @@ export async function POST(request: NextRequest) {
     } = body;
 
     // Validate required fields
-    if (!items || !Array.isArray(items) || items.length === 0) {
-      return NextResponse.json(
-        { error: "Items are required" },
-        { status: 400 },
-      );
-    }
-
-    if (!totalAmount || totalAmount <= 0) {
-      return NextResponse.json(
-        { error: "Valid total amount is required" },
-        { status: 400 },
-      );
-    }
-
-    if (!contactData?.email || !shippingData?.firstName) {
-      return NextResponse.json(
-        { error: "Contact and shipping information are required" },
-        { status: 400 },
-      );
-    }
+    // All critical validation handled by zod above
 
     // Helper function to normalize address data (handles both old and new formats)
     const normalizeAddress = (addr: {

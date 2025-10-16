@@ -84,7 +84,7 @@ export default function AddressesPage() {
     isDefault: false,
   });
 
-  const addresses = data?.addresses || [];
+  const addresses = data?.addresses ?? [];
   const shippingAddresses = addresses.filter(
     (addr) => addr.type === "shipping",
   );
@@ -114,7 +114,7 @@ export default function AddressesPage() {
       firstName: address.firstName,
       lastName: address.lastName,
       addressLine1: address.addressLine1,
-      addressLine2: address.addressLine2 || "",
+      addressLine2: address.addressLine2 ?? "",
       city: address.city,
       state: address.state,
       postalCode: address.postalCode,

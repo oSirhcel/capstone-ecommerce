@@ -72,7 +72,8 @@ export async function fetchAddresses(): Promise<{ addresses: AddressDTO[] }> {
   const url = new URL("/api/addresses", base);
   const res = await fetch(url.toString(), { credentials: "include" });
   if (!res.ok) throw new Error(`Failed to fetch addresses: ${res.status}`);
-  return res.json();
+  const data = (await res.json()) as unknown;
+  return data as { addresses: AddressDTO[] };
 }
 
 export async function createAddress(
@@ -89,12 +90,9 @@ export async function createAddress(
     body: JSON.stringify(data),
   });
   if (!res.ok) {
-    const error = await res
-      .json()
-      .catch(() => ({ error: "Failed to create address" }));
-    throw new Error(error.error || "Failed to create address");
+    throw new Error("Failed to create address");
   }
-  return res.json();
+  return res.json() as Promise<{ address: AddressDTO }>;
 }
 
 export async function updateAddress(
@@ -110,13 +108,11 @@ export async function updateAddress(
     credentials: "include",
     body: JSON.stringify(data),
   });
+
   if (!res.ok) {
-    const error = await res
-      .json()
-      .catch(() => ({ error: "Failed to update address" }));
-    throw new Error(error.error || "Failed to update address");
+    throw new Error("Failed to update address");
   }
-  return res.json();
+  return res.json() as Promise<{ address: AddressDTO }>;
 }
 
 export async function deleteAddress(
@@ -130,12 +126,9 @@ export async function deleteAddress(
     credentials: "include",
   });
   if (!res.ok) {
-    const error = await res
-      .json()
-      .catch(() => ({ error: "Failed to delete address" }));
-    throw new Error(error.error || "Failed to delete address");
+    throw new Error("Failed to delete address");
   }
-  return res.json();
+  return res.json() as Promise<{ success: boolean; message: string }>;
 }
 
 export async function setDefaultAddress(

@@ -79,18 +79,33 @@ export default function OrderViewPageClient({ orderId }: { orderId: string }) {
   }, [order]);
 
   const payment = useMemo(() => {
+    if (!order) {
+      return {
+        method: "Card",
+        last4: "0000",
+        billingAddress: {
+          street: "",
+          city: "",
+          state: "",
+          zip: "",
+          country: "",
+        },
+      };
+    }
+    const billingAddr =
+      order.addresses.find((a) => a.type === "billing") ?? order.addresses[0];
     return {
       method: "Card",
       last4: "0000",
       billingAddress: {
-        street: shipping.address.street,
-        city: shipping.address.city,
-        state: shipping.address.state,
-        zip: shipping.address.zip,
-        country: shipping.address.country,
+        street: billingAddr?.addressLine1 ?? "",
+        city: billingAddr?.city ?? "",
+        state: billingAddr?.state ?? "",
+        zip: billingAddr?.postalCode ?? "",
+        country: billingAddr?.country ?? "",
       },
     };
-  }, [shipping]);
+  }, [order]);
 
   if (isLoading) {
     return <div className="p-6">Loading order...</div>;

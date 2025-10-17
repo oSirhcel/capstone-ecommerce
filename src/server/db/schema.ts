@@ -13,25 +13,6 @@ import {
   pgEnum,
 } from "drizzle-orm/pg-core";
 
-// Define enums
-export const orderStatusEnum = pgEnum("order_status", [
-  "Pending",
-  "Processing",
-  "Shipped",
-  "Completed",
-  "Cancelled",
-  "Refunded",
-  "On-hold",
-  "Failed",
-]);
-
-export const paymentStatusEnum = pgEnum("payment_status", [
-  "Pending",
-  "Paid",
-  "Failed",
-  "Refunded",
-]);
-
 export const users = pgTable("users", {
   id: varchar("id", { length: 255 }).primaryKey().notNull(),
   username: varchar({ length: 255 }).notNull(),
@@ -104,6 +85,24 @@ export const cartItems = pgTable("cart_items", {
     .notNull(),
   quantity: integer().notNull().default(1),
 });
+
+export const orderStatusEnum = pgEnum("order_status", [
+  "Pending",
+  "Processing",
+  "Shipped",
+  "Completed",
+  "Cancelled",
+  "Refunded",
+  "On-hold",
+  "Failed",
+]);
+
+export const paymentStatusEnum = pgEnum("payment_status", [
+  "Pending",
+  "Paid",
+  "Failed",
+  "Refunded",
+]);
 
 export const orders = pgTable("orders", {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),
@@ -226,13 +225,18 @@ export const storeCustomerProfiles = pgTable(
   ],
 );
 
+export const addressTypesEnum = pgEnum("address_types", [
+  "shipping",
+  "billing",
+]);
+
 // Addresses for shipping and billing
 export const addresses = pgTable("addresses", {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),
   userId: varchar("userId", { length: 255 })
     .references(() => users.id)
     .notNull(),
-  type: varchar({ length: 20 }).notNull(), // 'shipping' or 'billing'
+  type: addressTypesEnum().notNull(),
   firstName: varchar({ length: 100 }).notNull(),
   lastName: varchar({ length: 100 }).notNull(),
   addressLine1: varchar({ length: 255 }).notNull(),
@@ -255,7 +259,7 @@ export const orderAddresses = pgTable("order_addresses", {
   orderId: integer()
     .references(() => orders.id)
     .notNull(),
-  type: varchar({ length: 20 }).notNull(), // 'shipping' | 'billing'
+  type: addressTypesEnum().notNull(),
   firstName: varchar({ length: 100 }).notNull(),
   lastName: varchar({ length: 100 }).notNull(),
   addressLine1: varchar({ length: 255 }).notNull(),

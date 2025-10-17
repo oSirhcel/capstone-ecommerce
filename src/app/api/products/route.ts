@@ -40,10 +40,13 @@ export async function GET(request: NextRequest) {
       .select({
         id: products.id,
         name: products.name,
+        sku: products.sku,
         description: products.description,
         price: products.price,
         slug: products.slug,
         stock: products.stock,
+        status: products.status,
+        featured: products.featured,
         storeId: products.storeId,
         categoryId: products.categoryId,
         createdAt: products.createdAt,

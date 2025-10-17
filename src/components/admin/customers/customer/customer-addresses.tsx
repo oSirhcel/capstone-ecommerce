@@ -9,7 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { type Address } from "@/lib/api/addresses";
+import { type CustomerAddress } from "@/lib/api/admin/customers";
 import { useState } from "react";
 import {
   Dialog,
@@ -43,7 +43,8 @@ interface Props {
 
 export function CustomerAddresses({ customerId, storeId }: Props) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
+  const [selectedAddress, setSelectedAddress] =
+    useState<CustomerAddress | null>(null);
 
   const { data } = useCustomerAddresses(customerId, storeId);
   const addresses = data?.addresses ?? [];
@@ -52,7 +53,7 @@ export function CustomerAddresses({ customerId, storeId }: Props) {
   const updateMutation = useUpdateCustomerAddress(customerId, storeId);
   const deleteMutation = useDeleteCustomerAddress(customerId, storeId);
 
-  function onDelete(addr: Address) {
+  function onDelete(addr: CustomerAddress) {
     deleteMutation.mutate(addr, {
       onSuccess: () => toast.success("Address deleted"),
       onError: () => toast.error("Failed to delete address"),
@@ -64,7 +65,7 @@ export function CustomerAddresses({ customerId, storeId }: Props) {
     setIsDialogOpen(true);
   }
 
-  function openEditDialog(addr: Address) {
+  function openEditDialog(addr: CustomerAddress) {
     setSelectedAddress(addr);
     setIsDialogOpen(true);
   }
@@ -86,13 +87,16 @@ export function CustomerAddresses({ customerId, storeId }: Props) {
         },
       );
     } else {
-      createMutation.mutate(values, {
-        onSuccess: () => {
-          toast.success("Address added");
-          setIsDialogOpen(false);
+      createMutation.mutate(
+        { ...values, isDefault: values.isDefault ?? false },
+        {
+          onSuccess: () => {
+            toast.success("Address added");
+            setIsDialogOpen(false);
+          },
+          onError: () => toast.error("Failed to add address"),
         },
-        onError: () => toast.error("Failed to add address"),
-      });
+      );
     }
   }
 

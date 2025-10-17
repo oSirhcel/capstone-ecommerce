@@ -1,36 +1,37 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  adminCreateCustomerAddress,
-  adminDeleteCustomerAddress,
-  adminFetchCustomerAddresses,
-  adminUpdateCustomerAddress,
-} from "@/lib/api/admin/addresses";
-import {
-  type CreateAddressInput,
-  type Address,
-  type UpdateAddressInput,
-} from "@/lib/api/addresses";
+  fetchCustomerAddresses,
+  createCustomerAddress,
+  updateCustomerAddress,
+  deleteCustomerAddress,
+  type AddressCreate,
+  type AddressUpdate,
+  type CustomerAddress,
+} from "@/lib/api/admin/customers";
 
-export function addressesQueryKey(customerId: string, storeId: string) {
-  return ["admin", "customer-addresses", customerId, storeId] as const;
-}
-
-export function useCustomerAddresses(customerId: string, storeId: string) {
+export function useCustomerAddresses(
+  customerId: string | null,
+  storeId: string,
+) {
   return useQuery({
-    queryKey: addressesQueryKey(customerId, storeId),
-    queryFn: () => adminFetchCustomerAddresses(customerId, storeId),
-    enabled: Boolean(customerId && storeId),
+    queryKey: ["admin-customer-addresses", customerId, storeId],
+    queryFn: () => fetchCustomerAddresses(customerId!, storeId),
+    enabled: !!customerId && !!storeId,
   });
 }
 
 export function useCreateCustomerAddress(customerId: string, storeId: string) {
   const queryClient = useQueryClient();
+
   return useMutation({
-    mutationFn: (values: CreateAddressInput) =>
-      adminCreateCustomerAddress(customerId, storeId, values),
+    mutationFn: (data: AddressCreate) =>
+      createCustomerAddress(customerId, storeId, data),
     onSuccess: () => {
       void queryClient.invalidateQueries({
-        queryKey: addressesQueryKey(customerId, storeId),
+        queryKey: ["admin-customer-addresses", customerId, storeId],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ["admin-customer", customerId, storeId],
       });
     },
   });
@@ -38,17 +39,19 @@ export function useCreateCustomerAddress(customerId: string, storeId: string) {
 
 export function useUpdateCustomerAddress(customerId: string, storeId: string) {
   const queryClient = useQueryClient();
+
   return useMutation({
-    mutationFn: (payload: { id: number; values: UpdateAddressInput }) =>
-      adminUpdateCustomerAddress(
-        customerId,
-        storeId,
-        payload.id,
-        payload.values,
-      ),
+    mutationFn: (vars: {
+      id: number;
+      values: AddressUpdate & { id: number };
+    }) =>
+      updateCustomerAddress(customerId, String(vars.id), storeId, vars.values),
     onSuccess: () => {
       void queryClient.invalidateQueries({
-        queryKey: addressesQueryKey(customerId, storeId),
+        queryKey: ["admin-customer-addresses", customerId, storeId],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ["admin-customer", customerId, storeId],
       });
     },
   });
@@ -56,12 +59,16 @@ export function useUpdateCustomerAddress(customerId: string, storeId: string) {
 
 export function useDeleteCustomerAddress(customerId: string, storeId: string) {
   const queryClient = useQueryClient();
+
   return useMutation({
-    mutationFn: (addr: Address) =>
-      adminDeleteCustomerAddress(customerId, storeId, addr.id),
+    mutationFn: (address: CustomerAddress) =>
+      deleteCustomerAddress(customerId, String(address.id), storeId),
     onSuccess: () => {
       void queryClient.invalidateQueries({
-        queryKey: addressesQueryKey(customerId, storeId),
+        queryKey: ["admin-customer-addresses", customerId, storeId],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ["admin-customer", customerId, storeId],
       });
     },
   });

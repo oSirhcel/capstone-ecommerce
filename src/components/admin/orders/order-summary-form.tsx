@@ -4,27 +4,28 @@ import Image from "next/image";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ShoppingCart, User, Package } from "lucide-react";
-import type { CustomerData, OrderItem } from "@/app/admin/orders/create/page";
+import { useFormContext } from "react-hook-form";
+import type { OrderFormValues } from "@/app/admin/orders/create/page";
+import { useMemo } from "react";
 
-interface OrderSummaryFormProps {
-  customer: CustomerData | null;
-  orderItems: OrderItem[];
-  subtotal: number;
-  shipping: number;
-  tax: number;
-  total: number;
-}
+export function OrderSummaryForm() {
+  const { watch } = useFormContext<OrderFormValues>();
+  const customer = watch("customer");
+  const orderItems = watch("orderItems");
 
-export function OrderSummaryForm({
-  customer,
-  orderItems,
-  subtotal,
-  shipping,
-  tax,
-  total,
-}: OrderSummaryFormProps) {
+  // Calculate totals
+  const subtotal = useMemo(
+    () => orderItems.reduce((sum, item) => sum + item.price * item.quantity, 0),
+    [orderItems],
+  );
+  const shipping = useMemo(() => (subtotal > 100 ? 0 : 9.99), [subtotal]);
+  const tax = useMemo(() => subtotal * 0.08, [subtotal]);
+  const total = useMemo(
+    () => subtotal + shipping + tax,
+    [subtotal, shipping, tax],
+  );
   return (
     <div className="space-y-6">
       {/* Order Summary */}
@@ -45,10 +46,6 @@ export function OrderSummaryForm({
               </div>
               <div className="bg-muted/50 flex items-center gap-3 rounded-lg p-3">
                 <Avatar className="h-8 w-8">
-                  <AvatarImage
-                    src={customer.avatar ?? "/placeholder.svg"}
-                    alt={customer.name}
-                  />
                   <AvatarFallback>{customer.name.charAt(0)}</AvatarFallback>
                 </Avatar>
                 <div className="min-w-0 flex-1">

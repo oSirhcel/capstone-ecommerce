@@ -7,6 +7,9 @@ import {
   userProfiles,
   stores,
   orderItems,
+  orderAddresses,
+  addresses,
+  products,
 } from "@/server/db/schema";
 import {
   and,
@@ -19,6 +22,7 @@ import {
   sql,
   between,
   inArray,
+  isNull,
 } from "drizzle-orm";
 
 export async function GET(request: NextRequest) {
@@ -223,6 +227,17 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    type ShippingAddressInput = {
+      firstName: string;
+      lastName: string;
+      addressLine1: string;
+      addressLine2?: string;
+      city: string;
+      state: string;
+      postalCode: string;
+      country: string;
+    };
+
     type CreateBody = {
       storeId?: string;
       customerId?: string;
@@ -232,11 +247,23 @@ export async function POST(request: NextRequest) {
         priceAtTime: number;
       }>;
       totalAmount?: number;
+      addressId?: number;
+      shippingAddress?: ShippingAddressInput;
+      notes?: string;
     };
     const bodyUnknown = (await request.json()) as unknown;
     const body = bodyUnknown as CreateBody;
-    const { storeId, customerId, items, totalAmount } = body;
+    const {
+      storeId,
+      customerId,
+      items,
+      totalAmount,
+      addressId,
+      shippingAddress,
+      notes,
+    } = body;
 
+    // Validation
     if (
       !storeId ||
       !customerId ||
@@ -245,6 +272,14 @@ export async function POST(request: NextRequest) {
       !totalAmount
     ) {
       return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
+    }
+
+    // Must provide either addressId or shippingAddress
+    if (!addressId && !shippingAddress) {
+      return NextResponse.json(
+        { error: "Either addressId or shippingAddress is required" },
+        { status: 400 },
+      );
     }
 
     // Verify store ownership
@@ -256,6 +291,83 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    // Verify customer exists
+    const [customer] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.id, customerId));
+    if (!customer) {
+      return NextResponse.json(
+        { error: "Customer not found" },
+        { status: 404 },
+      );
+    }
+
+    // Verify all products are active and belong to the store
+    const productIds = items.map((i) => i.productId);
+    const productsFromDb = await db
+      .select({ id: products.id, price: products.price, stock: products.stock })
+      .from(products)
+      .where(
+        and(
+          inArray(products.id, productIds),
+          eq(products.storeId, storeId),
+          eq(products.status, "active"),
+        ),
+      );
+
+    if (productsFromDb.length !== productIds.length) {
+      return NextResponse.json(
+        { error: "Some products are invalid or not available" },
+        { status: 400 },
+      );
+    }
+
+    // Get address data (either from existing address or from manual input)
+    let addressData: ShippingAddressInput;
+    if (addressId) {
+      const [existingAddress] = await db
+        .select({
+          firstName: addresses.firstName,
+          lastName: addresses.lastName,
+          addressLine1: addresses.addressLine1,
+          addressLine2: addresses.addressLine2,
+          city: addresses.city,
+          state: addresses.state,
+          postalCode: addresses.postalCode,
+          country: addresses.country,
+        })
+        .from(addresses)
+        .where(
+          and(
+            eq(addresses.id, addressId),
+            eq(addresses.userId, customerId),
+            isNull(addresses.archivedAt),
+          ),
+        );
+
+      if (!existingAddress) {
+        return NextResponse.json(
+          { error: "Address not found" },
+          { status: 404 },
+        );
+      }
+
+      addressData = {
+        firstName: existingAddress.firstName,
+        lastName: existingAddress.lastName,
+        addressLine1: existingAddress.addressLine1,
+        addressLine2: existingAddress.addressLine2 ?? undefined,
+        city: existingAddress.city,
+        state: existingAddress.state,
+        postalCode: existingAddress.postalCode,
+        country: existingAddress.country,
+      };
+    } else {
+      addressData = shippingAddress!;
+    }
+
+    // Create order
     const [order] = await db
       .insert(orders)
       .values({
@@ -266,6 +378,7 @@ export async function POST(request: NextRequest) {
       })
       .returning();
 
+    // Create order items
     if (items.length > 0) {
       await db.insert(orderItems).values(
         items.map((i) => ({
@@ -276,6 +389,20 @@ export async function POST(request: NextRequest) {
         })),
       );
     }
+
+    // Create order address snapshot
+    await db.insert(orderAddresses).values({
+      orderId: order.id,
+      type: "shipping",
+      firstName: addressData.firstName,
+      lastName: addressData.lastName,
+      addressLine1: addressData.addressLine1,
+      addressLine2: addressData.addressLine2 ?? null,
+      city: addressData.city,
+      state: addressData.state,
+      postalCode: addressData.postalCode,
+      country: addressData.country,
+    });
 
     return NextResponse.json({ success: true, orderId: order.id });
   } catch (error) {

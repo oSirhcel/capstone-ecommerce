@@ -40,6 +40,42 @@ export const orderUpdateSchema = z.object({
 
 export type OrderUpdate = z.infer<typeof orderUpdateSchema>;
 
+export const orderCreateSchema = z.object({
+  storeId: z.string().min(1),
+  customerId: z.string().min(1),
+  items: z
+    .array(
+      z.object({
+        productId: z.number().int().positive(),
+        quantity: z.number().int().positive(),
+        priceAtTime: z.number().int().nonnegative(),
+      }),
+    )
+    .min(1),
+  totalAmount: z.number().int().positive(),
+  addressId: z.number().int().positive().optional(),
+  shippingAddress: z
+    .object({
+      firstName: z.string().min(1),
+      lastName: z.string().min(1),
+      addressLine1: z.string().min(1),
+      addressLine2: z.string().optional(),
+      city: z.string().min(1),
+      state: z.string().min(1),
+      postalCode: z.string().min(1),
+      country: z.string().min(1),
+    })
+    .optional(),
+  notes: z.string().optional(),
+});
+
+export type OrderCreateInput = z.infer<typeof orderCreateSchema>;
+
+export interface OrderCreateResponse {
+  success: boolean;
+  orderId: number;
+}
+
 export interface OrderListItem {
   id: number;
   customer: { name: string; email: string };
@@ -167,4 +203,17 @@ export async function fetchOrderStats(params: {
     throw new Error(err.error ?? "Failed to fetch order stats");
   }
   return res.json() as Promise<OrderStats>;
+}
+
+export async function createOrder(data: OrderCreateInput) {
+  const res = await fetch("/api/admin/orders", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = (await res.json()) as { error?: string };
+    throw new Error(err.error ?? "Failed to create order");
+  }
+  return res.json() as Promise<OrderCreateResponse>;
 }

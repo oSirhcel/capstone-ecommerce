@@ -1,4 +1,6 @@
+import { Suspense } from "react";
 import OrderViewPageClient from "./page-client";
+import { OrderViewSkeleton } from "@/components/admin/orders/order-view-skeleton";
 
 export default async function OrderViewPage({
   params,
@@ -6,5 +8,9 @@ export default async function OrderViewPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  return <OrderViewPageClient orderId={id} />;
+  return (
+    <Suspense fallback={<OrderViewSkeleton />}>
+      <OrderViewPageClient orderId={id} />
+    </Suspense>
+  );
 }

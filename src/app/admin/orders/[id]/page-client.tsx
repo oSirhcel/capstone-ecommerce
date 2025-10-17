@@ -7,12 +7,17 @@ import { OrderCustomer } from "@/components/admin/orders/order-customer";
 import { OrderPayment } from "@/components/admin/orders/order-payment";
 import { useOrderQuery } from "@/hooks/admin/orders/use-order-query";
 import { useSession } from "next-auth/react";
+import { OrderViewSkeleton } from "@/components/admin/orders/order-view-skeleton";
 
 export default function OrderViewPageClient({ orderId }: { orderId: string }) {
   const session = useSession();
   const storeId = session?.data?.store?.id ?? "";
   const idNum = Number(orderId);
-  const { data: order, isLoading } = useOrderQuery({ id: idNum, storeId });
+  const {
+    data: order,
+    isLoading,
+    isError,
+  } = useOrderQuery({ id: idNum, storeId });
 
   const orderHeader = useMemo(() => {
     if (!order) return null;
@@ -107,33 +112,31 @@ export default function OrderViewPageClient({ orderId }: { orderId: string }) {
     };
   }, [order]);
 
-  if (isLoading) {
-    return <div className="p-6">Loading order...</div>;
+  if (isLoading || !order || !orderHeader) {
+    return <OrderViewSkeleton />;
   }
 
-  if (!order || !orderHeader) {
+  if (isError) {
     return <div className="p-6">Order not found</div>;
   }
 
   return (
     <div className="mx-4 space-y-6 xl:mx-64">
-      <Suspense fallback={<div>Loading...</div>}>
-        <OrderHeader order={orderHeader} />
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_380px]">
-          <div className="space-y-6">
-            <OrderItems items={items} />
-            <OrderPayment payment={payment} total={order.totalAmount / 100} />
-          </div>
-
-          <div className="space-y-6">
-            <OrderCustomer
-              customer={orderHeader.customer}
-              shippingAddress={shipping.address}
-              billingAddress={payment.billingAddress}
-            />
-          </div>
+      <OrderHeader order={orderHeader} />
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_380px]">
+        <div className="space-y-6">
+          <OrderItems items={items} />
+          <OrderPayment payment={payment} total={order.totalAmount / 100} />
         </div>
-      </Suspense>
+
+        <div className="space-y-6">
+          <OrderCustomer
+            customer={orderHeader.customer}
+            shippingAddress={shipping.address}
+            billingAddress={payment.billingAddress}
+          />
+        </div>
+      </div>
     </div>
   );
 }

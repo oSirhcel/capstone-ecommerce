@@ -23,7 +23,7 @@ const activities = [
     user: "Sarah Johnson",
     avatar: "/placeholder.svg?height=32&width=32",
     action: "placed an order",
-    target: "#ORD-1234",
+    target: "#001",
     time: "5 minutes ago",
     type: "order",
   },

@@ -2,6 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Printer, Download } from "lucide-react";
 import Link from "next/link";
+import { formatOrderNumber } from "@/lib/utils/order-number";
 
 interface OrderHeaderProps {
   order: {
@@ -40,7 +41,7 @@ export function OrderHeader({ order }: OrderHeaderProps) {
           </Button>
         </Link>
         <div>
-          <h1 className="text-3xl font-bold">{order.id}</h1>
+          <h1 className="text-3xl font-bold">{formatOrderNumber(order.id)}</h1>
           <div className="mt-2 flex items-center gap-4">
             <Badge variant={getStatusVariant(order.status)}>
               {order.status}

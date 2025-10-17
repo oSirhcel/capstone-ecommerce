@@ -20,6 +20,7 @@ interface DataTableProps<T = unknown> {
   isLoading?: boolean;
   emptyMessage?: string;
   emptyIcon?: React.ReactNode;
+  onRowClick?: (row: T) => void;
 }
 
 export function DataTable<T = unknown>({
@@ -28,6 +29,7 @@ export function DataTable<T = unknown>({
   isLoading,
   emptyMessage = "No results found.",
   emptyIcon,
+  onRowClick,
 }: DataTableProps<T>) {
   return (
     <div className="rounded-md border">
@@ -52,7 +54,11 @@ export function DataTable<T = unknown>({
             ))
           ) : data.length ? (
             data.map((row, index) => (
-              <TableRow key={index}>
+              <TableRow
+                key={index}
+                onClick={() => onRowClick?.(row)}
+                className={onRowClick ? "hover:bg-muted/50 cursor-pointer" : ""}
+              >
                 {columns.map((column, colIndex) => (
                   <TableCell key={colIndex}>
                     {column.cell

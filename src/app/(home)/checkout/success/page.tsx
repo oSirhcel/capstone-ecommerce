@@ -11,6 +11,7 @@ import { CheckCircle, Package, Mail, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { getPaymentStatus } from "@/lib/stripe-client";
 import { Skeleton } from "@/components/ui/skeleton";
+import { formatOrderNumber } from "@/lib/utils/order-number";
 
 interface PaymentDetails {
   transaction: {
@@ -150,7 +151,7 @@ export default function CheckoutSuccessPage() {
                 <div className="flex items-center justify-between">
                   <span>Order Number</span>
                   <Badge variant="outline">
-                    #{paymentDetails.transaction.orderId}
+                    {formatOrderNumber(paymentDetails.transaction.orderId)}
                   </Badge>
                 </div>
 

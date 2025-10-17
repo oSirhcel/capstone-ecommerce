@@ -2,7 +2,9 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { DataTable } from "@/components/admin/data-table";
+import { formatOrderNumber } from "@/lib/utils/order-number";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -13,14 +15,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  Search,
-  Plus,
-  Eye,
-  Download,
-  RefreshCw,
-  ShoppingCart,
-} from "lucide-react";
+import { Search, Plus, Download, RefreshCw, ShoppingCart } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -113,7 +108,7 @@ const columns = [
           href={`/admin/orders/${row.original.id}`}
           className="hover:underline"
         >
-          {row.original.id}
+          {formatOrderNumber(row.original.id)}
         </Link>
         <div className="text-muted-foreground mt-1 text-xs">
           {new Date(row.original.date).toLocaleDateString()}
@@ -141,7 +136,7 @@ const columns = [
     header: "Amount",
     accessorKey: "amount",
     cell: ({ row }: { row: { original: OrdersListRow } }) => (
-      <div className="text-right">
+      <div className="text-left">
         <div className="font-medium">${row.original.amount.toFixed(2)}</div>
         <div className="text-muted-foreground text-xs">
           {row.original.items} items
@@ -150,33 +145,25 @@ const columns = [
     ),
   },
   {
-    header: "Status",
-    accessorKey: "status",
+    header: "Fulfillment Status",
+    accessorKey: "fulfillmentStatus",
     cell: ({ row }: { row: { original: OrdersListRow } }) => (
-      <div className="space-y-1">
-        {getStatusBadge(row.original.status)}
-        <div className="text-xs">
-          {getPaymentStatusBadge(row.original.paymentStatus)}
-        </div>
-      </div>
+      <div className="space-y-1">{getStatusBadge(row.original.status)}</div>
     ),
   },
   {
-    header: "Actions",
+    header: "Payment Status",
+    accessorKey: "paymentStatus",
     cell: ({ row }: { row: { original: OrdersListRow } }) => (
-      <div className="flex gap-1">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href={`/admin/orders/${row.original.id}`}>
-            <Eye className="h-3 w-3" />
-            <span className="sr-only">View order</span>
-          </Link>
-        </Button>
+      <div className="space-y-1">
+        {getPaymentStatusBadge(row.original.paymentStatus)}
       </div>
     ),
   },
 ];
 
 export default function OrdersPage() {
+  const router = useRouter();
   const session = useSession();
   const storeId = session?.data?.store?.id ?? "";
   const [searchTerm, setSearchTerm] = useState("");
@@ -206,6 +193,8 @@ export default function OrdersPage() {
     () => data?.orders ?? [],
     [data],
   );
+
+  console.log(data);
 
   return (
     <div className="space-y-6">
@@ -301,6 +290,7 @@ export default function OrdersPage() {
             isLoading={isLoading}
             emptyMessage="No orders match your filters. Try adjusting your search criteria."
             emptyIcon={<ShoppingCart className="h-12 w-12 opacity-20" />}
+            onRowClick={(row) => router.push(`/admin/orders/${row.id}`)}
           />
         </CardContent>
       </Card>

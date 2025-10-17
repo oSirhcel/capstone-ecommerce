@@ -9,6 +9,7 @@ import {
 import { eq, desc, count, and } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { ordersQuerySchema } from "@/lib/api/admin/customers";
+import { formatOrderNumber } from "@/lib/utils/order-number";
 
 /**
  * GET /api/admin/customers/[id]/orders
@@ -110,7 +111,7 @@ export async function GET(
 
         return {
           id: order.id,
-          orderNumber: `ORD-${order.id.toString().padStart(4, "0")}`,
+          orderNumber: formatOrderNumber(order.id),
           createdAt: order.createdAt.toISOString(),
           status: order.status,
           totalAmount: order.totalAmount,

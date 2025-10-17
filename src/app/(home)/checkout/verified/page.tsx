@@ -57,48 +57,23 @@ function VerifiedContent() {
       // Handle order creation for warn transactions
       let orderId = paymentData.orderId;
       if (paymentData.orderData && !orderId) {
-        // If still no orderId, check if an order already exists for this user with the same data
-        if (!orderId) {
-          const checkOrderResponse = await fetch("/api/orders/check-existing", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              totalAmount: paymentData.orderData.totalAmount,
-              items: paymentData.orderData.items,
-            }),
-          });
+        // Use idempotent creation on the server; POST /api/orders already avoids duplicates
+        const orderResponse = await fetch("/api/orders", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(paymentData.orderData),
+        });
 
-          if (checkOrderResponse.ok) {
-            const checkResult = await checkOrderResponse.json();
-            if (checkResult.existingOrderId) {
-              // Use existing order
-              orderId = checkResult.existingOrderId;
-              console.log("Using existing order from check:", orderId);
-            }
-          }
+        if (!orderResponse.ok) {
+          const errorData = await orderResponse.json();
+          throw new Error(errorData.error || "Failed to create order");
         }
 
-        // Only create a new order if no existing order was found
-        if (!orderId) {
-          const orderResponse = await fetch("/api/orders", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(paymentData.orderData),
-          });
-
-          if (!orderResponse.ok) {
-            const errorData = await orderResponse.json();
-            throw new Error(errorData.error || "Failed to create order");
-          }
-
-          const orderResult = await orderResponse.json();
-          orderId = orderResult.orderId;
-          console.log("Created new order:", orderId);
-        }
+        const orderResult = await orderResponse.json();
+        orderId = orderResult.orderId;
+        console.log("Order ensured (idempotent):", orderId);
       }
 
       // Now process the payment with the original payment data and order ID

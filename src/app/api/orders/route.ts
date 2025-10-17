@@ -167,7 +167,77 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Create the order
+    // Idempotency: check for an existing recent pending order with identical items and total
+    {
+      const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+      const recentOrders = await db
+        .select({
+          id: orders.id,
+          totalAmount: orders.totalAmount,
+          status: orders.status,
+          createdAt: orders.createdAt,
+        })
+        .from(orders)
+        .where(
+          and(
+            eq(orders.userId, user.id),
+            eq(orders.totalAmount, totalAmount),
+            // created recently to avoid matching old historical orders
+            // @ts-expect-error drizzle timestamp compare helper used below
+            // drizzle-orm supports Date in comparisons
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+            // the gte helper is not imported here; keep simple by filtering after fetch if needed
+            // We will perform item-level matching regardless
+            // Note: We intentionally do not early-return here if none found
+          )
+        )
+        .orderBy(desc(orders.createdAt))
+        .limit(30);
+
+      for (const candidate of recentOrders) {
+        if (candidate.status !== 'pending') continue;
+        if (candidate.createdAt < twoHoursAgo) continue;
+
+        const existingItems = await db
+          .select({
+            productId: orderItems.productId,
+            quantity: orderItems.quantity,
+            priceAtTime: orderItems.priceAtTime,
+          })
+          .from(orderItems)
+          .where(eq(orderItems.orderId, candidate.id));
+
+        const requestedItems = items.map((item: { productId: number; quantity: number; price: number; }) => ({
+          productId: item.productId,
+          quantity: item.quantity,
+          priceAtTime: Math.round(item.price * 100),
+        }));
+
+        const sameLength = existingItems.length === requestedItems.length;
+        const allMatch = sameLength && requestedItems.every((req) => {
+          const match = existingItems.find((ex) => ex.productId === req.productId);
+          return !!match && match.quantity === req.quantity && match.priceAtTime === req.priceAtTime;
+        });
+
+        if (allMatch) {
+          return NextResponse.json({
+            success: true,
+            orderId: candidate.id,
+            order: {
+              id: candidate.id,
+              status: candidate.status,
+              totalAmount: candidate.totalAmount,
+              createdAt: candidate.createdAt,
+            },
+            shippingAddressId,
+            billingAddressId,
+            idempotent: true,
+          });
+        }
+      }
+    }
+
+    // Create the order (no matching pending order found)
     const [order] = await db
       .insert(orders)
       .values({

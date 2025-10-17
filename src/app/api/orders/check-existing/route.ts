@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
       .from(orders)
       .where(
         and(
-          eq(orders.userId, parseInt(user.id)),
+          eq(orders.userId, user.id),
           eq(orders.totalAmount, totalAmount),
           gte(orders.createdAt, twoHoursAgo), // Check orders from the last 2 hours
         )

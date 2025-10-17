@@ -1,3 +1,5 @@
+"use client";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,6 +20,7 @@ import {
   Pencil,
 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { formatOrderNumber } from "@/lib/utils/order-number";
 import { format } from "date-fns";
 
@@ -30,29 +33,32 @@ interface OrderHeaderProps {
 }
 
 export function OrderHeader({ order }: OrderHeaderProps) {
+  const router = useRouter();
+  const isEditable = !["Shipped", "Completed"].includes(order.status);
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "Completed":
         return (
-          <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
+          <Badge className="bg-green-100 text-base text-green-800 hover:bg-green-100">
             Completed
           </Badge>
         );
       case "Processing":
         return (
-          <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
+          <Badge className="bg-blue-100 text-base text-blue-800 hover:bg-blue-100">
             Processing
           </Badge>
         );
       case "Shipped":
         return (
-          <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-100">
+          <Badge className="bg-purple-100 text-base text-purple-800 hover:bg-purple-100">
             Shipped
           </Badge>
         );
       case "Pending":
         return (
-          <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">
+          <Badge className="bg-yellow-100 text-base text-yellow-800 hover:bg-yellow-100">
             Pending
           </Badge>
         );
@@ -66,27 +72,40 @@ export function OrderHeader({ order }: OrderHeaderProps) {
   return (
     <div className="flex items-center justify-between">
       <div className="flex items-center gap-4">
-        <Link href="/admin/orders">
-          <Button variant="ghost" size="icon">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-        </Link>
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold">
-              {formatOrderNumber(order.id)}
-            </h1>
-            {getStatusBadge(order.status)}
-          </div>
+        <div className="flex items-center justify-between">
+          <div className="space-y-1">
+            <div className="text-muted-foreground flex items-center gap-2 text-sm">
+              <Link
+                href={`/admin/orders`}
+                className="hover:text-foreground flex items-center gap-1"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back to order
+              </Link>
+            </div>
+            <div>
+              <div className="justify flex items-center gap-2">
+                <h1 className="text-3xl font-bold">
+                  Order {formatOrderNumber(order.id)}
+                </h1>
+                {getStatusBadge(order.status)}
+              </div>
 
-          <span className="text-muted-foreground text-xs">
-            {format(new Date(order.date), "MMM d, yyyy hh:mm a")}
-          </span>
+              <span className="text-muted-foreground text-xs">
+                {format(new Date(order.date), "MMM d, yyyy hh:mm a")}
+              </span>
+            </div>
+          </div>
         </div>
       </div>
 
       <div className="flex gap-2">
-        <Button variant="outline" size="sm">
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={!isEditable}
+          onClick={() => router.push(`/admin/orders/${order.id}/edit`)}
+        >
           <Pencil className="mr-2 h-4 w-4" /> Edit
         </Button>
         <Button variant="outline" size="sm">

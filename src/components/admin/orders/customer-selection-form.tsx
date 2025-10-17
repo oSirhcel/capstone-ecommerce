@@ -33,15 +33,21 @@ import {
 
 interface CustomerSelectionFormProps {
   storeId: string;
+  readOnly?: boolean;
 }
 
-export function CustomerSelectionForm({ storeId }: CustomerSelectionFormProps) {
+export function CustomerSelectionForm({
+  storeId,
+  readOnly = false,
+}: CustomerSelectionFormProps) {
   const { watch, setValue, control } = useFormContext<OrderFormValues>();
   const customer = watch("customer");
   const selectedAddressId = watch("selectedAddressId");
 
   const [searchTerm, setSearchTerm] = useState("");
-  const [showCustomerSearch, setShowCustomerSearch] = useState(!customer);
+  const [showCustomerSearch, setShowCustomerSearch] = useState(
+    !customer && !readOnly,
+  );
   const [addressMode, setAddressMode] = useState<"select" | "manual">("select");
   const debouncedSearch = useDebounce(searchTerm, 300);
 
@@ -151,7 +157,7 @@ export function CustomerSelectionForm({ storeId }: CustomerSelectionFormProps) {
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Customer</CardTitle>
-            {customer && (
+            {customer && !readOnly && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -166,7 +172,7 @@ export function CustomerSelectionForm({ storeId }: CustomerSelectionFormProps) {
           </div>
         </CardHeader>
         <CardContent>
-          {showCustomerSearch ? (
+          {showCustomerSearch && !readOnly ? (
             <div className="space-y-3">
               <div className="relative">
                 <Search className="text-muted-foreground absolute top-2.5 left-2.5 h-4 w-4" />

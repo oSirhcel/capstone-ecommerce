@@ -72,6 +72,16 @@ export function OrderCustomer({
               <span>{customer.phone}</span>
             </div>
           )}
+          <Link href={`/admin/users/${customer.id}`}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full bg-transparent"
+            >
+              <User className="mr-2 h-4 w-4" />
+              View Customer Profile
+            </Button>
+          </Link>
         </div>
 
         {shippingAddress && (
@@ -113,13 +123,6 @@ export function OrderCustomer({
             </div>
           </>
         )}
-
-        <Link href={`/admin/users/${customer.id}`}>
-          <Button variant="outline" size="sm" className="w-full bg-transparent">
-            <User className="mr-2 h-4 w-4" />
-            View Customer Profile
-          </Button>
-        </Link>
       </CardContent>
     </Card>
   );

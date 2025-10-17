@@ -2,8 +2,10 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   updateOrder,
   createOrder,
+  updateOrderDetails,
   type OrderUpdate,
   type OrderCreateInput,
+  type OrderEditInput,
 } from "@/lib/api/admin/orders";
 
 export function useOrderMutations(storeId: string) {
@@ -28,5 +30,17 @@ export function useOrderMutations(storeId: string) {
     },
   });
 
-  return { updateStatus, create };
+  const updateDetails = useMutation({
+    mutationFn: (vars: { id: number; data: OrderEditInput }) =>
+      updateOrderDetails(vars.id, storeId, vars.data),
+    onSuccess: (_, vars) => {
+      void queryClient.invalidateQueries({
+        queryKey: ["admin-order", vars.id, storeId],
+      });
+      void queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin-order-stats"] });
+    },
+  });
+
+  return { updateStatus, create, updateDetails };
 }

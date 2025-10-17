@@ -71,6 +71,30 @@ export const orderCreateSchema = z.object({
 
 export type OrderCreateInput = z.infer<typeof orderCreateSchema>;
 
+export const orderEditSchema = z.object({
+  items: z
+    .array(
+      z.object({
+        productId: z.number().int().positive(),
+        quantity: z.number().int().positive(),
+        priceAtTime: z.number().int().nonnegative(),
+      }),
+    )
+    .min(1),
+  shippingAddress: z.object({
+    firstName: z.string().min(1),
+    lastName: z.string().min(1),
+    addressLine1: z.string().min(1),
+    addressLine2: z.string().optional(),
+    city: z.string().min(1),
+    state: z.string().min(1),
+    postalCode: z.string().min(1),
+    country: z.string().min(1),
+  }),
+});
+
+export type OrderEditInput = z.infer<typeof orderEditSchema>;
+
 export interface OrderCreateResponse {
   success: boolean;
   orderId: number;
@@ -241,4 +265,24 @@ export async function createOrder(data: OrderCreateInput) {
     throw new Error(err.error ?? "Failed to create order");
   }
   return res.json() as Promise<OrderCreateResponse>;
+}
+
+export async function updateOrderDetails(
+  id: number,
+  storeId: string,
+  data: OrderEditInput,
+) {
+  const res = await fetch(`/api/admin/orders/${id}?storeId=${storeId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = (await res.json()) as { error?: string };
+    throw new Error(err.error ?? "Failed to update order");
+  }
+  return res.json() as Promise<{
+    success: boolean;
+    order: OrderDetail;
+  }>;
 }

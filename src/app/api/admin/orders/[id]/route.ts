@@ -18,6 +18,27 @@ import { orderStatusSchema, paymentStatusSchema } from "@/lib/api/admin/orders";
 const orderUpdateSchema = z.object({
   status: orderStatusSchema.optional(),
   paymentStatus: paymentStatusSchema.optional(),
+  items: z
+    .array(
+      z.object({
+        productId: z.number().int().positive(),
+        quantity: z.number().int().positive(),
+        priceAtTime: z.number().int().nonnegative(),
+      }),
+    )
+    .optional(),
+  shippingAddress: z
+    .object({
+      firstName: z.string().min(1),
+      lastName: z.string().min(1),
+      addressLine1: z.string().min(1),
+      addressLine2: z.string().optional(),
+      city: z.string().min(1),
+      state: z.string().min(1),
+      postalCode: z.string().min(1),
+      country: z.string().min(1),
+    })
+    .optional(),
 });
 
 export async function GET(
@@ -169,6 +190,16 @@ export async function PATCH(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    // Fetch existing order to validate status
+    const [existingOrder] = await db
+      .select({ id: orders.id, status: orders.status })
+      .from(orders)
+      .where(and(eq(orders.id, Number(id)), eq(orders.storeId, storeId)));
+
+    if (!existingOrder) {
+      return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    }
+
     const bodyJson = (await request.json()) as unknown;
     const parseResult = orderUpdateSchema.safeParse(bodyJson);
 
@@ -179,10 +210,185 @@ export async function PATCH(
       );
     }
 
-    const { status: newStatus, paymentStatus: newPaymentStatus } =
-      parseResult.data;
+    const {
+      status: newStatus,
+      paymentStatus: newPaymentStatus,
+      items: newItems,
+      shippingAddress: newShippingAddress,
+    } = parseResult.data;
 
-    // Build update object dynamically
+    // Validate that Shipped/Completed orders cannot be edited (except status)
+    if (
+      (newItems || newShippingAddress) &&
+      ["Shipped", "Completed"].includes(existingOrder.status)
+    ) {
+      return NextResponse.json(
+        { error: "Cannot edit shipped or completed orders" },
+        { status: 400 },
+      );
+    }
+
+    // Handle full order editing (items + address)
+    if (newItems || newShippingAddress) {
+      // Update items if provided
+      if (newItems) {
+        // Delete all existing items and insert new ones (simpler than upsert)
+        await db.delete(orderItems).where(eq(orderItems.orderId, Number(id)));
+
+        if (newItems.length > 0) {
+          await db.insert(orderItems).values(
+            newItems.map((item) => ({
+              orderId: Number(id),
+              productId: item.productId,
+              quantity: item.quantity,
+              priceAtTime: item.priceAtTime,
+            })),
+          );
+        }
+
+        // Recalculate total amount
+        const totalAmount = newItems.reduce(
+          (sum, item) => sum + item.priceAtTime * item.quantity,
+          0,
+        );
+
+        await db
+          .update(orders)
+          .set({ totalAmount, updatedAt: new Date() })
+          .where(eq(orders.id, Number(id)));
+      }
+
+      // Update shipping address if provided
+      if (newShippingAddress) {
+        // Update existing shipping address or create if doesn't exist
+        const [existingAddress] = await db
+          .select({ id: orderAddresses.id })
+          .from(orderAddresses)
+          .where(
+            and(
+              eq(orderAddresses.orderId, Number(id)),
+              eq(orderAddresses.type, "shipping"),
+            ),
+          );
+
+        if (existingAddress) {
+          await db
+            .update(orderAddresses)
+            .set({
+              firstName: newShippingAddress.firstName,
+              lastName: newShippingAddress.lastName,
+              addressLine1: newShippingAddress.addressLine1,
+              addressLine2: newShippingAddress.addressLine2 ?? null,
+              city: newShippingAddress.city,
+              state: newShippingAddress.state,
+              postalCode: newShippingAddress.postalCode,
+              country: newShippingAddress.country,
+            })
+            .where(eq(orderAddresses.id, existingAddress.id));
+        } else {
+          await db.insert(orderAddresses).values({
+            orderId: Number(id),
+            type: "shipping",
+            firstName: newShippingAddress.firstName,
+            lastName: newShippingAddress.lastName,
+            addressLine1: newShippingAddress.addressLine1,
+            addressLine2: newShippingAddress.addressLine2 ?? null,
+            city: newShippingAddress.city,
+            state: newShippingAddress.state,
+            postalCode: newShippingAddress.postalCode,
+            country: newShippingAddress.country,
+          });
+        }
+      }
+
+      // Fetch updated order data to return
+      const [orderRow] = await db
+        .select({
+          id: orders.id,
+          userId: orders.userId,
+          status: orders.status,
+          paymentStatus: orders.paymentStatus,
+          totalAmount: orders.totalAmount,
+          createdAt: orders.createdAt,
+          updatedAt: orders.updatedAt,
+        })
+        .from(orders)
+        .where(eq(orders.id, Number(id)));
+
+      const [customer] = await db
+        .select({
+          id: users.id,
+          firstName: userProfiles.firstName,
+          lastName: userProfiles.lastName,
+          email: userProfiles.email,
+          username: users.username,
+        })
+        .from(users)
+        .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
+        .where(eq(users.id, orderRow.userId));
+
+      const items = await db
+        .select({
+          id: orderItems.id,
+          productId: orderItems.productId,
+          quantity: orderItems.quantity,
+          priceAtTime: orderItems.priceAtTime,
+          productName: products.name,
+        })
+        .from(orderItems)
+        .leftJoin(products, eq(products.id, orderItems.productId))
+        .where(eq(orderItems.orderId, Number(id)));
+
+      const addresses = await db
+        .select({
+          id: orderAddresses.id,
+          type: orderAddresses.type,
+          firstName: orderAddresses.firstName,
+          lastName: orderAddresses.lastName,
+          addressLine1: orderAddresses.addressLine1,
+          addressLine2: orderAddresses.addressLine2,
+          city: orderAddresses.city,
+          state: orderAddresses.state,
+          postalCode: orderAddresses.postalCode,
+          country: orderAddresses.country,
+          createdAt: orderAddresses.createdAt,
+        })
+        .from(orderAddresses)
+        .where(eq(orderAddresses.orderId, Number(id)));
+
+      return NextResponse.json({
+        success: true,
+        order: {
+          id: orderRow.id,
+          status: orderRow.status,
+          totalAmount: orderRow.totalAmount,
+          createdAt: orderRow.createdAt,
+          updatedAt: orderRow.updatedAt,
+          customer: {
+            id: customer?.id ?? "",
+            name:
+              `${customer?.firstName ?? ""} ${customer?.lastName ?? ""}`.trim() ||
+              customer?.username ||
+              "",
+            email: customer?.email ?? "",
+          },
+          items: items.map((i) => ({
+            id: i.id,
+            productId: i.productId,
+            productName: i.productName,
+            quantity: i.quantity,
+            priceAtTime: i.priceAtTime,
+          })),
+          addresses,
+          payment: {
+            status: "Pending",
+          },
+          timeline: [],
+        },
+      });
+    }
+
+    // Handle simple status/payment status updates
     const updateData: {
       status?: typeof newStatus;
       paymentStatus?: typeof newPaymentStatus;

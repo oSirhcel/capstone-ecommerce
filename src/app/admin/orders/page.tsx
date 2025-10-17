@@ -40,31 +40,31 @@ type OrdersListRow = {
 
 const getStatusBadge = (status: string) => {
   switch (status) {
-    case "completed":
+    case "Completed":
       return (
         <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
           Completed
         </Badge>
       );
-    case "processing":
+    case "Processing":
       return (
         <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
           Processing
         </Badge>
       );
-    case "shipped":
+    case "Shipped":
       return (
         <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-100">
           Shipped
         </Badge>
       );
-    case "pending":
+    case "Pending":
       return (
         <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">
           Pending
         </Badge>
       );
-    case "cancelled":
+    case "Cancelled":
       return <Badge variant="destructive">Cancelled</Badge>;
     default:
       return <Badge variant="secondary">{status}</Badge>;
@@ -73,25 +73,25 @@ const getStatusBadge = (status: string) => {
 
 const getPaymentStatusBadge = (status: string) => {
   switch (status) {
-    case "paid":
+    case "Paid":
       return (
         <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
           Paid
         </Badge>
       );
-    case "pending":
+    case "Pending":
       return (
         <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">
           Pending
         </Badge>
       );
-    case "refunded":
+    case "Refunded":
       return (
         <Badge className="bg-gray-100 text-gray-800 hover:bg-gray-100">
           Refunded
         </Badge>
       );
-    case "failed":
+    case "Failed":
       return <Badge variant="destructive">Failed</Badge>;
     default:
       return <Badge variant="secondary">{status}</Badge>;
@@ -169,14 +169,14 @@ export default function OrdersPage() {
   const [searchTerm, setSearchTerm] = useState("");
   type StatusFilter =
     | "all"
-    | "pending"
-    | "processing"
-    | "shipped"
-    | "completed"
-    | "cancelled"
-    | "refunded"
-    | "on-hold"
-    | "failed";
+    | "Pending"
+    | "Processing"
+    | "Shipped"
+    | "Completed"
+    | "Cancelled"
+    | "Refunded"
+    | "On-hold"
+    | "Failed";
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [paymentFilter, setPaymentFilter] = useState("all");
   // For now, keep date picker uncontrolled to avoid prop mismatch
@@ -193,8 +193,6 @@ export default function OrdersPage() {
     () => data?.orders ?? [],
     [data],
   );
-
-  console.log(data);
 
   return (
     <div className="space-y-6">
@@ -263,11 +261,14 @@ export default function OrdersPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="processing">Processing</SelectItem>
-                <SelectItem value="shipped">Shipped</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-                <SelectItem value="cancelled">Cancelled</SelectItem>
+                <SelectItem value="Pending">Pending</SelectItem>
+                <SelectItem value="Processing">Processing</SelectItem>
+                <SelectItem value="Shipped">Shipped</SelectItem>
+                <SelectItem value="Completed">Completed</SelectItem>
+                <SelectItem value="Cancelled">Cancelled</SelectItem>
+                <SelectItem value="Refunded">Refunded</SelectItem>
+                <SelectItem value="On-hold">On-hold</SelectItem>
+                <SelectItem value="Failed">Failed</SelectItem>
               </SelectContent>
             </Select>
             <Select value={paymentFilter} onValueChange={setPaymentFilter}>
@@ -276,10 +277,10 @@ export default function OrdersPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Payments</SelectItem>
-                <SelectItem value="paid">Paid</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="refunded">Refunded</SelectItem>
-                <SelectItem value="failed">Failed</SelectItem>
+                <SelectItem value="Paid">Paid</SelectItem>
+                <SelectItem value="Pending">Pending</SelectItem>
+                <SelectItem value="Refunded">Refunded</SelectItem>
+                <SelectItem value="Failed">Failed</SelectItem>
               </SelectContent>
             </Select>
           </div>

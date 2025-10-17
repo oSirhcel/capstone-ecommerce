@@ -10,7 +10,27 @@ import {
   decimal,
   index,
   unique,
+  pgEnum,
 } from "drizzle-orm/pg-core";
+
+// Define enums
+export const orderStatusEnum = pgEnum("order_status", [
+  "Pending",
+  "Processing",
+  "Shipped",
+  "Completed",
+  "Cancelled",
+  "Refunded",
+  "On-hold",
+  "Failed",
+]);
+
+export const paymentStatusEnum = pgEnum("payment_status", [
+  "Pending",
+  "Paid",
+  "Failed",
+  "Refunded",
+]);
 
 export const users = pgTable("users", {
   id: varchar("id", { length: 255 }).primaryKey().notNull(),
@@ -93,7 +113,8 @@ export const orders = pgTable("orders", {
   storeId: varchar("storeId", { length: 255 })
     .references(() => stores.id)
     .notNull(), // Orders belong to a specific store
-  status: varchar({ length: 50 }).notNull().default("pending"),
+  status: orderStatusEnum().notNull().default("Pending"),
+  paymentStatus: paymentStatusEnum().notNull().default("Pending"),
   totalAmount: integer().notNull(), // Total in cents
   createdAt: timestamp().defaultNow().notNull(),
   updatedAt: timestamp().defaultNow().notNull(),

@@ -85,6 +85,13 @@
       "when": 1760017144830,
       "tag": "0011_peaceful_inertia",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1760710016893,
+      "tag": "0012_wandering_nightcrawler",
+      "breakpoints": true
     }
   ]
 }

@@ -10,21 +10,15 @@ import {
   products,
   orderAddresses,
 } from "@/server/db/schema";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
+import { z } from "zod";
+import { orderStatusSchema, paymentStatusSchema } from "@/lib/api/admin/orders";
 
-function isValidStatus(status: string) {
-  const allowed = [
-    "pending",
-    "processing",
-    "shipped",
-    "completed",
-    "cancelled",
-    "refunded",
-    "on-hold",
-    "failed",
-  ];
-  return allowed.includes(status);
-}
+// Validation schema for order updates
+const orderUpdateSchema = z.object({
+  status: orderStatusSchema.optional(),
+  paymentStatus: paymentStatusSchema.optional(),
+});
 
 export async function GET(
   request: NextRequest,
@@ -60,6 +54,7 @@ export async function GET(
         id: orders.id,
         userId: orders.userId,
         status: orders.status,
+        paymentStatus: orders.paymentStatus,
         totalAmount: orders.totalAmount,
         createdAt: orders.createdAt,
         updatedAt: orders.updatedAt,
@@ -133,9 +128,9 @@ export async function GET(
       })),
       addresses,
       payment: {
-        status: "pending", // placeholder as requested
+        status: "Pending",
       },
-      timeline: [], // placeholder
+      timeline: [],
     });
   } catch (error) {
     console.error("Admin Order detail GET error", error);
@@ -174,16 +169,43 @@ export async function PATCH(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const body = (await request.json()) as { status?: string };
-    if (!body.status || !isValidStatus(body.status)) {
-      return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+    const bodyJson = (await request.json()) as unknown;
+    const parseResult = orderUpdateSchema.safeParse(bodyJson);
+
+    if (!parseResult.success) {
+      return NextResponse.json(
+        { error: "Invalid data", details: parseResult.error.format() },
+        { status: 400 },
+      );
+    }
+
+    const { status: newStatus, paymentStatus: newPaymentStatus } =
+      parseResult.data;
+
+    // Build update object dynamically
+    const updateData: {
+      status?: typeof newStatus;
+      paymentStatus?: typeof newPaymentStatus;
+    } = {};
+    if (newStatus) updateData.status = newStatus;
+    if (newPaymentStatus) updateData.paymentStatus = newPaymentStatus;
+
+    if (Object.keys(updateData).length === 0) {
+      return NextResponse.json(
+        { error: "No valid fields to update" },
+        { status: 400 },
+      );
     }
 
     const result = await db
       .update(orders)
-      .set({ status: body.status })
+      .set(updateData)
       .where(and(eq(orders.id, Number(id)), eq(orders.storeId, storeId)))
-      .returning({ id: orders.id, status: orders.status });
+      .returning({
+        id: orders.id,
+        status: orders.status,
+        paymentStatus: orders.paymentStatus,
+      });
     if (result.length === 0) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }

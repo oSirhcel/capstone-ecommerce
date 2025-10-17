@@ -235,7 +235,7 @@ export default function CreateOrderPage() {
 
   return (
     <FormProvider {...form}>
-      <div className="space-y-6">
+      <div className="mx-4 space-y-6 xl:mx-64">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="space-y-1">
@@ -273,22 +273,23 @@ export default function CreateOrderPage() {
           </div>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-3">
-          {/* Main Content */}
-          <div className="space-y-6 lg:col-span-2">
-            {/* Customer Selection */}
-            <CustomerSelectionForm storeId={storeId} />
-
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_380px]">
+          {/* Main Content - Left Column */}
+          <div className="space-y-6">
             {/* Product Selection */}
             <ProductSelectionForm storeId={storeId} />
 
-            {/* Payment Information */}
-            <PaymentForm />
+            {/* Payment Summary */}
+            <OrderSummaryForm />
           </div>
 
-          {/* Sidebar - Order Summary */}
-          <div>
-            <OrderSummaryForm />
+          {/* Sidebar - Right Column */}
+          <div className="space-y-6">
+            {/* Customer Selection & Shipping */}
+            <CustomerSelectionForm storeId={storeId} />
+
+            {/* Payment Information & Notes */}
+            <PaymentForm />
           </div>
         </div>
       </div>

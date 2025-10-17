@@ -4,10 +4,7 @@ import { Suspense, useMemo } from "react";
 import { OrderHeader } from "@/components/admin/orders/order-header";
 import { OrderItems } from "@/components/admin/orders/order-items";
 import { OrderCustomer } from "@/components/admin/orders/order-customer";
-import { OrderShipping } from "@/components/admin/orders/order-shipping";
 import { OrderPayment } from "@/components/admin/orders/order-payment";
-import { OrderTimeline } from "@/components/admin/orders/order-timeline";
-import { OrderActions } from "@/components/admin/orders/order-actions";
 import { useOrderQuery } from "@/hooks/admin/orders/use-order-query";
 import { useSession } from "next-auth/react";
 
@@ -54,16 +51,6 @@ export default function OrderViewPageClient({ orderId }: { orderId: string }) {
       total: (i.priceAtTime * i.quantity) / 100,
       store: "",
     }));
-  }, [order]);
-
-  const timeline = useMemo(() => {
-    if (!order)
-      return [] as Array<{ status: string; date: string; description: string }>;
-    return (
-      (order.timeline as
-        | Array<{ status: string; date: string; description: string }>
-        | undefined) ?? []
-    );
   }, [order]);
 
   const shipping = useMemo(() => {
@@ -114,21 +101,21 @@ export default function OrderViewPageClient({ orderId }: { orderId: string }) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="mx-4 space-y-6 xl:mx-64">
       <Suspense fallback={<div>Loading...</div>}>
         <OrderHeader order={orderHeader} />
-
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          <div className="space-y-6 lg:col-span-2">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_380px]">
+          <div className="space-y-6">
             <OrderItems items={items} />
-            <OrderTimeline timeline={timeline} />
+            <OrderPayment payment={payment} total={order.totalAmount / 100} />
           </div>
 
           <div className="space-y-6">
-            <OrderActions orderId={String(order.id)} />
-            <OrderCustomer customer={orderHeader.customer} />
-            <OrderShipping shipping={shipping} />
-            <OrderPayment payment={payment} total={order.totalAmount / 100} />
+            <OrderCustomer
+              customer={orderHeader.customer}
+              shippingAddress={shipping.address}
+              billingAddress={payment.billingAddress}
+            />
           </div>
         </div>
       </Suspense>

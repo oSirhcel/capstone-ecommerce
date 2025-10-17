@@ -7,14 +7,14 @@ export const ordersListQuerySchema = z.object({
   search: z.string().nullish(),
   status: z
     .enum([
-      "pending",
-      "processing",
-      "shipped",
-      "completed",
-      "cancelled",
-      "refunded",
-      "on-hold",
-      "failed",
+      "Pending",
+      "Processing",
+      "Shipped",
+      "Completed",
+      "Cancelled",
+      "Refunded",
+      "On-hold",
+      "Failed",
     ])
     .nullish(),
   sortBy: z.enum(["createdAt", "totalAmount", "status"]).default("createdAt"),
@@ -27,14 +27,14 @@ export type OrdersListQuery = z.infer<typeof ordersListQuerySchema>;
 
 export const orderUpdateSchema = z.object({
   status: z.enum([
-    "pending",
-    "processing",
-    "shipped",
-    "completed",
-    "cancelled",
-    "refunded",
-    "on-hold",
-    "failed",
+    "Pending",
+    "Processing",
+    "Shipped",
+    "Completed",
+    "Cancelled",
+    "Refunded",
+    "On-hold",
+    "Failed",
   ]),
 });
 
@@ -131,6 +131,31 @@ export interface OrderStats {
     activeCustomers: number;
   };
 }
+
+export const orderStatusValues = [
+  "Pending",
+  "Processing",
+  "Shipped",
+  "Completed",
+  "Cancelled",
+  "Refunded",
+  "On-hold",
+  "Failed",
+] as const;
+
+export const orderStatusSchema = z.enum(orderStatusValues);
+export type OrderStatus = z.infer<typeof orderStatusSchema>;
+
+// Payment status enum values
+export const paymentStatusValues = [
+  "Pending",
+  "Paid",
+  "Failed",
+  "Refunded",
+] as const;
+
+export const paymentStatusSchema = z.enum(paymentStatusValues);
+export type PaymentStatus = z.infer<typeof paymentStatusSchema>;
 
 export async function fetchOrders(params: Partial<OrdersListQuery>) {
   const sp = new URLSearchParams();

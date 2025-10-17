@@ -3,19 +3,11 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useFormContext } from "react-hook-form";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { Search, User, MapPin, Loader2 } from "lucide-react";
+import { Search, Loader2 } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -153,93 +145,94 @@ export function CustomerSelectionForm({ storeId }: CustomerSelectionFormProps) {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Customer Selection */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <User className="h-5 w-5" />
-                Customer Information
-              </CardTitle>
-              <CardDescription>Select or search for a customer</CardDescription>
-            </div>
+            <CardTitle>Customer</CardTitle>
             {customer && (
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
                 onClick={() => {
                   setShowCustomerSearch(true);
                   setValue("customer", null);
                 }}
               >
-                Change Customer
+                Change
               </Button>
             )}
           </div>
         </CardHeader>
         <CardContent>
           {showCustomerSearch ? (
-            <div className="space-y-4">
+            <div className="space-y-3">
               <div className="relative">
                 <Search className="text-muted-foreground absolute top-2.5 left-2.5 h-4 w-4" />
                 <Input
-                  placeholder="Search customers by name or email..."
+                  placeholder="Search customers..."
                   className="pl-8"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
 
-              <div className="max-h-60 space-y-2 overflow-y-auto">
+              <div className="max-h-48 space-y-2 overflow-y-auto">
                 {isLoadingCustomers ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin" />
+                  <div className="flex items-center justify-center py-6">
+                    <Loader2 className="h-5 w-5 animate-spin" />
                   </div>
                 ) : customers.length > 0 ? (
                   customers.map((c) => (
                     <div
                       key={c.id}
-                      className="hover:bg-muted/50 flex cursor-pointer items-center gap-3 rounded-lg border p-3"
+                      className="hover:bg-muted/50 flex cursor-pointer items-center gap-2 rounded-md border p-2 transition-colors"
                       onClick={() => handleCustomerSelect(c)}
                     >
-                      <Avatar className="h-10 w-10">
-                        <AvatarFallback>
+                      <Avatar className="h-8 w-8">
+                        <AvatarFallback className="text-xs">
                           {c.name.charAt(0).toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
-                      <div className="flex-1">
-                        <p className="font-medium">{c.name}</p>
-                        <p className="text-muted-foreground text-sm">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">{c.name}</p>
+                        <p className="text-muted-foreground truncate text-xs">
                           {c.email}
                         </p>
                       </div>
                     </div>
                   ))
                 ) : (
-                  <p className="text-muted-foreground py-8 text-center text-sm">
+                  <p className="text-muted-foreground py-6 text-center text-sm">
                     No customers found
                   </p>
                 )}
               </div>
             </div>
           ) : customer ? (
-            <div className="bg-muted/20 flex items-center gap-4 rounded-lg border p-4">
-              <Avatar className="h-12 w-12">
-                <AvatarFallback>
-                  {customer.name.charAt(0).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1">
-                <p className="font-medium">{customer.name}</p>
-                <p className="text-muted-foreground text-sm">
-                  {customer.email}
-                </p>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Avatar className="h-8 w-8">
+                  <AvatarFallback className="text-xs">
+                    {customer.name.charAt(0).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">
+                    {customer.name}
+                  </p>
+                  <p className="text-muted-foreground truncate text-xs">
+                    {customer.email}
+                  </p>
+                </div>
               </div>
-              <Badge>Selected</Badge>
             </div>
-          ) : null}
+          ) : (
+            <p className="text-muted-foreground text-sm">
+              Select a customer to continue
+            </p>
+          )}
         </CardContent>
       </Card>
 
@@ -247,55 +240,44 @@ export function CustomerSelectionForm({ storeId }: CustomerSelectionFormProps) {
       {customer && (
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <MapPin className="h-5 w-5" />
-              Shipping Address
-            </CardTitle>
-            <CardDescription>
-              Select an existing address or enter a new one
-            </CardDescription>
+            <CardTitle>Shipping address</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {/* Address Selection */}
-            <div>
-              <Label htmlFor="addressSelect">Select Address</Label>
-              {isLoadingAddresses ? (
-                <div className="flex items-center gap-2 py-2">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span className="text-muted-foreground text-sm">
-                    Loading addresses...
-                  </span>
-                </div>
-              ) : (
-                <Select
-                  value={
-                    selectedAddressId
-                      ? String(selectedAddressId)
-                      : addressMode === "manual"
-                        ? "manual"
-                        : ""
-                  }
-                  onValueChange={handleAddressSelect}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Choose an address or enter manually" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {addresses.map((addr) => (
-                      <SelectItem key={addr.id} value={String(addr.id)}>
-                        {addr.firstName} {addr.lastName} - {addr.addressLine1},{" "}
-                        {addr.city}, {addr.state} {addr.postalCode}
-                        {addr.isDefault && " (Default)"}
-                      </SelectItem>
-                    ))}
-                    <SelectItem value="manual">
-                      Enter address manually
+            {isLoadingAddresses ? (
+              <div className="flex items-center gap-2 py-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="text-muted-foreground text-sm">
+                  Loading addresses...
+                </span>
+              </div>
+            ) : (
+              <Select
+                value={
+                  selectedAddressId
+                    ? String(selectedAddressId)
+                    : addressMode === "manual"
+                      ? "manual"
+                      : ""
+                }
+                onValueChange={handleAddressSelect}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select or enter address" />
+                </SelectTrigger>
+                <SelectContent>
+                  {addresses.map((addr) => (
+                    <SelectItem key={addr.id} value={String(addr.id)}>
+                      {addr.firstName} {addr.lastName} - {addr.addressLine1},{" "}
+                      {addr.city}, {addr.state} {addr.postalCode}
+                      {addr.isDefault && " (Default)"}
                     </SelectItem>
-                  </SelectContent>
-                </Select>
-              )}
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
+                  ))}
+                  <SelectItem value="manual">Enter address manually</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
+            <div className="grid gap-3">
               <FormField
                 control={control}
                 name="shippingAddress.firstName"
@@ -366,20 +348,21 @@ export function CustomerSelectionForm({ storeId }: CustomerSelectionFormProps) {
               )}
             />
 
-            <div className="grid gap-4 sm:grid-cols-3">
-              <FormField
-                control={control}
-                name="shippingAddress.city"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>City *</FormLabel>
-                    <FormControl>
-                      <Input placeholder="New York" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+            <FormField
+              control={control}
+              name="shippingAddress.city"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>City *</FormLabel>
+                  <FormControl>
+                    <Input placeholder="New York" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="grid grid-cols-2 gap-3">
               <FormField
                 control={control}
                 name="shippingAddress.state"
@@ -408,48 +391,47 @@ export function CustomerSelectionForm({ storeId }: CustomerSelectionFormProps) {
               />
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <FormField
-                control={control}
-                name="shippingAddress.country"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Country *</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="US">United States</SelectItem>
-                        <SelectItem value="CA">Canada</SelectItem>
-                        <SelectItem value="UK">United Kingdom</SelectItem>
-                        <SelectItem value="AU">Australia</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={control}
-                name="shippingAddress.phone"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Phone (Optional)</FormLabel>
+            <FormField
+              control={control}
+              name="shippingAddress.country"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Country *</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
-                      <Input
-                        type="tel"
-                        placeholder="+1 (555) 123-4567"
-                        {...field}
-                      />
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
                     </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+                    <SelectContent>
+                      <SelectItem value="US">United States</SelectItem>
+                      <SelectItem value="CA">Canada</SelectItem>
+                      <SelectItem value="UK">United Kingdom</SelectItem>
+                      <SelectItem value="AU">Australia</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={control}
+              name="shippingAddress.phone"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Phone (Optional)</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="tel"
+                      placeholder="+1 (555) 123-4567"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
           </CardContent>
         </Card>
       )}

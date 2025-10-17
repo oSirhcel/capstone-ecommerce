@@ -24,6 +24,7 @@ import {
   inArray,
   isNull,
 } from "drizzle-orm";
+import { orderStatusSchema } from "@/lib/api/admin/orders";
 
 export async function GET(request: NextRequest) {
   const session = await auth();
@@ -74,10 +75,24 @@ export async function GET(request: NextRequest) {
 
     const searchTerm = search?.trim() ? `%${search.trim()}%` : undefined;
 
-    // Common filters (conditionally include undefineds per Drizzle best practice)
+    // Validate status if provided
+    const validatedStatus = status
+      ? orderStatusSchema.safeParse(status).success
+        ? (status as
+            | "Pending"
+            | "Processing"
+            | "Shipped"
+            | "Completed"
+            | "Cancelled"
+            | "Refunded"
+            | "On-hold"
+            | "Failed")
+        : undefined
+      : undefined;
+
     const commonFilters = and(
       eq(orders.storeId, storeId),
-      status ? eq(orders.status, status) : undefined,
+      validatedStatus ? eq(orders.status, validatedStatus) : undefined,
       dateFrom && dateTo
         ? between(orders.createdAt, new Date(dateFrom), new Date(dateTo))
         : undefined,
@@ -99,6 +114,7 @@ export async function GET(request: NextRequest) {
         id: orders.id,
         userId: orders.userId,
         status: orders.status,
+        paymentStatus: orders.paymentStatus,
         totalAmount: orders.totalAmount,
         createdAt: orders.createdAt,
         itemCount: itemsSub.itemCount,
@@ -114,6 +130,7 @@ export async function GET(request: NextRequest) {
           id: orders.id,
           userId: orders.userId,
           status: orders.status,
+          paymentStatus: orders.paymentStatus,
           totalAmount: orders.totalAmount,
           createdAt: orders.createdAt,
           itemCount: itemsSub.itemCount,
@@ -175,9 +192,9 @@ export async function GET(request: NextRequest) {
       customer: customerMap[r.userId] ?? { name: "", email: "" },
       amount: r.totalAmount / 100,
       status: r.status,
+      paymentStatus: r.paymentStatus,
       date: r.createdAt.toISOString(),
       items: Number(r.itemCount ?? 0),
-      paymentStatus: "pending" as const,
     }));
 
     // Count with identical filters and conditional search joins
@@ -260,7 +277,6 @@ export async function POST(request: NextRequest) {
       totalAmount,
       addressId,
       shippingAddress,
-      notes,
     } = body;
 
     // Validation
@@ -373,7 +389,7 @@ export async function POST(request: NextRequest) {
       .values({
         userId: customerId,
         storeId,
-        status: "pending",
+        status: "Pending",
         totalAmount,
       })
       .returning();

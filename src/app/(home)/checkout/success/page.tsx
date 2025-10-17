@@ -12,6 +12,7 @@ import Link from "next/link";
 // Note: We intentionally avoid getPaymentStatus here so we can inspect HTTP status codes
 // and implement retry logic if the transaction record is not yet available.
 import { Skeleton } from "@/components/ui/skeleton";
+import { useCart } from "@/contexts/cart-context";
 
 interface PaymentDetails {
   transaction: {
@@ -30,6 +31,7 @@ export default function CheckoutSuccessPage() {
   const searchParams = useSearchParams();
   const paymentIntentId = searchParams.get("payment_intent");
   const orderId = searchParams.get("order_id");
+  const { clearCart } = useCart();
 
   const [paymentDetails, setPaymentDetails] = useState<PaymentDetails | null>(
     null,
@@ -74,6 +76,15 @@ export default function CheckoutSuccessPage() {
             setPaymentDetails(data);
             setIsLoading(false);
             setError(null);
+
+            // Clear the cart after successful payment confirmation
+            try {
+              clearCart();
+              console.log("Cart cleared after successful payment");
+            } catch (error) {
+              console.error("Failed to clear cart after payment:", error);
+            }
+
             return;
           }
 

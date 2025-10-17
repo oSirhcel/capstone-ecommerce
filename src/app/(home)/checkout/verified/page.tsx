@@ -7,10 +7,12 @@ import { CheckCircle2, Loader2, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { useCart } from "@/contexts/cart-context";
 
 function VerifiedContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { clearCart } = useCart();
   const [status, setStatus] = useState<"processing" | "success" | "error">(
     "processing",
   );
@@ -127,6 +129,14 @@ function VerifiedContent() {
 
       // Payment successful
       setStatus("success");
+
+      // Clear the cart after successful payment
+      try {
+        clearCart();
+        console.log("Cart cleared after verified payment");
+      } catch (error) {
+        console.error("Failed to clear cart after verified payment:", error);
+      }
 
       toast.success("Payment verified and processed!", {
         description: "Redirecting to confirmation page...",

@@ -10,7 +10,7 @@ export type Address = {
   addressLine2?: string | null;
   city: string;
   state: string;
-  postalCode: string;
+  postcode: string;
   country: string;
   isDefault: boolean;
   version: number;
@@ -28,7 +28,7 @@ export type CreateAddressInput = {
   addressLine2?: string;
   city: string;
   state: string;
-  postalCode: string;
+  postcode: string;
   country: string;
   isDefault?: boolean;
 };
@@ -42,7 +42,7 @@ export type UpdateAddressInput = {
   addressLine2?: string;
   city?: string;
   state?: string;
-  postalCode?: string;
+  postcode?: string;
   country?: string;
   isDefault?: boolean;
 };

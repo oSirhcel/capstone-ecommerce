@@ -243,7 +243,7 @@ export const addresses = pgTable("addresses", {
   addressLine2: varchar({ length: 255 }),
   city: varchar({ length: 100 }).notNull(),
   state: varchar({ length: 100 }).notNull(),
-  postalCode: varchar({ length: 20 }).notNull(),
+  postcode: varchar({ length: 20 }).notNull(),
   country: varchar({ length: 100 }).notNull(),
   isDefault: boolean().notNull().default(false),
   // Concurrency and lifecycle
@@ -266,7 +266,7 @@ export const orderAddresses = pgTable("order_addresses", {
   addressLine2: varchar({ length: 255 }),
   city: varchar({ length: 100 }).notNull(),
   state: varchar({ length: 100 }).notNull(),
-  postalCode: varchar({ length: 20 }).notNull(),
+  postcode: varchar({ length: 20 }).notNull(),
   country: varchar({ length: 100 }).notNull(),
   createdAt: timestamp().defaultNow().notNull(),
 });

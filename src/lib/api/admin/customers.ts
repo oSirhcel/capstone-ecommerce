@@ -34,7 +34,7 @@ export const addressCreateSchema = z.object({
   addressLine2: z.string().optional(),
   city: z.string().min(2),
   state: z.string().min(2),
-  postalCode: z.string().min(3),
+  postcode: z.string().min(3),
   country: z.string().min(2),
   isDefault: z.boolean().default(false),
 });
@@ -94,7 +94,7 @@ export interface CustomerAddress {
   addressLine2?: string;
   city: string;
   state: string;
-  postalCode: string;
+  postcode: string;
   country: string;
   isDefault: boolean;
   createdAt: string;

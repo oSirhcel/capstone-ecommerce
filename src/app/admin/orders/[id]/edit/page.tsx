@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
 import { ArrowLeft, Save, X } from "lucide-react";
@@ -48,7 +48,7 @@ const orderEditFormSchema = z.object({
     address2: z.string().optional(),
     city: z.string().min(1, "City is required"),
     state: z.string().min(1, "State is required"),
-    zipCode: z.string().min(1, "ZIP code is required"),
+    postcode: z.string().min(1, "Postcode is required"),
     country: z.string().min(1, "Country is required"),
     phone: z.string().optional(),
   }),
@@ -70,46 +70,30 @@ export default function EditOrderPage() {
 
   const { updateDetails } = useOrderMutations(storeId);
 
-  const form = useForm<OrderEditFormValues>({
-    resolver: zodResolver(orderEditFormSchema),
-    defaultValues: {
-      customer: null,
-      orderItems: [],
-      selectedAddressId: null,
-      shippingAddress: {
-        firstName: "",
-        lastName: "",
-        company: "",
-        address1: "",
-        address2: "",
-        city: "",
-        state: "",
-        zipCode: "",
-        country: "US",
-        phone: "",
-      },
-    },
-  });
-
-  const { watch, handleSubmit: createHandleSubmit, reset } = form;
-
-  // Redirect if order is shipped or completed
-  useEffect(() => {
-    if (order && ["Shipped", "Completed"].includes(order.status)) {
-      toast.error("Cannot Edit Order", {
-        description: "This order has been shipped or completed.",
-      });
-      router.push(`/admin/orders/${orderId}`);
+  const defaultValues = useMemo<OrderEditFormValues>(() => {
+    if (!order) {
+      return {
+        customer: null,
+        orderItems: [],
+        selectedAddressId: null,
+        shippingAddress: {
+          firstName: "",
+          lastName: "",
+          company: "",
+          address1: "",
+          address2: "",
+          city: "",
+          state: "",
+          postcode: "",
+          country: "AU",
+          phone: "",
+        },
+      };
     }
-  }, [order, orderId, router]);
-
-  // Pre-populate form with existing order data
-  useEffect(() => {
-    if (!order) return;
 
     const shippingAddress = order.addresses.find((a) => a.type === "shipping");
 
-    const formData: OrderEditFormValues = {
+    return {
       customer: {
         id: order.customer.id,
         name: order.customer.name,
@@ -133,14 +117,20 @@ export default function EditOrderPage() {
         address2: shippingAddress?.addressLine2 ?? "",
         city: shippingAddress?.city ?? "",
         state: shippingAddress?.state ?? "",
-        zipCode: shippingAddress?.postalCode ?? "",
-        country: shippingAddress?.country ?? "US",
+        postcode: shippingAddress?.postcode ?? "",
+        country: shippingAddress?.country ?? "AU",
         phone: "",
       },
     };
+  }, [order]);
 
-    reset(formData);
-  }, [order, reset]);
+  const form = useForm<OrderEditFormValues>({
+    resolver: zodResolver(orderEditFormSchema),
+    defaultValues,
+    values: defaultValues, // Reset form when order data changes
+  });
+
+  const { watch, handleSubmit: createHandleSubmit } = form;
 
   // Calculations
   const orderItems = watch("orderItems");
@@ -149,7 +139,7 @@ export default function EditOrderPage() {
     0,
   );
   const shipping = subtotal > 100 ? 0 : 9.99;
-  const tax = subtotal * 0.08;
+  const tax = subtotal * 0.1; // 10% GST for Australia
   const total = subtotal + shipping + tax;
 
   const onSubmit = async (data: OrderEditFormValues) => {
@@ -167,7 +157,7 @@ export default function EditOrderPage() {
           addressLine2: data.shippingAddress.address2 ?? undefined,
           city: data.shippingAddress.city,
           state: data.shippingAddress.state,
-          postalCode: data.shippingAddress.zipCode,
+          postcode: data.shippingAddress.postcode,
           country: data.shippingAddress.country,
         },
       };
@@ -227,6 +217,21 @@ export default function EditOrderPage() {
       <div className="mx-4 space-y-6 xl:mx-64">
         <div className="flex items-center justify-center py-12">
           <p className="text-muted-foreground">Order not found</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Check if order can be edited
+  if (["Shipped", "Completed"].includes(order.status)) {
+    toast.error("Cannot Edit Order", {
+      description: "This order has been shipped or completed.",
+    });
+    router.push(`/admin/orders/${orderId}`);
+    return (
+      <div className="mx-4 space-y-6 xl:mx-64">
+        <div className="flex items-center justify-center py-12">
+          <p className="text-muted-foreground">Redirecting...</p>
         </div>
       </div>
     );

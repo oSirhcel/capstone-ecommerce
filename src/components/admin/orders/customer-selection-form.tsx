@@ -105,8 +105,8 @@ export function CustomerSelectionForm({
       address2: "",
       city: "",
       state: "",
-      zipCode: "",
-      country: "US",
+      postcode: "",
+      country: "AU",
       phone: "",
     });
   };
@@ -124,8 +124,8 @@ export function CustomerSelectionForm({
         address2: "",
         city: "",
         state: "",
-        zipCode: "",
-        country: "US",
+        postcode: "",
+        country: "AU",
         phone: "",
       });
     } else {
@@ -142,7 +142,7 @@ export function CustomerSelectionForm({
           address2: selectedAddress.addressLine2 ?? "",
           city: selectedAddress.city,
           state: selectedAddress.state,
-          zipCode: selectedAddress.postalCode,
+          postcode: selectedAddress.postcode,
           country: selectedAddress.country,
           phone: "",
         });
@@ -275,7 +275,7 @@ export function CustomerSelectionForm({
                   {addresses.map((addr) => (
                     <SelectItem key={addr.id} value={String(addr.id)}>
                       {addr.firstName} {addr.lastName} - {addr.addressLine1},{" "}
-                      {addr.city}, {addr.state} {addr.postalCode}
+                      {addr.city}, {addr.state} {addr.postcode}
                       {addr.isDefault && " (Default)"}
                     </SelectItem>
                   ))}
@@ -361,7 +361,7 @@ export function CustomerSelectionForm({
                 <FormItem>
                   <FormLabel>City *</FormLabel>
                   <FormControl>
-                    <Input placeholder="New York" {...field} />
+                    <Input placeholder="Sydney" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -371,12 +371,12 @@ export function CustomerSelectionForm({
             <div className="grid grid-cols-2 gap-3">
               <FormField
                 control={control}
-                name="shippingAddress.state"
+                name="shippingAddress.postcode"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>State *</FormLabel>
+                    <FormLabel>Postcode *</FormLabel>
                     <FormControl>
-                      <Input placeholder="NY" {...field} />
+                      <Input placeholder="2000" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -384,12 +384,31 @@ export function CustomerSelectionForm({
               />
               <FormField
                 control={control}
-                name="shippingAddress.zipCode"
+                name="shippingAddress.state"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>ZIP Code *</FormLabel>
+                    <FormLabel>State *</FormLabel>
                     <FormControl>
-                      <Input placeholder="10001" {...field} />
+                      <Select
+                        value={field.value}
+                        onValueChange={field.onChange}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select state" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="NSW">New South Wales</SelectItem>
+                          <SelectItem value="VIC">Victoria</SelectItem>
+                          <SelectItem value="QLD">Queensland</SelectItem>
+                          <SelectItem value="WA">Western Australia</SelectItem>
+                          <SelectItem value="SA">South Australia</SelectItem>
+                          <SelectItem value="TAS">Tasmania</SelectItem>
+                          <SelectItem value="ACT">
+                            Australian Capital Territory
+                          </SelectItem>
+                          <SelectItem value="NT">Northern Territory</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -410,9 +429,6 @@ export function CustomerSelectionForm({
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="US">United States</SelectItem>
-                      <SelectItem value="CA">Canada</SelectItem>
-                      <SelectItem value="UK">United Kingdom</SelectItem>
                       <SelectItem value="AU">Australia</SelectItem>
                     </SelectContent>
                   </Select>
@@ -430,7 +446,7 @@ export function CustomerSelectionForm({
                   <FormControl>
                     <Input
                       type="tel"
-                      placeholder="+1 (555) 123-4567"
+                      placeholder="+61 (2) 1234 5678"
                       {...field}
                     />
                   </FormControl>

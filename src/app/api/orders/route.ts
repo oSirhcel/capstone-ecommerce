@@ -31,7 +31,6 @@ export async function POST(request: NextRequest) {
       address: z.string().optional(),
       city: z.string().min(1).optional(),
       state: z.string().min(1).optional(),
-      postalCode: z.string().optional(),
       postcode: z.string().optional(),
       country: z.string().min(1).optional(),
     });
@@ -86,7 +85,6 @@ export async function POST(request: NextRequest) {
       address?: string;
       city?: string;
       state?: string;
-      postalCode?: string;
       postcode?: string;
       country?: string;
     }) => ({
@@ -96,7 +94,7 @@ export async function POST(request: NextRequest) {
       addressLine2: addr.addressLine2 ?? null,
       city: addr.city ?? "",
       state: addr.state ?? "",
-      postalCode: addr.postalCode ?? addr.postcode ?? "",
+      postcode: addr.postcode ?? addr.postcode ?? "",
       country: addr.country ?? "AU",
     });
 
@@ -196,7 +194,7 @@ export async function POST(request: NextRequest) {
       .values({
         userId: user.id,
         storeId,
-        status: "pending",
+        status: "Pending",
         totalAmount: totalAmount,
       })
       .returning();

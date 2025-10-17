@@ -29,7 +29,7 @@ const addressFormSchema = z.object({
   addressLine2: z.string().optional(),
   city: z.string().min(1, "City is required"),
   state: z.string().min(1, "State is required"),
-  postalCode: z.string().min(2, "Postcode is required"),
+  postcode: z.string().min(2, "Postcode is required"),
   country: z.string().min(2, "Country is required"),
   isDefault: z.boolean().default(false),
 });
@@ -59,7 +59,7 @@ export function AdminCustomerAddressForm({
       addressLine2: "",
       city: "",
       state: "",
-      postalCode: "",
+      postcode: "",
       country: "AU",
       isDefault: false,
       ...defaultValues,
@@ -238,13 +238,13 @@ export function AdminCustomerAddressForm({
           <div className="grid grid-cols-2 gap-4">
             <FormField
               control={form.control}
-              name="postalCode"
+              name="postcode"
               render={({ field, fieldState }) => (
                 <Field data-invalid={!!fieldState.error}>
-                  <FieldLabel htmlFor="postalCode">Postcode</FieldLabel>
+                  <FieldLabel htmlFor="postcode">Postcode</FieldLabel>
                   <FormControl>
                     <Input
-                      id="postalCode"
+                      id="postcode"
                       {...field}
                       aria-invalid={!!fieldState.error}
                     />

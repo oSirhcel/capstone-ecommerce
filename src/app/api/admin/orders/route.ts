@@ -251,7 +251,7 @@ export async function POST(request: NextRequest) {
       addressLine2?: string;
       city: string;
       state: string;
-      postalCode: string;
+      postcode: string;
       country: string;
     };
 
@@ -350,7 +350,7 @@ export async function POST(request: NextRequest) {
           addressLine2: addresses.addressLine2,
           city: addresses.city,
           state: addresses.state,
-          postalCode: addresses.postalCode,
+          postcode: addresses.postcode,
           country: addresses.country,
         })
         .from(addresses)
@@ -376,7 +376,7 @@ export async function POST(request: NextRequest) {
         addressLine2: existingAddress.addressLine2 ?? undefined,
         city: existingAddress.city,
         state: existingAddress.state,
-        postalCode: existingAddress.postalCode,
+        postcode: existingAddress.postcode,
         country: existingAddress.country,
       };
     } else {
@@ -416,7 +416,7 @@ export async function POST(request: NextRequest) {
       addressLine2: addressData.addressLine2 ?? null,
       city: addressData.city,
       state: addressData.state,
-      postalCode: addressData.postalCode,
+      postcode: addressData.postcode,
       country: addressData.country,
     });
 

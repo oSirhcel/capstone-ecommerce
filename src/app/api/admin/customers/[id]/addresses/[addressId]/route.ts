@@ -114,7 +114,7 @@ export async function PATCH(
         addressLine2: updatedAddress.addressLine2,
         city: updatedAddress.city,
         state: updatedAddress.state,
-        postalCode: updatedAddress.postalCode,
+        postcode: updatedAddress.postcode,
         country: updatedAddress.country,
         isDefault: updatedAddress.isDefault,
         createdAt: updatedAddress.createdAt.toISOString(),

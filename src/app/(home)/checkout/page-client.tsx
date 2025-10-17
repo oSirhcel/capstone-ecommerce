@@ -34,7 +34,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { toast } from "sonner";
 import { StripePaymentForm } from "@/components/checkout/stripe-payment-form";
 import { useAddressesByType } from "@/hooks/use-addresses";
-import type { AddressDTO } from "@/lib/api/addresses";
+import type { Address } from "@/lib/api/addresses";
 
 export function CheckoutClient() {
   const { data: session } = useSession();
@@ -82,7 +82,7 @@ export function CheckoutClient() {
     addressLine2: "",
     city: "",
     state: "",
-    postalCode: "",
+    postcode: "",
     country: "Australia",
   });
 
@@ -99,7 +99,7 @@ export function CheckoutClient() {
     addressLine2: "",
     city: "",
     state: "",
-    postalCode: "",
+    postcode: "",
     country: "Australia",
   });
 
@@ -115,10 +115,10 @@ export function CheckoutClient() {
         firstName: defaultShipping.firstName,
         lastName: defaultShipping.lastName,
         addressLine1: defaultShipping.addressLine1,
-        addressLine2: defaultShipping.addressLine2 || "",
+        addressLine2: defaultShipping.addressLine2 ?? "",
         city: defaultShipping.city,
         state: defaultShipping.state,
-        postalCode: defaultShipping.postalCode,
+        postcode: defaultShipping.postcode,
         country: defaultShipping.country,
       });
     }
@@ -133,10 +133,10 @@ export function CheckoutClient() {
         firstName: defaultBilling.firstName,
         lastName: defaultBilling.lastName,
         addressLine1: defaultBilling.addressLine1,
-        addressLine2: defaultBilling.addressLine2 || "",
+        addressLine2: defaultBilling.addressLine2 ?? "",
         city: defaultBilling.city,
         state: defaultBilling.state,
-        postalCode: defaultBilling.postalCode,
+        postcode: defaultBilling.postcode,
         country: defaultBilling.country,
       });
     }
@@ -151,10 +151,10 @@ export function CheckoutClient() {
         firstName: address.firstName,
         lastName: address.lastName,
         addressLine1: address.addressLine1,
-        addressLine2: address.addressLine2 || "",
+        addressLine2: address.addressLine2 ?? "",
         city: address.city,
         state: address.state,
-        postalCode: address.postalCode,
+        postcode: address.postcode,
         country: address.country,
       });
     }
@@ -169,10 +169,10 @@ export function CheckoutClient() {
         firstName: address.firstName,
         lastName: address.lastName,
         addressLine1: address.addressLine1,
-        addressLine2: address.addressLine2 || "",
+        addressLine2: address.addressLine2 ?? "",
         city: address.city,
         state: address.state,
-        postalCode: address.postalCode,
+        postcode: address.postcode,
         country: address.country,
       });
     }
@@ -257,7 +257,7 @@ export function CheckoutClient() {
 
   // Calculate shipping, tax, and total
   const shipping = subtotal > 50 ? 0 : 5.99;
-  const tax = subtotal * 0.08;
+  const tax = subtotal * 0.1; // 10% GST for Australia
   const total = subtotal + shipping + tax;
 
   // Get final shipping and billing data
@@ -309,7 +309,7 @@ export function CheckoutClient() {
         !finalShipping.addressLine1 ||
         !finalShipping.city ||
         !finalShipping.state ||
-        !finalShipping.postalCode
+        !finalShipping.postcode
       ) {
         throw new Error("Please complete your shipping information");
       }
@@ -320,7 +320,7 @@ export function CheckoutClient() {
         !finalBilling.addressLine1 ||
         !finalBilling.city ||
         !finalBilling.state ||
-        !finalBilling.postalCode
+        !finalBilling.postcode
       ) {
         throw new Error("Please complete your billing information");
       }
@@ -437,7 +437,7 @@ export function CheckoutClient() {
       shippingData.addressLine1 &&
       shippingData.city &&
       shippingData.state &&
-      shippingData.postalCode
+      shippingData.postcode
     );
   };
 
@@ -450,7 +450,7 @@ export function CheckoutClient() {
       billingData.addressLine1 &&
       billingData.city &&
       billingData.state &&
-      billingData.postalCode
+      billingData.postcode
     );
   };
 
@@ -467,7 +467,7 @@ export function CheckoutClient() {
         />
 
         {/* Header */}
-        <div className="mb-8 mt-6">
+        <div className="mt-6 mb-8">
           <div className="mb-4 flex items-center gap-4">
             <Button variant="ghost" size="sm" asChild>
               <Link href="/cart" className="flex items-center gap-2">
@@ -601,7 +601,7 @@ export function CheckoutClient() {
                               </div>
                               <div className="text-muted-foreground text-sm">
                                 {address.city}, {address.state}{" "}
-                                {address.postalCode}
+                                {address.postcode}
                               </div>
                               {address.isDefault && (
                                 <Badge variant="secondary" className="mt-1">
@@ -734,15 +734,15 @@ export function CheckoutClient() {
                         </Select>
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="shippingPostalCode">Postal Code</Label>
+                        <Label htmlFor="shippingPostcode">Postcode</Label>
                         <Input
-                          id="shippingPostalCode"
+                          id="shippingPostcode"
                           placeholder="2000"
-                          value={shippingData.postalCode}
+                          value={shippingData.postcode}
                           onChange={(e) =>
                             setShippingData({
                               ...shippingData,
-                              postalCode: e.target.value,
+                              postcode: e.target.value,
                             })
                           }
                         />
@@ -867,7 +867,7 @@ export function CheckoutClient() {
                                   </div>
                                   <div className="text-muted-foreground text-sm">
                                     {address.city}, {address.state}{" "}
-                                    {address.postalCode}
+                                    {address.postcode}
                                   </div>
                                   {address.isDefault && (
                                     <Badge variant="secondary" className="mt-1">
@@ -1007,17 +1007,15 @@ export function CheckoutClient() {
                             </Select>
                           </div>
                           <div className="space-y-2">
-                            <Label htmlFor="billingPostalCode">
-                              Postal Code
-                            </Label>
+                            <Label htmlFor="billingPostcode">Postcode</Label>
                             <Input
-                              id="billingPostalCode"
+                              id="billingPostcode"
                               placeholder="2000"
-                              value={billingData.postalCode}
+                              value={billingData.postcode}
                               onChange={(e) =>
                                 setBillingData({
                                   ...billingData,
-                                  postalCode: e.target.value,
+                                  postcode: e.target.value,
                                 })
                               }
                             />

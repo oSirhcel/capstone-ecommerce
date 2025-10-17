@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useMemo } from "react";
+import { useMemo } from "react";
 import { OrderHeader } from "@/components/admin/orders/order-header";
 import { OrderItems } from "@/components/admin/orders/order-items";
 import { OrderCustomer } from "@/components/admin/orders/order-customer";
@@ -77,7 +77,7 @@ export default function OrderViewPageClient({ orderId }: { orderId: string }) {
         street: addr?.addressLine1 ?? "",
         city: addr?.city ?? "",
         state: addr?.state ?? "",
-        zip: addr?.postalCode ?? "",
+        zip: addr?.postcode ?? "",
         country: addr?.country ?? "",
       },
     };
@@ -106,7 +106,7 @@ export default function OrderViewPageClient({ orderId }: { orderId: string }) {
         street: billingAddr?.addressLine1 ?? "",
         city: billingAddr?.city ?? "",
         state: billingAddr?.state ?? "",
-        zip: billingAddr?.postalCode ?? "",
+        zip: billingAddr?.postcode ?? "",
         country: billingAddr?.country ?? "",
       },
     };

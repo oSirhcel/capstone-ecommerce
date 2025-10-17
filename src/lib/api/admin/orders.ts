@@ -62,7 +62,7 @@ export const orderCreateSchema = z.object({
       addressLine2: z.string().optional(),
       city: z.string().min(1),
       state: z.string().min(1),
-      postalCode: z.string().min(1),
+      postcode: z.string().min(1),
       country: z.string().min(1),
     })
     .optional(),
@@ -88,7 +88,7 @@ export const orderEditSchema = z.object({
     addressLine2: z.string().optional(),
     city: z.string().min(1),
     state: z.string().min(1),
-    postalCode: z.string().min(1),
+    postcode: z.string().min(1),
     country: z.string().min(1),
   }),
 });
@@ -135,7 +135,7 @@ export interface OrderDetail {
     addressLine2?: string | null;
     city: string;
     state: string;
-    postalCode: string;
+    postcode: string;
     country: string;
     createdAt: string;
   }>;

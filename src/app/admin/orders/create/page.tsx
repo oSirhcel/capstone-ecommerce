@@ -41,7 +41,7 @@ export type ShippingAddress = {
   address2?: string;
   city: string;
   state: string;
-  zipCode: string;
+  postcode: string;
   country: string;
   phone?: string;
 };
@@ -83,7 +83,7 @@ const orderFormSchema = z.object({
     address2: z.string().optional(),
     city: z.string().min(1, "City is required"),
     state: z.string().min(1, "State is required"),
-    zipCode: z.string().min(1, "ZIP code is required"),
+    postcode: z.string().min(1, "Postcode is required"),
     country: z.string().min(1, "Country is required"),
     phone: z.string().optional(),
   }),
@@ -117,8 +117,8 @@ export default function CreateOrderPage() {
         address2: "",
         city: "",
         state: "",
-        zipCode: "",
-        country: "US",
+        postcode: "",
+        country: "AU",
         phone: "",
       },
       paymentData: {
@@ -139,7 +139,7 @@ export default function CreateOrderPage() {
     0,
   );
   const shipping = subtotal > 100 ? 0 : 9.99;
-  const tax = subtotal * 0.08;
+  const tax = subtotal * 0.1; // 10% GST for Australia
   const total = subtotal + shipping + tax;
 
   const onSubmit = async (data: OrderFormValues) => {
@@ -161,7 +161,7 @@ export default function CreateOrderPage() {
           addressLine2?: string;
           city: string;
           state: string;
-          postalCode: string;
+          postcode: string;
           country: string;
         };
         notes?: string;
@@ -188,7 +188,7 @@ export default function CreateOrderPage() {
           addressLine2: data.shippingAddress.address2 ?? undefined,
           city: data.shippingAddress.city,
           state: data.shippingAddress.state,
-          postalCode: data.shippingAddress.zipCode,
+          postcode: data.shippingAddress.postcode,
           country: data.shippingAddress.country,
         };
       }

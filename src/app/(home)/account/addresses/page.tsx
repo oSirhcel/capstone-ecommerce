@@ -24,11 +24,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Form, FormControl, FormField } from "@/components/ui/form";
-import {
-  Field,
-  FieldGroup,
-  FieldLabel,
-} from "@/components/ui/field";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import {
   Plus,
   MoreVertical,
@@ -63,7 +59,7 @@ const addressFormSchema = z.object({
   addressLine2: z.string().optional(),
   city: z.string().min(1, "City is required"),
   state: z.string().min(1, "State is required"),
-  postalCode: z.string().min(2, "Postcode is required"),
+  postcode: z.string().min(2, "Postcode is required"),
   country: z.string().min(2, "Country is required"),
   isDefault: z.boolean().default(false),
 });
@@ -91,7 +87,7 @@ export default function AddressesPage() {
       addressLine2: "",
       city: "",
       state: "",
-      postalCode: "",
+      postcode: "",
       country: "AU",
       isDefault: false,
     },
@@ -113,7 +109,7 @@ export default function AddressesPage() {
       addressLine2: "",
       city: "",
       state: "",
-      postalCode: "",
+      postcode: "",
       country: "AU",
       isDefault: false,
     });
@@ -130,7 +126,7 @@ export default function AddressesPage() {
       addressLine2: address.addressLine2 ?? "",
       city: address.city,
       state: address.state,
-      postalCode: address.postalCode,
+      postcode: address.postcode,
       country: address.country,
       isDefault: address.isDefault,
     });
@@ -233,7 +229,7 @@ export default function AddressesPage() {
                 <p>{address.addressLine1}</p>
                 {address.addressLine2 && <p>{address.addressLine2}</p>}
                 <p>
-                  {address.city}, {address.state} {address.postalCode}
+                  {address.city}, {address.state} {address.postcode}
                 </p>
                 <p>{address.country}</p>
               </div>
@@ -489,13 +485,13 @@ export default function AddressesPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
-                    name="postalCode"
+                    name="postcode"
                     render={({ field, fieldState }) => (
                       <Field data-invalid={!!fieldState.error}>
-                        <FieldLabel htmlFor="postalCode">Postcode</FieldLabel>
+                        <FieldLabel htmlFor="postcode">Postcode</FieldLabel>
                         <FormControl>
                           <Input
-                            id="postalCode"
+                            id="postcode"
                             {...field}
                             aria-invalid={!!fieldState.error}
                           />

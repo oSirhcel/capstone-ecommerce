@@ -10,7 +10,7 @@ export function CartSummary() {
 
   // Calculate shipping, tax, and total
   const shipping = subtotal > 50 ? 0 : 5.99;
-  const tax = subtotal * 0.08;
+  const tax = subtotal * 0.1; // 10% GST for Australia
   const total = subtotal + shipping + tax;
 
   return (

@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
       addressLine2: z.string().optional().nullable(),
       city: z.string().min(1),
       state: z.string().min(1),
-      postalCode: z.string().min(1),
+      postcode: z.string().min(1),
       country: z.string().min(1),
       isDefault: z.boolean().optional(),
     });
@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
       addressLine2,
       city,
       state,
-      postalCode,
+      postcode,
       country,
       isDefault,
     } = createParsed.data;
@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
         addressLine2: addressLine2 ?? null,
         city,
         state,
-        postalCode,
+        postcode,
         country,
         isDefault: isDefault ?? false,
       })
@@ -136,7 +136,7 @@ export async function PUT(request: NextRequest) {
       addressLine2: z.string().optional().nullable(),
       city: z.string().min(1).optional(),
       state: z.string().min(1).optional(),
-      postalCode: z.string().min(1).optional(),
+      postcode: z.string().min(1).optional(),
       country: z.string().min(1).optional(),
       isDefault: z.boolean().optional(),
     });
@@ -160,7 +160,7 @@ export async function PUT(request: NextRequest) {
       addressLine2,
       city,
       state,
-      postalCode,
+      postcode,
       country,
       isDefault,
     } = updateParsed.data;
@@ -206,7 +206,7 @@ export async function PUT(request: NextRequest) {
         ...(addressLine2 !== undefined && { addressLine2 }),
         ...(city && { city }),
         ...(state && { state }),
-        ...(postalCode && { postalCode }),
+        ...(postcode && { postcode }),
         ...(country && { country }),
         ...(isDefault !== undefined && { isDefault }),
       })

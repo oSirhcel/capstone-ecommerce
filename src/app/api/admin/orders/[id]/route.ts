@@ -35,7 +35,7 @@ const orderUpdateSchema = z.object({
       addressLine2: z.string().optional(),
       city: z.string().min(1),
       state: z.string().min(1),
-      postalCode: z.string().min(1),
+      postcode: z.string().min(1),
       country: z.string().min(1),
     })
     .optional(),
@@ -119,7 +119,7 @@ export async function GET(
         addressLine2: orderAddresses.addressLine2,
         city: orderAddresses.city,
         state: orderAddresses.state,
-        postalCode: orderAddresses.postalCode,
+        postcode: orderAddresses.postcode,
         country: orderAddresses.country,
         createdAt: orderAddresses.createdAt,
       })
@@ -281,7 +281,7 @@ export async function PATCH(
               addressLine2: newShippingAddress.addressLine2 ?? null,
               city: newShippingAddress.city,
               state: newShippingAddress.state,
-              postalCode: newShippingAddress.postalCode,
+              postcode: newShippingAddress.postcode,
               country: newShippingAddress.country,
             })
             .where(eq(orderAddresses.id, existingAddress.id));
@@ -295,7 +295,7 @@ export async function PATCH(
             addressLine2: newShippingAddress.addressLine2 ?? null,
             city: newShippingAddress.city,
             state: newShippingAddress.state,
-            postalCode: newShippingAddress.postalCode,
+            postcode: newShippingAddress.postcode,
             country: newShippingAddress.country,
           });
         }
@@ -349,7 +349,7 @@ export async function PATCH(
           addressLine2: orderAddresses.addressLine2,
           city: orderAddresses.city,
           state: orderAddresses.state,
-          postalCode: orderAddresses.postalCode,
+          postcode: orderAddresses.postcode,
           country: orderAddresses.country,
           createdAt: orderAddresses.createdAt,
         })

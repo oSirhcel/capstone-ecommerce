@@ -663,7 +663,7 @@ async function main() {
         addressLine2: "Unit 7",
         city: "Sydney",
         state: "NSW",
-        postalCode: "2000",
+        postcode: "2000",
         country: "AU",
         isDefault: true,
       },
@@ -675,7 +675,7 @@ async function main() {
         addressLine1: "156 Collins Street",
         city: "Melbourne",
         state: "VIC",
-        postalCode: "3000",
+        postcode: "3000",
         country: "AU",
         isDefault: true,
       },
@@ -688,19 +688,19 @@ async function main() {
       {
         userId: customer1.id,
         storeId: alphaStore.id,
-        status: "completed",
+        status: "Completed",
         totalAmount: cents(119.49), // Wireless Earbuds Pro + USB-C Charger
       },
       {
         userId: customer1.id,
         storeId: alphaStore.id,
-        status: "completed",
+        status: "Completed",
         totalAmount: cents(39.5), // USB-C Fast Charger
       },
       {
         userId: customer2.id,
         storeId: alphaStore.id,
-        status: "processing",
+        status: "Processing",
         totalAmount: cents(59.99), // Portable Bluetooth Speaker
       },
     ];

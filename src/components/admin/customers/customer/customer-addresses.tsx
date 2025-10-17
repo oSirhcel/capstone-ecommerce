@@ -110,7 +110,7 @@ export function CustomerAddresses({ customerId, storeId }: Props) {
           addressLine2: selectedAddress.addressLine2 ?? undefined,
           city: selectedAddress.city,
           state: selectedAddress.state,
-          postalCode: selectedAddress.postalCode,
+          postcode: selectedAddress.postcode,
           country: selectedAddress.country,
           isDefault: selectedAddress.isDefault,
         }
@@ -221,7 +221,7 @@ export function CustomerAddresses({ customerId, storeId }: Props) {
                           </p>
                         )}
                         <p className="text-muted-foreground">
-                          {address.city}, {address.state} {address.postalCode}
+                          {address.city}, {address.state} {address.postcode}
                         </p>
                         <p className="text-muted-foreground">
                           {address.country}

@@ -9,7 +9,7 @@ import {
   getOrGenerateJustification,
   generateAndSaveJustification,
   getRiskAssessment,
-} from "@/lib/api/risk-justification";
+} from "@/lib/api/risk-justification-server";
 
 /**
  * GET /api/risk-assessment/[id]/justification

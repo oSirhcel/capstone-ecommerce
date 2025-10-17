@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getRiskAssessment, getOrGenerateJustification } from "@/lib/api/risk-justification";
+import { getRiskAssessment } from "@/lib/api/risk-justification-server";
 
 export async function GET(
   request: NextRequest,

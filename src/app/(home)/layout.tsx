@@ -7,7 +7,6 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 
 import Image from "next/image";
 import Link from "next/link";
@@ -273,7 +272,7 @@ const Footer = () => {
         </div>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-muted-foreground text-xs">
-            © 2025 MarketHub. All rights reserved.
+            © 2025 Buyio. All rights reserved.
           </p>
           <div className="flex gap-4">
             <Link

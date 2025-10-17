@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/server/db";
 import { orderItems, products, cartItems, carts, zeroTrustAssessments, users, stores, orders } from "@/server/db/schema";
 import { eq, and, sql } from "drizzle-orm";
-import { generateJustificationBackground } from "@/lib/api/risk-justification";
+import { generateJustificationBackground } from "@/lib/api/risk-justification-server";
 
 export type RiskDecision = "allow" | "deny" | "warn";
 

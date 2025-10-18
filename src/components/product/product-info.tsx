@@ -74,10 +74,7 @@ export function ProductInfo({ product }: ProductInfoProps) {
       quantity: quantity,
       storeId: product.store?.id ?? "unknown",
       storeName: product.store?.name ?? "Unknown Store",
-    });
-
-    toast.success("Added to cart", {
-      description: `${quantity} × ${product.name} has been added to your cart.`,
+      stock: product.stock,
     });
   };
 

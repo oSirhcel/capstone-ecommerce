@@ -56,13 +56,16 @@ export async function POST(request: NextRequest) {
     });
 
     const parsed = CreateOrderSchema.safeParse(await request.json());
+
     if (!parsed.success) {
       return NextResponse.json(
-        { error: "Validation error", details: parsed.error.flatten() },
+        { error: "Validation error", details: z.treeifyError(parsed.error) },
         { status: 400 },
       );
     }
     const body = parsed.data;
+
+    console.log(body);
 
     const {
       items,

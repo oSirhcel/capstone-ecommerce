@@ -143,6 +143,7 @@ export const reviews = pgTable("reviews", {
     .notNull(),
   rating: integer().notNull(),
   comment: varchar({ length: 1000 }),
+  verifiedPurchase: boolean().notNull().default(false),
   createdAt: timestamp().defaultNow().notNull(),
 });
 
@@ -400,7 +401,11 @@ export const storeSettings = pgTable("store_settings", {
     .notNull()
     .unique(),
   currency: varchar({ length: 3 }).notNull().default("AUD"),
-  taxRate: decimal({ precision: 5, scale: 4 }).notNull().default("0.00"), // Tax rate as decimal
+  taxRate: decimal({ precision: 5, scale: 4 }).notNull().default("0.10"), // Tax rate as decimal (10% GST)
+  abn: varchar({ length: 11 }), // Australian Business Number
+  businessName: varchar({ length: 255 }),
+  contactEmail: varchar({ length: 255 }),
+  gstRegistered: boolean().notNull().default(false),
   shippingPolicy: text(),
   returnPolicy: text(),
   privacyPolicy: text(),

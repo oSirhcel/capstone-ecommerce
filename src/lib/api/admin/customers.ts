@@ -132,8 +132,6 @@ export async function fetchCustomers(params?: {
 
   const response = await fetch(`/api/admin/customers?${searchParams}`);
 
-  console.log("Response", response);
-
   if (!response.ok) {
     const error = (await response.json()) as { error?: string };
     throw new Error(error.error ?? "Failed to fetch customers");

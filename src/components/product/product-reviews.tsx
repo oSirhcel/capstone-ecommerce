@@ -1,116 +1,208 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { Star, ThumbsDown, ThumbsUp } from "lucide-react"
+import { useState } from "react";
+import { Star, ThumbsDown, ThumbsUp, Edit, Trash2 } from "lucide-react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Skeleton } from "@/components/ui/skeleton";
 
-// Mock reviews data
-const mockReviews = [
-  {
-    id: "1",
-    author: "Sarah Johnson",
-    avatar: "/placeholder.svg?height=40&width=40",
-    rating: 5,
-    date: "2023-10-15",
-    title: "Absolutely love this mug!",
-    content:
-      "This mug is exactly what I was looking for. The quality is excellent, and it keeps my coffee hot for a long time. The design is beautiful, and it feels great in my hand. Highly recommend!",
-    helpful: 12,
-    notHelpful: 2,
-  },
-  {
-    id: "2",
-    author: "Michael Chen",
-    avatar: "/placeholder.svg?height=40&width=40",
-    rating: 4,
-    date: "2023-09-28",
-    title: "Great quality, but smaller than expected",
-    content:
-      "The mug is beautifully crafted and feels very sturdy. My only complaint is that it's a bit smaller than I expected. Still, it's perfect for my morning espresso. The glaze is gorgeous and has held up well in the dishwasher.",
-    helpful: 8,
-    notHelpful: 1,
-  },
-  {
-    id: "3",
-    author: "Emily Rodriguez",
-    avatar: "/placeholder.svg?height=40&width=40",
-    rating: 5,
-    date: "2023-11-02",
-    title: "Perfect gift!",
-    content:
-      "I bought this as a gift for my sister, and she absolutely loves it! The craftsmanship is exceptional, and the color is exactly as shown in the photos. Will definitely purchase more for other family members.",
-    helpful: 5,
-    notHelpful: 0,
-  },
-]
+import {
+  useProductReviews,
+  useCanReviewProduct,
+  useSubmitReview,
+  useUpdateReview,
+  useDeleteReview,
+} from "@/hooks/use-product-reviews";
+import type { Review } from "@/lib/api/reviews";
 
-export function ProductReviews() {
-  const [sortBy, setSortBy] = useState("newest")
-  const [reviewsData, setReviewsData] = useState(mockReviews)
+interface ProductReviewsProps {
+  productId: number;
+}
 
-  // Calculate average rating
-  const averageRating = reviewsData.reduce((acc, review) => acc + review.rating, 0) / reviewsData.length
+export function ProductReviews({ productId }: ProductReviewsProps) {
+  const { data: session } = useSession();
+  const router = useRouter();
+  const [sortBy, setSortBy] = useState("newest");
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+  const [isEditingReview, setIsEditingReview] = useState(false);
+  const [editingReviewId, setEditingReviewId] = useState<number | null>(null);
+  const [rating, setRating] = useState(5);
+  const [comment, setComment] = useState("");
 
-  // Rating distribution
-  const ratingCounts = [0, 0, 0, 0, 0]
-  reviewsData.forEach((review) => {
-    ratingCounts[review.rating - 1]++
-  })
+  const {
+    data: reviewsData,
+    isLoading,
+    error,
+  } = useProductReviews(productId, sortBy);
+  const { data: canReviewData, isLoading: canReviewLoading } =
+    useCanReviewProduct(productId);
+  const submitReviewMutation = useSubmitReview();
+  const updateReviewMutation = useUpdateReview();
+  const deleteReviewMutation = useDeleteReview();
 
-  const handleHelpful = (reviewId: string, isHelpful: boolean) => {
-    setReviewsData(
-      reviewsData.map((review) => {
-        if (review.id === reviewId) {
-          if (isHelpful) {
-            return { ...review, helpful: review.helpful + 1 }
-          } else {
-            return { ...review, notHelpful: review.notHelpful + 1 }
-          }
-        }
-        return review
-      }),
-    )
-  }
+  const reviews = reviewsData?.reviews ?? [];
+  const stats = reviewsData?.stats ?? {
+    average: 0,
+    total: 0,
+    distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+  };
 
-  const sortReviews = (reviews: typeof mockReviews) => {
-    switch (sortBy) {
-      case "newest":
-        return [...reviews].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-      case "oldest":
-        return [...reviews].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-      case "highest":
-        return [...reviews].sort((a, b) => b.rating - a.rating)
-      case "lowest":
-        return [...reviews].sort((a, b) => a.rating - b.rating)
-      case "mostHelpful":
-        return [...reviews].sort((a, b) => b.helpful - a.helpful)
-      default:
-        return reviews
+  const handleSubmitReview = async () => {
+    if (!session?.user) {
+      const callbackUrl =
+        typeof window !== "undefined"
+          ? encodeURIComponent(window.location.href)
+          : "/";
+      router.push(`/auth/signin?callbackUrl=${callbackUrl}`);
+      return;
     }
+
+    if (!canReviewData?.canReview) {
+      toast.error(canReviewData?.reason ?? "You cannot review this product");
+      return;
+    }
+
+    try {
+      await submitReviewMutation.mutateAsync({
+        productId,
+        rating,
+        comment: comment.trim() || undefined,
+      });
+
+      toast.success("Review submitted successfully!");
+      setRating(5);
+      setComment("");
+      setIsSubmittingReview(false);
+    } catch (error) {
+      toast.error("Failed to submit review");
+    }
+  };
+
+  const handleEditReview = async (
+    reviewId: number,
+    currentRating: number,
+    currentComment: string,
+  ) => {
+    setEditingReviewId(reviewId);
+    setRating(currentRating);
+    setComment(currentComment || "");
+    setIsEditingReview(true);
+  };
+
+  const handleUpdateReview = async () => {
+    if (!editingReviewId) return;
+
+    try {
+      await updateReviewMutation.mutateAsync({
+        reviewId: editingReviewId,
+        rating,
+        comment: comment.trim() || undefined,
+      });
+
+      toast.success("Review updated successfully!");
+      setIsEditingReview(false);
+      setEditingReviewId(null);
+      setRating(5);
+      setComment("");
+    } catch (error) {
+      toast.error("Failed to update review");
+    }
+  };
+
+  const handleDeleteReview = async (reviewId: number) => {
+    if (!confirm("Are you sure you want to delete this review?")) return;
+
+    try {
+      await deleteReviewMutation.mutateAsync(reviewId);
+      toast.success("Review deleted successfully!");
+    } catch (error) {
+      toast.error("Failed to delete review");
+    }
+  };
+
+  const renderStars = (
+    rating: number,
+    interactive = false,
+    onRatingChange?: (rating: number) => void,
+  ) => {
+    return [...Array(5).keys()].map((i) => (
+      <Star
+        key={i}
+        className={`h-5 w-5 ${
+          i < rating ? "fill-primary text-primary" : "text-muted-foreground"
+        } ${interactive ? "hover:text-primary cursor-pointer" : ""}`}
+        onClick={
+          interactive && onRatingChange
+            ? () => onRatingChange(i + 1)
+            : undefined
+        }
+      />
+    ));
+  };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-8">
+        <div className="grid gap-8 md:grid-cols-[1fr_2fr]">
+          <div className="space-y-4 rounded-lg border p-4">
+            <Skeleton className="h-16 w-full" />
+            <Skeleton className="h-32 w-full" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+          <div className="space-y-6">
+            <Skeleton className="h-6 w-48" />
+            <div className="space-y-4">
+              {[...Array(3).keys()].map((i) => (
+                <Skeleton key={i} className="h-24 w-full" />
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
-  const sortedReviews = sortReviews(reviewsData)
+  if (error) {
+    return (
+      <div className="space-y-8">
+        <div className="text-center text-red-600">
+          <p>Failed to load reviews. Please try again later.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
       <div className="grid gap-8 md:grid-cols-[1fr_2fr]">
         <div className="space-y-4 rounded-lg border p-4">
           <div className="text-center">
-            <div className="text-4xl font-bold">{averageRating.toFixed(1)}</div>
+            <div className="text-4xl font-bold">{stats.average.toFixed(1)}</div>
             <div className="flex justify-center">
-              {[...Array(5)].map((_, i) => (
-                <Star
-                  key={i}
-                  className={`h-5 w-5 ${
-                    i < Math.round(averageRating) ? "fill-primary text-primary" : "text-muted-foreground"
-                  }`}
-                />
-              ))}
+              {renderStars(Math.round(stats.average))}
             </div>
-            <div className="mt-1 text-sm text-muted-foreground">Based on {reviewsData.length} reviews</div>
+            <div className="text-muted-foreground mt-1 text-sm">
+              Based on {stats.total} reviews
+            </div>
           </div>
 
           <div className="space-y-2">
@@ -118,22 +210,94 @@ export function ProductReviews() {
               <div key={rating} className="flex items-center gap-2">
                 <div className="flex w-20 items-center">
                   <span className="mr-1">{rating}</span>
-                  <Star className="h-4 w-4 fill-primary text-primary" />
+                  <Star className="fill-primary text-primary h-4 w-4" />
                 </div>
-                <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+                <div className="bg-muted h-2 flex-1 overflow-hidden rounded-full">
                   <div
-                    className="h-full bg-primary"
+                    className="bg-primary h-full"
                     style={{
-                      width: `${reviewsData.length > 0 ? (ratingCounts[rating - 1] / reviewsData.length) * 100 : 0}%`,
+                      width: `${stats.total > 0 ? (stats.distribution[rating as keyof typeof stats.distribution] / stats.total) * 100 : 0}%`,
                     }}
                   ></div>
                 </div>
-                <div className="w-10 text-right text-sm text-muted-foreground">{ratingCounts[rating - 1]}</div>
+                <div className="text-muted-foreground w-10 text-right text-sm">
+                  {
+                    stats.distribution[
+                      rating as keyof typeof stats.distribution
+                    ]
+                  }
+                </div>
               </div>
             ))}
           </div>
 
-          <Button className="w-full">Write a Review</Button>
+          <Dialog
+            open={isSubmittingReview}
+            onOpenChange={setIsSubmittingReview}
+          >
+            <DialogTrigger asChild>
+              <Button
+                className="w-full"
+                disabled={canReviewLoading || !canReviewData?.canReview}
+              >
+                {canReviewLoading
+                  ? "Checking..."
+                  : !canReviewData?.canReview
+                    ? "Purchase Required to Review"
+                    : "Write a Review"}
+              </Button>
+            </DialogTrigger>
+            {!canReviewLoading && !canReviewData?.canReview && (
+              <p className="text-muted-foreground mt-2 text-center text-sm">
+                {canReviewData?.reason ??
+                  "You must purchase this product to review it"}
+              </p>
+            )}
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Write a Review</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium">Rating</label>
+                  <div className="mt-1 flex gap-1">
+                    {renderStars(rating, true, setRating)}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">
+                    Comment (optional)
+                  </label>
+                  <Textarea
+                    placeholder="Share your thoughts about this product..."
+                    value={comment}
+                    onChange={(e) => setComment(e.target.value)}
+                    maxLength={1000}
+                    className="mt-1"
+                  />
+                  <div className="text-muted-foreground mt-1 text-xs">
+                    {comment.length}/1000 characters
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsSubmittingReview(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleSubmitReview}
+                    disabled={submitReviewMutation.isPending}
+                  >
+                    {submitReviewMutation.isPending
+                      ? "Submitting..."
+                      : "Submit Review"}
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
 
         <div className="space-y-6">
@@ -148,58 +312,128 @@ export function ProductReviews() {
                 <SelectItem value="oldest">Oldest</SelectItem>
                 <SelectItem value="highest">Highest Rating</SelectItem>
                 <SelectItem value="lowest">Lowest Rating</SelectItem>
-                <SelectItem value="mostHelpful">Most Helpful</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           <div className="space-y-6">
-            {sortedReviews.map((review) => (
-              <div key={review.id} className="space-y-2 border-b pb-6 last:border-0">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Avatar>
-                      <AvatarImage src={review.avatar || "/placeholder.svg"} alt={review.author} />
-                      <AvatarFallback>{review.author.charAt(0)}</AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <div className="font-medium">{review.author}</div>
-                      <div className="text-xs text-muted-foreground">{new Date(review.date).toLocaleDateString()}</div>
+            {reviews.length === 0 ? (
+              <div className="text-muted-foreground py-8 text-center">
+                No reviews yet. Be the first to review this product!
+              </div>
+            ) : (
+              reviews.map((review: Review) => (
+                <div
+                  key={review.id}
+                  className="space-y-2 border-b pb-6 last:border-0"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Avatar>
+                        <AvatarImage
+                          src="/placeholder.svg"
+                          alt={review.user.name}
+                        />
+                        <AvatarFallback>
+                          {review.user.name.charAt(0)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <div className="font-medium">{review.user.name}</div>
+                        <div className="text-muted-foreground text-xs">
+                          {new Date(review.createdAt).toLocaleDateString()}
+                          <span className="ml-2 text-green-600">
+                            ✓ Verified Purchase
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="flex">{renderStars(review.rating)}</div>
+                      {session?.user?.id === review.userId && (
+                        <div className="flex gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              handleEditReview(
+                                review.id,
+                                review.rating,
+                                review.comment ?? "",
+                              )
+                            }
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteReview(review.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   </div>
-                  <div className="flex">
-                    {[...Array(5)].map((_, i) => (
-                      <Star
-                        key={i}
-                        className={`h-4 w-4 ${
-                          i < review.rating ? "fill-primary text-primary" : "text-muted-foreground"
-                        }`}
-                      />
-                    ))}
-                  </div>
-                </div>
 
-                <div>
-                  <h4 className="font-medium">{review.title}</h4>
-                  <p className="mt-1 text-muted-foreground">{review.content}</p>
+                  {review.comment && (
+                    <div>
+                      <p className="text-muted-foreground">{review.comment}</p>
+                    </div>
+                  )}
                 </div>
-
-                <div className="flex items-center gap-4 pt-2">
-                  <div className="text-sm text-muted-foreground">Was this review helpful?</div>
-                  <button className="flex items-center gap-1 text-sm" onClick={() => handleHelpful(review.id, true)}>
-                    <ThumbsUp className="h-4 w-4" />
-                    <span>{review.helpful}</span>
-                  </button>
-                  <button className="flex items-center gap-1 text-sm" onClick={() => handleHelpful(review.id, false)}>
-                    <ThumbsDown className="h-4 w-4" />
-                    <span>{review.notHelpful}</span>
-                  </button>
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
       </div>
+
+      {/* Edit Review Dialog */}
+      <Dialog open={isEditingReview} onOpenChange={setIsEditingReview}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Review</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">Rating</label>
+              <div className="mt-1 flex gap-1">
+                {renderStars(rating, true, setRating)}
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium">Comment (optional)</label>
+              <Textarea
+                placeholder="Share your thoughts about this product..."
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                maxLength={1000}
+                className="mt-1"
+              />
+              <div className="text-muted-foreground mt-1 text-xs">
+                {comment.length}/1000 characters
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setIsEditingReview(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleUpdateReview}
+                disabled={updateReviewMutation.isPending}
+              >
+                {updateReviewMutation.isPending
+                  ? "Updating..."
+                  : "Update Review"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
-  )
+  );
 }

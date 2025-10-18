@@ -42,8 +42,6 @@ export async function GET(request: NextRequest) {
       .from(stores)
       .where(eq(stores.id, query.storeId));
 
-    console.log("Store", store);
-
     if (!store) {
       return NextResponse.json({ error: "Store not found" }, { status: 404 });
     }
@@ -124,8 +122,6 @@ export async function GET(request: NextRequest) {
 
     // Get paginated results
     const customers = await sortedQuery.limit(query.limit).offset(offset);
-
-    console.log("Customers", customers);
 
     // Get total count for pagination (only customers who ordered from this store)
     const [{ total }] = await db

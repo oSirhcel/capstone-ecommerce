@@ -1154,7 +1154,7 @@ export function CheckoutClient() {
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Tax (8%)</span>
+                    <span>GST (10%)</span>
                     <span>${tax.toFixed(2)}</span>
                   </div>
                 </div>

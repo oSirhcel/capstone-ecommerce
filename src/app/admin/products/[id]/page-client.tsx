@@ -62,9 +62,9 @@ export const ProductPageClient = ({ id }: { id: number }) => {
   const transformedProduct = {
     id: product.id.toString(),
     name: product.name,
-    sku: product.sku,
+    sku: product.sku ?? "",
     description: product.description ?? "",
-    price: product.price ?? 0 / 100, // Convert from cents to dollars
+    price: (product.price ?? 0) / 100, // Convert from cents to dollars
     compareAtPrice: product.compareAtPrice
       ? product.compareAtPrice / 100
       : undefined,

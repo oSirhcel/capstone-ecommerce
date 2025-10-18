@@ -46,7 +46,7 @@ export function CartSummary() {
           <span>{shipping === 0 ? "Free" : `$${shipping.toFixed(2)}`}</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-sm">Tax (8%)</span>
+          <span className="text-sm">GST (10%)</span>
           <span>${tax.toFixed(2)}</span>
         </div>
       </div>

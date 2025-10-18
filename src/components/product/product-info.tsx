@@ -19,7 +19,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { parseAsStringLiteral, useQueryStates } from "nuqs";
-import { toast } from "sonner";
 import { useCart } from "@/contexts/cart-context";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";

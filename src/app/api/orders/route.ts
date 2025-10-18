@@ -57,6 +57,8 @@ export async function POST(request: NextRequest) {
 
     const parsed = CreateOrderSchema.safeParse(await request.json());
 
+    console.log("parsed", parsed);
+
     if (!parsed.success) {
       return NextResponse.json(
         { error: "Validation error", details: z.treeifyError(parsed.error) },
@@ -70,7 +72,6 @@ export async function POST(request: NextRequest) {
     const {
       items,
       totalAmount,
-      contactData,
       storeId,
       shippingAddress: shippingData,
       billingAddress: billingData,

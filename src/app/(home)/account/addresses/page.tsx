@@ -3,9 +3,6 @@
 import type React from "react";
 
 import { useState } from "react";
-import { useForm } from "react-hook-form";
-import * as z from "zod";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -21,10 +18,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Form, FormControl, FormField } from "@/components/ui/form";
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import {
   Plus,
   MoreVertical,
@@ -37,34 +30,18 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   useAddresses,
   useCreateAddress,
   useUpdateAddress,
   useDeleteAddress,
   useSetDefaultAddress,
 } from "@/hooks/use-addresses";
-import type { Address } from "@/lib/api/addresses";
-
-const addressFormSchema = z.object({
-  firstName: z.string().min(1, "First name is required"),
-  lastName: z.string().min(1, "Last name is required"),
-  addressLine1: z.string().min(3, "Address is required"),
-  addressLine2: z.string().optional(),
-  city: z.string().min(1, "City is required"),
-  state: z.string().min(1, "State is required"),
-  postcode: z.string().min(2, "Postcode is required"),
-  country: z.string().min(2, "Country is required"),
-  isDefault: z.boolean().default(false),
-});
-
-type AddressFormData = z.input<typeof addressFormSchema>;
+import { AddressForm } from "@/components/checkout/address-form";
+import type {
+  Address,
+  CreateAddressInput,
+  UpdateAddressInput,
+} from "@/lib/api/addresses";
 
 export default function AddressesPage() {
   const { data, isLoading, error } = useAddresses();
@@ -78,20 +55,6 @@ export default function AddressesPage() {
   const [currentType, setCurrentType] = useState<"shipping" | "billing">(
     "shipping",
   );
-  const form = useForm<AddressFormData>({
-    resolver: zodResolver(addressFormSchema),
-    defaultValues: {
-      firstName: "",
-      lastName: "",
-      addressLine1: "",
-      addressLine2: "",
-      city: "",
-      state: "",
-      postcode: "",
-      country: "AU",
-      isDefault: false,
-    },
-  });
 
   const addresses = data?.addresses ?? [];
   const shippingAddresses = addresses.filter(
@@ -102,34 +65,12 @@ export default function AddressesPage() {
   const handleAddAddress = (type: "shipping" | "billing") => {
     setCurrentType(type);
     setEditingAddress(null);
-    form.reset({
-      firstName: "",
-      lastName: "",
-      addressLine1: "",
-      addressLine2: "",
-      city: "",
-      state: "",
-      postcode: "",
-      country: "AU",
-      isDefault: false,
-    });
     setIsDialogOpen(true);
   };
 
   const handleEditAddress = (address: Address) => {
     setCurrentType(address.type);
     setEditingAddress(address);
-    form.reset({
-      firstName: address.firstName,
-      lastName: address.lastName,
-      addressLine1: address.addressLine1,
-      addressLine2: address.addressLine2 ?? "",
-      city: address.city,
-      state: address.state,
-      postcode: address.postcode,
-      country: address.country,
-      isDefault: address.isDefault,
-    });
     setIsDialogOpen(true);
   };
 
@@ -143,15 +84,25 @@ export default function AddressesPage() {
     setDefaultMutation.mutate({ id, type });
   };
 
-  const onSubmit = async (values: AddressFormData) => {
+  const onSubmit = async (values: {
+    firstName: string;
+    lastName: string;
+    addressLine1: string;
+    addressLine2?: string;
+    city: string;
+    state: string;
+    postcode: string;
+    country: string;
+    isDefault: boolean;
+  }) => {
     if (editingAddress) {
       await updateAddressMutation.mutateAsync(
-        { id: editingAddress.id, ...values },
+        { id: editingAddress.id, ...values } as UpdateAddressInput,
         { onSuccess: () => setIsDialogOpen(false) },
       );
     } else {
       await createAddressMutation.mutateAsync(
-        { type: currentType, ...values },
+        { type: currentType, ...values } as CreateAddressInput,
         { onSuccess: () => setIsDialogOpen(false) },
       );
     }
@@ -324,245 +275,30 @@ export default function AddressesPage() {
                 : `Add ${currentType === "shipping" ? "Shipping" : "Billing"} Address`}
             </DialogTitle>
           </DialogHeader>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)}>
-              <FieldGroup className="gap-4">
-                {/* Validation summary */}
-                {Object.keys(form.formState.errors).length > 0 && (
-                  <div className="border-destructive bg-destructive/10 text-destructive rounded-md border p-3 text-sm">
-                    <span className="font-medium">Missing fields:</span>{" "}
-                    {Object.keys(form.formState.errors)
-                      .map((key) =>
-                        key
-                          .charAt(0)
-                          .toUpperCase()
-                          .concat(
-                            key
-                              .slice(1)
-                              .replace(/([A-Z])/g, " $1")
-                              .trim(),
-                          ),
-                      )
-                      .join(", ")}
-                  </div>
-                )}
-
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="firstName"
-                    render={({ field, fieldState }) => (
-                      <Field data-invalid={!!fieldState.error}>
-                        <FieldLabel htmlFor="firstName">First name</FieldLabel>
-                        <FormControl>
-                          <Input
-                            id="firstName"
-                            {...field}
-                            aria-invalid={!!fieldState.error}
-                          />
-                        </FormControl>
-                      </Field>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="lastName"
-                    render={({ field, fieldState }) => (
-                      <Field data-invalid={!!fieldState.error}>
-                        <FieldLabel htmlFor="lastName">Last name</FieldLabel>
-                        <FormControl>
-                          <Input
-                            id="lastName"
-                            {...field}
-                            aria-invalid={!!fieldState.error}
-                          />
-                        </FormControl>
-                      </Field>
-                    )}
-                  />
-                </div>
-
-                <FormField
-                  control={form.control}
-                  name="addressLine1"
-                  render={({ field, fieldState }) => (
-                    <Field data-invalid={!!fieldState.error}>
-                      <FieldLabel htmlFor="addressLine1">
-                        Address line 1
-                      </FieldLabel>
-                      <FormControl>
-                        <Input
-                          id="addressLine1"
-                          {...field}
-                          aria-invalid={!!fieldState.error}
-                          placeholder="Street address, P.O. box"
-                        />
-                      </FormControl>
-                    </Field>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="addressLine2"
-                  render={({ field, fieldState }) => (
-                    <Field data-invalid={!!fieldState.error}>
-                      <FieldLabel htmlFor="addressLine2">
-                        Address line 2
-                      </FieldLabel>
-                      <FormControl>
-                        <Input
-                          id="addressLine2"
-                          {...field}
-                          aria-invalid={!!fieldState.error}
-                          placeholder="Apartment, suite, unit, building, floor, etc. (optional)"
-                        />
-                      </FormControl>
-                    </Field>
-                  )}
-                />
-
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="city"
-                    render={({ field, fieldState }) => (
-                      <Field data-invalid={!!fieldState.error}>
-                        <FieldLabel htmlFor="city">City</FieldLabel>
-                        <FormControl>
-                          <Input
-                            id="city"
-                            {...field}
-                            aria-invalid={!!fieldState.error}
-                          />
-                        </FormControl>
-                      </Field>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="state"
-                    render={({ field, fieldState }) => (
-                      <Field data-invalid={!!fieldState.error}>
-                        <FieldLabel htmlFor="state">State</FieldLabel>
-                        <FormControl>
-                          <Select
-                            value={field.value}
-                            onValueChange={field.onChange}
-                          >
-                            <SelectTrigger id="state">
-                              <SelectValue placeholder="Select state" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="NSW">
-                                New South Wales
-                              </SelectItem>
-                              <SelectItem value="VIC">Victoria</SelectItem>
-                              <SelectItem value="QLD">Queensland</SelectItem>
-                              <SelectItem value="WA">
-                                Western Australia
-                              </SelectItem>
-                              <SelectItem value="SA">
-                                South Australia
-                              </SelectItem>
-                              <SelectItem value="TAS">Tasmania</SelectItem>
-                              <SelectItem value="ACT">
-                                Australian Capital Territory
-                              </SelectItem>
-                              <SelectItem value="NT">
-                                Northern Territory
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </FormControl>
-                      </Field>
-                    )}
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="postcode"
-                    render={({ field, fieldState }) => (
-                      <Field data-invalid={!!fieldState.error}>
-                        <FieldLabel htmlFor="postcode">Postcode</FieldLabel>
-                        <FormControl>
-                          <Input
-                            id="postcode"
-                            {...field}
-                            aria-invalid={!!fieldState.error}
-                          />
-                        </FormControl>
-                      </Field>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="country"
-                    render={({ field, fieldState }) => (
-                      <Field data-invalid={!!fieldState.error}>
-                        <FieldLabel htmlFor="country">Country</FieldLabel>
-                        <FormControl>
-                          <Input
-                            id="country"
-                            {...field}
-                            aria-invalid={!!fieldState.error}
-                          />
-                        </FormControl>
-                      </Field>
-                    )}
-                  />
-                </div>
-
-                <FormField
-                  control={form.control}
-                  name="isDefault"
-                  render={({ field, fieldState }) => (
-                    <Field
-                      orientation="horizontal"
-                      data-invalid={!!fieldState.error}
-                    >
-                      <FormControl>
-                        <Checkbox
-                          id="isDefault"
-                          checked={field.value}
-                          onCheckedChange={(v) => field.onChange(Boolean(v))}
-                        />
-                      </FormControl>
-                      <FieldLabel htmlFor="isDefault" className="font-normal">
-                        Set as default address
-                      </FieldLabel>
-                    </Field>
-                  )}
-                />
-
-                <Field orientation="horizontal">
-                  <div className="ml-auto flex gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setIsDialogOpen(false)}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      type="submit"
-                      disabled={
-                        createAddressMutation.isPending ||
-                        updateAddressMutation.isPending
-                      }
-                    >
-                      {editingAddress ? "Update Address" : "Add Address"}
-                    </Button>
-                  </div>
-                </Field>
-              </FieldGroup>
-            </form>
-          </Form>
+          <AddressForm
+            type={currentType}
+            onSubmit={onSubmit}
+            onCancel={() => setIsDialogOpen(false)}
+            initialData={
+              editingAddress
+                ? {
+                    firstName: editingAddress.firstName,
+                    lastName: editingAddress.lastName,
+                    addressLine1: editingAddress.addressLine1,
+                    addressLine2: editingAddress.addressLine2 ?? "",
+                    city: editingAddress.city,
+                    state: editingAddress.state,
+                    postcode: editingAddress.postcode,
+                    country: editingAddress.country,
+                    isDefault: editingAddress.isDefault,
+                  }
+                : undefined
+            }
+            submitLabel={editingAddress ? "Update Address" : "Add Address"}
+            isSubmitting={
+              createAddressMutation.isPending || updateAddressMutation.isPending
+            }
+          />
         </DialogContent>
       </Dialog>
     </div>

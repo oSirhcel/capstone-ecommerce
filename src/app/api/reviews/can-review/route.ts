@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/server/db";
 import { orders, orderItems } from "@/server/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 
 type SessionUser = {
   id: string;
@@ -45,6 +45,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Check if user has purchased this product
+    // Allow reviews for orders that have been paid (Processing, Shipped, or Completed)
     const hasPurchased = await db
       .select({ id: orders.id })
       .from(orders)
@@ -53,7 +54,7 @@ export async function GET(request: NextRequest) {
         and(
           eq(orders.userId, user.id),
           eq(orderItems.productId, productIdNum),
-          eq(orders.status, "Completed"),
+          inArray(orders.status, ["Processing", "Shipped", "Completed"]),
         ),
       )
       .limit(1);

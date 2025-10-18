@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -10,13 +9,25 @@ import {
   ShoppingCartIcon,
   StoreIcon,
   SettingsIcon,
-  MenuIcon,
-  XIcon,
   HomeIcon,
   CreditCardIcon,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarRail,
+} from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
+import { useProfileQuery } from "@/hooks/admin/use-profile-query";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const navigation = [
   { name: "Home", href: "/admin", icon: HomeIcon },
@@ -30,82 +41,108 @@ const navigation = [
 ];
 
 export function AdminSidebar() {
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const pathname = usePathname();
+  const { data: profile, isLoading } = useProfileQuery();
 
   return (
-    <>
-      {/* Mobile menu button */}
-      <div className="fixed top-4 left-4 z-50 md:hidden">
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="bg-white shadow-md"
-        >
-          {isMobileMenuOpen ? (
-            <XIcon className="h-4 w-4" />
-          ) : (
-            <MenuIcon className="h-4 w-4" />
-          )}
-        </Button>
-      </div>
-
-      {/* Sidebar */}
-      <div
-        className={cn(
-          "fixed inset-y-0 left-0 z-40 w-64 transform border-r bg-white transition-transform duration-300 ease-in-out md:relative md:translate-x-0",
-          isMobileMenuOpen ? "translate-x-0" : "-translate-x-full",
-        )}
-      >
-        <div className="flex h-full flex-col">
-          {/* Navigation */}
-          <nav className="flex-1 space-y-1 px-3 py-4">
-            {navigation.map((item) => {
-              const isActive = pathname === item.href;
-              return (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                    isActive
-                      ? "bg-primary text-primary-foreground"
-                      : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700",
-                  )}
-                >
-                  <item.icon className="h-5 w-5" />
-                  {item.name}
-                </Link>
-              );
-            })}
-          </nav>
-
-          {/* User info */}
-          <div className="border-t p-4">
-            <div className="flex items-center gap-3">
-              <div className="h-8 w-8 rounded-full bg-gray-300"></div>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-gray-900 dark:text-white">
-                  Admin User
-                </p>
-                <p className="truncate text-xs text-gray-500 dark:text-gray-400">
-                  admin@markethub.com
-                </p>
+    <Sidebar collapsible="icon">
+      <SidebarHeader>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            {isLoading ? (
+              <div className="flex items-center gap-2 rounded-lg p-2">
+                <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
+                  <StoreIcon className="size-4" />
+                </div>
+                <div className="flex flex-1 flex-col gap-1">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-3 w-20" />
+                </div>
               </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Mobile overlay */}
-      {isMobileMenuOpen && (
-        <div
-          className="bg-opacity-50 fixed inset-0 z-30 bg-black md:hidden"
-          onClick={() => setIsMobileMenuOpen(false)}
-        />
-      )}
-    </>
+            ) : (
+              <SidebarMenuButton size="lg" asChild>
+                <Link href="/admin">
+                  <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
+                    <StoreIcon className="size-4" />
+                  </div>
+                  <div className="grid flex-1 text-left text-sm leading-tight">
+                    <span className="truncate font-semibold">
+                      {profile?.store?.name ?? "No Store"}
+                    </span>
+                    <span className="truncate text-xs">Admin Panel</span>
+                  </div>
+                </Link>
+              </SidebarMenuButton>
+            )}
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarHeader>
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupLabel>Navigation</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {navigation.map((item) => {
+                // Check if current route or child route is active
+                const isActive =
+                  item.href === "/admin"
+                    ? pathname === "/admin"
+                    : pathname.startsWith(item.href);
+                return (
+                  <SidebarMenuItem key={item.name}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={isActive}
+                      tooltip={item.name}
+                      className={cn(
+                        isActive &&
+                          "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground border-primary-foreground/30",
+                      )}
+                    >
+                      <Link href={item.href}>
+                        <item.icon />
+                        <span>{item.name}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
+      <SidebarFooter>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            {isLoading ? (
+              <div className="flex items-center gap-2 rounded-lg p-2">
+                <Skeleton className="size-8 rounded-full" />
+                <div className="flex flex-1 flex-col gap-1">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-3 w-32" />
+                </div>
+              </div>
+            ) : (
+              <SidebarMenuButton size="lg">
+                <div className="bg-sidebar-primary text-sidebar-primary-foreground flex size-8 items-center justify-center rounded-full">
+                  <span className="text-sm font-semibold">
+                    {profile?.user?.username?.[0]?.toUpperCase() ?? "A"}
+                  </span>
+                </div>
+                <div className="grid flex-1 text-left text-sm leading-tight">
+                  <span className="truncate font-semibold">
+                    {profile?.user?.username ?? "Admin User"}
+                  </span>
+                  <span className="truncate text-xs">
+                    {profile?.user?.email ?? "admin@example.com"}
+                  </span>
+                </div>
+              </SidebarMenuButton>
+            )}
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
+      <SidebarRail />
+    </Sidebar>
   );
 }

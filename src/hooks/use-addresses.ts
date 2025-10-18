@@ -5,9 +5,6 @@ import {
   updateAddress,
   deleteAddress,
   setDefaultAddress,
-  type AddressDTO,
-  type CreateAddressInput,
-  type UpdateAddressInput,
 } from "@/lib/api/addresses";
 import { toast } from "sonner";
 
@@ -24,7 +21,7 @@ export function useCreateAddress() {
   return useMutation({
     mutationFn: createAddress,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["addresses"] });
+      void queryClient.invalidateQueries({ queryKey: ["addresses"] });
       toast.success("Address added successfully");
     },
     onError: (error: Error) => {
@@ -41,7 +38,7 @@ export function useUpdateAddress() {
   return useMutation({
     mutationFn: updateAddress,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["addresses"] });
+      void queryClient.invalidateQueries({ queryKey: ["addresses"] });
       toast.success("Address updated successfully");
     },
     onError: (error: Error) => {
@@ -58,7 +55,7 @@ export function useDeleteAddress() {
   return useMutation({
     mutationFn: deleteAddress,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["addresses"] });
+      void queryClient.invalidateQueries({ queryKey: ["addresses"] });
       toast.success("Address deleted successfully");
     },
     onError: (error: Error) => {
@@ -76,7 +73,7 @@ export function useSetDefaultAddress() {
     mutationFn: ({ id, type }: { id: number; type: "shipping" | "billing" }) =>
       setDefaultAddress(id, type),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["addresses"] });
+      void queryClient.invalidateQueries({ queryKey: ["addresses"] });
       toast.success("Default address updated");
     },
     onError: (error: Error) => {
@@ -90,9 +87,9 @@ export function useSetDefaultAddress() {
 // Helper function to get addresses by type
 export function useAddressesByType(type: "shipping" | "billing") {
   const { data, ...rest } = useAddresses();
-  
-  const addresses = data?.addresses.filter((addr) => addr.type === type) || [];
-  const defaultAddress = addresses.find((addr) => addr.isDefault);
+
+  const addresses = data?.addresses.filter((addr) => addr.type === type) ?? [];
+  const defaultAddress = addresses.find((addr) => addr.isDefault) ?? null;
 
   return {
     ...rest,
@@ -100,4 +97,3 @@ export function useAddressesByType(type: "shipping" | "billing") {
     defaultAddress,
   };
 }
-

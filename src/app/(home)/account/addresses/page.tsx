@@ -17,11 +17,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Plus,
   MoreVertical,
@@ -34,32 +30,18 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   useAddresses,
   useCreateAddress,
   useUpdateAddress,
   useDeleteAddress,
   useSetDefaultAddress,
 } from "@/hooks/use-addresses";
-import type { AddressDTO } from "@/lib/api/addresses";
-
-type AddressFormData = {
-  firstName: string;
-  lastName: string;
-  addressLine1: string;
-  addressLine2: string;
-  city: string;
-  state: string;
-  postalCode: string;
-  country: string;
-  isDefault: boolean;
-};
+import { AddressForm } from "@/components/checkout/address-form";
+import type {
+  Address,
+  CreateAddressInput,
+  UpdateAddressInput,
+} from "@/lib/api/addresses";
 
 export default function AddressesPage() {
   const { data, isLoading, error } = useAddresses();
@@ -69,23 +51,12 @@ export default function AddressesPage() {
   const setDefaultMutation = useSetDefaultAddress();
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingAddress, setEditingAddress] = useState<AddressDTO | null>(null);
+  const [editingAddress, setEditingAddress] = useState<Address | null>(null);
   const [currentType, setCurrentType] = useState<"shipping" | "billing">(
     "shipping",
   );
-  const [formData, setFormData] = useState<AddressFormData>({
-    firstName: "",
-    lastName: "",
-    addressLine1: "",
-    addressLine2: "",
-    city: "",
-    state: "",
-    postalCode: "",
-    country: "Australia",
-    isDefault: false,
-  });
 
-  const addresses = data?.addresses || [];
+  const addresses = data?.addresses ?? [];
   const shippingAddresses = addresses.filter(
     (addr) => addr.type === "shipping",
   );
@@ -94,34 +65,12 @@ export default function AddressesPage() {
   const handleAddAddress = (type: "shipping" | "billing") => {
     setCurrentType(type);
     setEditingAddress(null);
-    setFormData({
-      firstName: "",
-      lastName: "",
-      addressLine1: "",
-      addressLine2: "",
-      city: "",
-      state: "",
-      postalCode: "",
-      country: "Australia",
-      isDefault: false,
-    });
     setIsDialogOpen(true);
   };
 
-  const handleEditAddress = (address: AddressDTO) => {
+  const handleEditAddress = (address: Address) => {
     setCurrentType(address.type);
     setEditingAddress(address);
-    setFormData({
-      firstName: address.firstName,
-      lastName: address.lastName,
-      addressLine1: address.addressLine1,
-      addressLine2: address.addressLine2 || "",
-      city: address.city,
-      state: address.state,
-      postalCode: address.postalCode,
-      country: address.country,
-      isDefault: address.isDefault,
-    });
     setIsDialogOpen(true);
   };
 
@@ -135,28 +84,32 @@ export default function AddressesPage() {
     setDefaultMutation.mutate({ id, type });
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
+  const onSubmit = async (values: {
+    firstName: string;
+    lastName: string;
+    addressLine1: string;
+    addressLine2?: string;
+    city: string;
+    state: string;
+    postcode: string;
+    country: string;
+    isDefault: boolean;
+  }) => {
     if (editingAddress) {
-      // Update existing address
-      await updateAddressMutation.mutateAsync({
-        id: editingAddress.id,
-        ...formData,
-      });
+      await updateAddressMutation.mutateAsync(
+        { id: editingAddress.id, ...values } as UpdateAddressInput,
+        { onSuccess: () => setIsDialogOpen(false) },
+      );
     } else {
-      // Create new address
-      await createAddressMutation.mutateAsync({
-        type: currentType,
-        ...formData,
-      });
+      await createAddressMutation.mutateAsync(
+        { type: currentType, ...values } as CreateAddressInput,
+        { onSuccess: () => setIsDialogOpen(false) },
+      );
     }
-
-    setIsDialogOpen(false);
   };
 
   const renderAddressList = (
-    addressList: AddressDTO[],
+    addressList: Address[],
     type: "shipping" | "billing",
   ) => {
     if (addressList.length === 0) {
@@ -227,7 +180,7 @@ export default function AddressesPage() {
                 <p>{address.addressLine1}</p>
                 {address.addressLine2 && <p>{address.addressLine2}</p>}
                 <p>
-                  {address.city}, {address.state} {address.postalCode}
+                  {address.city}, {address.state} {address.postcode}
                 </p>
                 <p>{address.country}</p>
               </div>
@@ -322,160 +275,30 @@ export default function AddressesPage() {
                 : `Add ${currentType === "shipping" ? "Shipping" : "Billing"} Address`}
             </DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="firstName">First Name</Label>
-                <Input
-                  id="firstName"
-                  value={formData.firstName}
-                  onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      firstName: e.target.value,
-                    }))
+          <AddressForm
+            type={currentType}
+            onSubmit={onSubmit}
+            onCancel={() => setIsDialogOpen(false)}
+            initialData={
+              editingAddress
+                ? {
+                    firstName: editingAddress.firstName,
+                    lastName: editingAddress.lastName,
+                    addressLine1: editingAddress.addressLine1,
+                    addressLine2: editingAddress.addressLine2 ?? "",
+                    city: editingAddress.city,
+                    state: editingAddress.state,
+                    postcode: editingAddress.postcode,
+                    country: editingAddress.country,
+                    isDefault: editingAddress.isDefault,
                   }
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="lastName">Last Name</Label>
-                <Input
-                  id="lastName"
-                  value={formData.lastName}
-                  onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      lastName: e.target.value,
-                    }))
-                  }
-                  required
-                />
-              </div>
-              <div className="col-span-2">
-                <Label htmlFor="addressLine1">Address Line 1</Label>
-                <Input
-                  id="addressLine1"
-                  value={formData.addressLine1}
-                  onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      addressLine1: e.target.value,
-                    }))
-                  }
-                  required
-                />
-              </div>
-              <div className="col-span-2">
-                <Label htmlFor="addressLine2">Address Line 2 (Optional)</Label>
-                <Input
-                  id="addressLine2"
-                  value={formData.addressLine2}
-                  onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      addressLine2: e.target.value,
-                    }))
-                  }
-                />
-              </div>
-              <div>
-                <Label htmlFor="city">City</Label>
-                <Input
-                  id="city"
-                  value={formData.city}
-                  onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, city: e.target.value }))
-                  }
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="state">State</Label>
-                <Select
-                  value={formData.state}
-                  onValueChange={(value) =>
-                    setFormData((prev) => ({ ...prev, state: value }))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select state" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="NSW">New South Wales</SelectItem>
-                    <SelectItem value="VIC">Victoria</SelectItem>
-                    <SelectItem value="QLD">Queensland</SelectItem>
-                    <SelectItem value="WA">Western Australia</SelectItem>
-                    <SelectItem value="SA">South Australia</SelectItem>
-                    <SelectItem value="TAS">Tasmania</SelectItem>
-                    <SelectItem value="ACT">
-                      Australian Capital Territory
-                    </SelectItem>
-                    <SelectItem value="NT">Northern Territory</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="postalCode">Postal Code</Label>
-                <Input
-                  id="postalCode"
-                  value={formData.postalCode}
-                  onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      postalCode: e.target.value,
-                    }))
-                  }
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="country">Country</Label>
-                <Input
-                  id="country"
-                  value={formData.country}
-                  onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      country: e.target.value,
-                    }))
-                  }
-                  required
-                />
-              </div>
-              <div className="col-span-2 flex items-center space-x-2">
-                <Checkbox
-                  id="isDefault"
-                  checked={formData.isDefault}
-                  onCheckedChange={(checked) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      isDefault: checked as boolean,
-                    }))
-                  }
-                />
-                <Label htmlFor="isDefault">Set as default address</Label>
-              </div>
-            </div>
-            <div className="flex justify-end space-x-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setIsDialogOpen(false)}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                disabled={
-                  createAddressMutation.isPending ||
-                  updateAddressMutation.isPending
-                }
-              >
-                {editingAddress ? "Update Address" : "Add Address"}
-              </Button>
-            </div>
-          </form>
+                : undefined
+            }
+            submitLabel={editingAddress ? "Update Address" : "Add Address"}
+            isSubmitting={
+              createAddressMutation.isPending || updateAddressMutation.isPending
+            }
+          />
         </DialogContent>
       </Dialog>
     </div>

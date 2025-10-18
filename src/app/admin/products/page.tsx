@@ -12,10 +12,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Search, Plus, Filter, Eye, Edit, Trash2 } from "lucide-react";
+import { Search, Plus, Filter, Eye, Edit, Trash2, Package } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useProducts } from "@/hooks/products/use-products";
+import { useProductsQuery } from "@/hooks/products/use-products-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { type Product } from "@/lib/api/products";
 import { useSession } from "next-auth/react";
@@ -60,7 +60,7 @@ const columns = [
     accessorKey: "price",
     cell: ({ row }: { row: { original: Product } }) => (
       <span className="font-medium">
-        ${(row.original.price / 100).toFixed(2)}
+        ${((row.original.price ?? 0) / 100).toFixed(2)}
       </span>
     ),
   },
@@ -134,7 +134,7 @@ export default function ProductsPage() {
     data: productsData,
     isLoading,
     error,
-  } = useProducts({
+  } = useProductsQuery({
     search: searchTerm || undefined,
     store: storeId,
   });
@@ -285,21 +285,13 @@ export default function ProductsPage() {
               Filter
             </Button>
           </div>
-          {isLoading ? (
-            <div className="space-y-4">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="flex items-center space-x-4">
-                  <Skeleton className="h-10 w-10 rounded-md" />
-                  <div className="space-y-2">
-                    <Skeleton className="h-4 w-[200px]" />
-                    <Skeleton className="h-4 w-[100px]" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <DataTable columns={columns} data={products} />
-          )}
+          <DataTable
+            columns={columns}
+            data={products}
+            isLoading={isLoading}
+            emptyMessage="No products found. Add your first product to get started."
+            emptyIcon={<Package className="h-12 w-12 opacity-20" />}
+          />
         </CardContent>
       </Card>
     </div>

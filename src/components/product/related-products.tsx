@@ -126,7 +126,7 @@ export function RelatedProducts({
       >
         {relatedProducts.map((product, index) => (
           <div key={index} className="min-w-[250px] md:min-w-[300px]">
-            <ProductCard {...product} />
+            <ProductCard id={index} {...product} />
           </div>
         ))}
       </div>

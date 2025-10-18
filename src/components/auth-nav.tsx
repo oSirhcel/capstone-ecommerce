@@ -13,9 +13,21 @@ import {
   DropdownMenuGroup,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { useState } from "react";
+import { SignInContent } from "@/components/auth/signin-content";
+import { SignUpContent } from "@/components/auth/signup-content";
 
 export function AuthNav() {
   const { data: session, status } = useSession();
+  const [authView, setAuthView] = useState<"signin" | "signup">("signin");
 
   if (status === "loading") {
     return (
@@ -26,8 +38,6 @@ export function AuthNav() {
   }
 
   if (session?.user) {
-    // Admin inferred by presence of a store on the session
-
     return (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -81,9 +91,30 @@ export function AuthNav() {
 
   return (
     <div className="flex items-center space-x-2">
-      <Link href="/auth/signin">
-        <Button size="sm">Sign In</Button>
-      </Link>
+      <Dialog>
+        <DialogTrigger asChild>
+          <Button size="sm">Sign In</Button>
+        </DialogTrigger>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="sr-only">Sign In</DialogTitle>
+            <DialogDescription className="sr-only">
+              Welcome back! Please sign in to your account
+            </DialogDescription>
+          </DialogHeader>
+          {authView === "signin" ? (
+            <SignInContent
+              onSuccessRedirect="/"
+              onToggleSignUp={() => setAuthView("signup")}
+            />
+          ) : (
+            <SignUpContent
+              onSuccessRedirect="/"
+              onToggleSignIn={() => setAuthView("signin")}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

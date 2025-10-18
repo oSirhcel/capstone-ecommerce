@@ -23,6 +23,7 @@ import { Search, Eye, Package, X } from "lucide-react";
 import Image from "next/image";
 import { useQuery } from "@tanstack/react-query";
 import { fetchOrders, type OrderDTO } from "@/lib/api/orders";
+import { formatOrderNumber } from "@/lib/utils/order-number";
 
 const getStatusBadge = (status: string) => {
   switch (status) {
@@ -159,7 +160,9 @@ export default function OrdersPage() {
               <CardHeader>
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <CardTitle className="text-lg">ORD-{order.id}</CardTitle>
+                    <CardTitle className="text-lg">
+                      {formatOrderNumber(order.id)}
+                    </CardTitle>
                     <CardDescription>
                       Placed on {new Date(order.createdAt).toLocaleDateString()}{" "}
                       • {order.items.length} items

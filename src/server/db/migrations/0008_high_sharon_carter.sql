@@ -1,0 +1,2 @@
+ALTER TABLE "orders" ADD COLUMN "storeId" varchar(255) NOT NULL;--> statement-breakpoint
+ALTER TABLE "orders" ADD CONSTRAINT "orders_storeId_stores_id_fk" FOREIGN KEY ("storeId") REFERENCES "public"."stores"("id") ON DELETE no action ON UPDATE no action;

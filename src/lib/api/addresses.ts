@@ -1,6 +1,6 @@
 import { getBaseUrl } from "./config";
 
-export type AddressDTO = {
+export type Address = {
   id: number;
   userId: string;
   type: "shipping" | "billing";
@@ -10,10 +10,14 @@ export type AddressDTO = {
   addressLine2?: string | null;
   city: string;
   state: string;
-  postalCode: string;
+  postcode: string;
   country: string;
   isDefault: boolean;
+  version: number;
+  isArchived: boolean;
+  archivedAt?: string | null;
   createdAt: string;
+  updatedAt: string;
 };
 
 export type CreateAddressInput = {
@@ -24,7 +28,7 @@ export type CreateAddressInput = {
   addressLine2?: string;
   city: string;
   state: string;
-  postalCode: string;
+  postcode: string;
   country: string;
   isDefault?: boolean;
 };
@@ -38,20 +42,27 @@ export type UpdateAddressInput = {
   addressLine2?: string;
   city?: string;
   state?: string;
-  postalCode?: string;
+  postcode?: string;
   country?: string;
   isDefault?: boolean;
 };
 
-export async function fetchAddresses(): Promise<{ addresses: AddressDTO[] }> {
+export async function fetchAddresses(): Promise<{
+  addresses: Address[];
+}> {
   const base = getBaseUrl();
   const url = new URL("/api/addresses", base);
   const res = await fetch(url.toString(), { credentials: "include" });
   if (!res.ok) throw new Error(`Failed to fetch addresses: ${res.status}`);
-  return res.json();
+
+  const data = (await res.json()) as { addresses: Address[] };
+
+  return data;
 }
 
-export async function createAddress(data: CreateAddressInput): Promise<{ address: AddressDTO }> {
+export async function createAddress(
+  data: CreateAddressInput,
+): Promise<{ address: Address }> {
   const base = getBaseUrl();
   const url = new URL("/api/addresses", base);
   const res = await fetch(url.toString(), {
@@ -62,14 +73,20 @@ export async function createAddress(data: CreateAddressInput): Promise<{ address
     credentials: "include",
     body: JSON.stringify(data),
   });
+
   if (!res.ok) {
-    const error = await res.json().catch(() => ({ error: "Failed to create address" }));
-    throw new Error(error.error || "Failed to create address");
+    const errorData = (await res.json().catch(() => ({}))) as {
+      message?: string;
+    };
+    const message = errorData.message ?? "Failed to create address";
+    throw new Error(message);
   }
-  return res.json();
+  return (await res.json()) as { address: Address };
 }
 
-export async function updateAddress(data: UpdateAddressInput): Promise<{ address: AddressDTO }> {
+export async function updateAddress(
+  data: UpdateAddressInput,
+): Promise<{ address: Address }> {
   const base = getBaseUrl();
   const url = new URL("/api/addresses", base);
   const res = await fetch(url.toString(), {
@@ -80,14 +97,20 @@ export async function updateAddress(data: UpdateAddressInput): Promise<{ address
     credentials: "include",
     body: JSON.stringify(data),
   });
+
   if (!res.ok) {
-    const error = await res.json().catch(() => ({ error: "Failed to update address" }));
-    throw new Error(error.error || "Failed to update address");
+    const errorData = (await res.json().catch(() => ({}))) as {
+      message?: string;
+    };
+    const message = errorData.message ?? "Failed to update address";
+    throw new Error(message);
   }
-  return res.json();
+  return (await res.json()) as { address: Address };
 }
 
-export async function deleteAddress(id: number): Promise<{ success: boolean; message: string }> {
+export async function deleteAddress(
+  id: number,
+): Promise<{ success: boolean; message: string }> {
   const base = getBaseUrl();
   const url = new URL("/api/addresses", base);
   url.searchParams.set("id", id.toString());
@@ -96,12 +119,18 @@ export async function deleteAddress(id: number): Promise<{ success: boolean; mes
     credentials: "include",
   });
   if (!res.ok) {
-    const error = await res.json().catch(() => ({ error: "Failed to delete address" }));
-    throw new Error(error.error || "Failed to delete address");
+    const errorData = (await res.json().catch(() => ({}))) as {
+      message?: string;
+    };
+    const message = errorData.message ?? "Failed to delete address";
+    throw new Error(message);
   }
-  return res.json();
+  return (await res.json()) as { success: boolean; message: string };
 }
 
-export async function setDefaultAddress(id: number, type: "shipping" | "billing"): Promise<{ address: AddressDTO }> {
+export async function setDefaultAddress(
+  id: number,
+  type: "shipping" | "billing",
+): Promise<{ address: Address }> {
   return updateAddress({ id, isDefault: true, type });
 }

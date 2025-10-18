@@ -19,7 +19,7 @@ import Image from "next/image";
 
 // Mock order data
 const orderData = {
-  id: "ORD-2024-001",
+  id: "#001",
   date: "2024-01-15",
   status: "delivered",
   total: 156.97,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useProduct } from "@/hooks/products/use-product";
+import { useProductQuery } from "@/hooks/products/use-product-query";
 import { ProductForm } from "@/components/admin/products/product-form";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -14,7 +14,7 @@ interface ProductEditPageClientProps {
 
 export function ProductEditPageClient({ id }: ProductEditPageClientProps) {
   const router = useRouter();
-  const { data: product, isLoading, isError, error } = useProduct(id);
+  const { data: product, isLoading, isError, error } = useProductQuery(id);
 
   // Loading state
   if (isLoading) {

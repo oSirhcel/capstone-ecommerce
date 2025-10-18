@@ -6,15 +6,31 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Skeleton } from "@/components/ui/skeleton";
 
-// TODO: Add types
-
-interface DataTableProps {
-  columns: any[];
-  data: any[];
+export interface DataTableColumn<T = unknown> {
+  header: string;
+  accessorKey?: string;
+  cell?: (props: { row: { original: T } }) => React.ReactNode;
 }
 
-export function DataTable({ columns, data }: DataTableProps) {
+interface DataTableProps<T = unknown> {
+  columns: DataTableColumn<T>[];
+  data: T[];
+  isLoading?: boolean;
+  emptyMessage?: string;
+  emptyIcon?: React.ReactNode;
+  onRowClick?: (row: T) => void;
+}
+
+export function DataTable<T = unknown>({
+  columns,
+  data,
+  isLoading,
+  emptyMessage = "No results found.",
+  emptyIcon,
+  onRowClick,
+}: DataTableProps<T>) {
   return (
     <div className="rounded-md border">
       <Table>
@@ -26,22 +42,43 @@ export function DataTable({ columns, data }: DataTableProps) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {data.length ? (
+          {isLoading ? (
+            Array.from({ length: 5 }).map((_, rowIndex) => (
+              <TableRow key={`skeleton-${rowIndex}`}>
+                {columns.map((_, colIndex) => (
+                  <TableCell key={`skeleton-${rowIndex}-${colIndex}`}>
+                    <Skeleton className="h-4 w-full" />
+                  </TableCell>
+                ))}
+              </TableRow>
+            ))
+          ) : data.length ? (
             data.map((row, index) => (
-              <TableRow key={index}>
+              <TableRow
+                key={index}
+                onClick={() => onRowClick?.(row)}
+                className={onRowClick ? "hover:bg-muted/50 cursor-pointer" : ""}
+              >
                 {columns.map((column, colIndex) => (
                   <TableCell key={colIndex}>
                     {column.cell
                       ? column.cell({ row: { original: row } })
-                      : row[column.accessorKey]}
+                      : column.accessorKey
+                        ? ((row as Record<string, unknown>)[
+                            column.accessorKey
+                          ] as React.ReactNode)
+                        : null}
                   </TableCell>
                 ))}
               </TableRow>
             ))
           ) : (
             <TableRow>
-              <TableCell colSpan={columns.length} className="h-24 text-center">
-                No results.
+              <TableCell colSpan={columns.length} className="h-32 text-center">
+                <div className="text-muted-foreground flex flex-col items-center justify-center gap-2">
+                  {emptyIcon}
+                  <p className="text-sm">{emptyMessage}</p>
+                </div>
               </TableCell>
             </TableRow>
           )}

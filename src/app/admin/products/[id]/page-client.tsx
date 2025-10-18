@@ -1,5 +1,5 @@
 "use client";
-import { useProduct } from "@/hooks/products/use-product";
+import { useProductQuery } from "@/hooks/products/use-product-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ProductHeader } from "@/components/admin/products/product-header";
 import { ProductGallery } from "@/components/admin/products/product-gallery";
@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { ProductAnalytics } from "@/components/admin/products/product-analytics";
 
 export const ProductPageClient = ({ id }: { id: number }) => {
-  const { data: product, isLoading, error } = useProduct(id);
+  const { data: product, isLoading, error } = useProductQuery(id);
 
   if (isLoading) {
     return (
@@ -62,9 +62,9 @@ export const ProductPageClient = ({ id }: { id: number }) => {
   const transformedProduct = {
     id: product.id.toString(),
     name: product.name,
-    sku: product.sku,
+    sku: product.sku ?? "",
     description: product.description ?? "",
-    price: product.price / 100, // Convert from cents to dollars
+    price: (product.price ?? 0) / 100, // Convert from cents to dollars
     compareAtPrice: product.compareAtPrice
       ? product.compareAtPrice / 100
       : undefined,

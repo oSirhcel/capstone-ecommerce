@@ -1,27 +1,36 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Elements } from "@stripe/react-stripe-js";
 import {
   useStripe,
   useElements,
   PaymentElement,
 } from "@stripe/react-stripe-js";
+import type { PaymentIntent } from "@stripe/stripe-js";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, CreditCard, Shield } from "lucide-react";
-import { getStripe, processPayment } from "@/lib/stripe-client";
+import { Loader2, Shield } from "lucide-react";
+import {
+  getStripe,
+  processPayment,
+  type ProcessPaymentResponse,
+} from "@/lib/stripe-client";
 import { toast } from "sonner";
 
 interface StripePaymentFormProps {
   amount: number;
   currency?: string;
   orderId?: number;
-  onSuccess: (paymentResult: any) => void;
-  onError: (error: string | Error) => void;
+  onSuccess: (paymentResult: {
+    paymentIntent: PaymentIntent;
+    paymentIntentId: string;
+    orderId?: number;
+  }) => void;
+  onError: (error: string) => void;
   onCreateOrder?: () => Promise<number>;
   orderData?: any; // Order data for verification flow
 }
@@ -59,9 +68,9 @@ function PaymentForm({
       if (submitError) {
         console.error("Elements submit error:", submitError);
         setPaymentError(
-          submitError.message || "Payment form validation failed",
+          submitError.message ?? "Payment form validation failed",
         );
-        onError(submitError.message || "Payment form validation failed");
+        onError(submitError.message ?? "Payment form validation failed");
         return;
       }
 
@@ -94,10 +103,19 @@ function PaymentForm({
         }
       }
 
-      const { clientSecret, paymentIntentId } = paymentData;
+      // Create payment intent
+      const paymentResponse: ProcessPaymentResponse = await processPayment({
+        amount,
+        currency,
+        orderId: currentOrderId,
+        savePaymentMethod,
+      });
+
+      const clientSecret: string = paymentResponse.clientSecret;
+      const paymentIntentId: string = paymentResponse.paymentIntentId;
 
       // Confirm payment with Stripe
-      const { error, paymentIntent } = await stripe.confirmPayment({
+      const confirmResult = await stripe.confirmPayment({
         elements,
         clientSecret,
         confirmParams: {
@@ -106,50 +124,23 @@ function PaymentForm({
         redirect: "if_required",
       });
 
-      if (error) {
-        console.error("Payment confirmation error:", error);
-        setPaymentError(error.message || "Payment failed");
-        onError(error.message || "Payment failed");
-      } else if (paymentIntent && paymentIntent.status === "succeeded") {
-        console.log("Payment succeeded:", paymentIntent);
-
-        // Create payment transaction record for pass results
-        if (currentOrderId && paymentIntentId) {
-          try {
-            const transactionResponse = await fetch(
-              "/api/payments/create-transaction",
-              {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  paymentIntentId: paymentIntentId,
-                  orderId: currentOrderId,
-                  amount: paymentIntent.amount,
-                  currency: paymentIntent.currency,
-                }),
-              },
-            );
-
-            if (!transactionResponse.ok) {
-              console.error("Failed to create payment transaction record");
-            } else {
-              console.log("Payment transaction record created successfully");
-            }
-          } catch (error) {
-            console.error("Error creating payment transaction record:", error);
-          }
-        }
-
+      if (confirmResult.error) {
+        console.error("Payment confirmation error:", confirmResult.error);
+        setPaymentError(confirmResult.error.message ?? "Payment failed");
+        onError(confirmResult.error.message ?? "Payment failed");
+      } else if (
+        confirmResult.paymentIntent &&
+        confirmResult.paymentIntent.status === "succeeded"
+      ) {
+        console.log("Payment succeeded:", confirmResult.paymentIntent);
         toast.success("Payment successful!");
         onSuccess({
-          paymentIntent,
+          paymentIntent: confirmResult.paymentIntent,
           paymentIntentId,
           orderId: currentOrderId,
         });
       } else {
-        console.log("Payment status:", paymentIntent?.status);
+        console.log("Payment status:", confirmResult.paymentIntent?.status);
         setPaymentError("Payment requires additional action");
         onError("Payment requires additional action");
       }
@@ -186,50 +177,42 @@ function PaymentForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <CreditCard className="h-5 w-5" />
-            Payment Information
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Stripe PaymentElement */}
-          <div className="stripe-payment-element">
-            <PaymentElement
-              options={{
-                layout: "tabs",
-                paymentMethodOrder: ["card", "au_becs_debit"],
-              }}
-            />
-          </div>
+      <div className="space-y-4">
+        {/* Stripe PaymentElement */}
+        <div className="stripe-payment-element">
+          <PaymentElement
+            options={{
+              layout: "tabs",
+              paymentMethodOrder: ["card", "au_becs_debit"],
+            }}
+          />
+        </div>
 
-          {/* Save payment method option */}
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="savePaymentMethod"
-              checked={savePaymentMethod}
-              onCheckedChange={(checked) =>
-                setSavePaymentMethod(checked as boolean)
-              }
-            />
-            <Label htmlFor="savePaymentMethod" className="text-sm">
-              Save this payment method for future purchases
-            </Label>
-          </div>
+        {/* Save payment method option */}
+        <div className="flex items-center space-x-2">
+          <Checkbox
+            id="savePaymentMethod"
+            checked={savePaymentMethod}
+            onCheckedChange={(checked) =>
+              setSavePaymentMethod(checked as boolean)
+            }
+          />
+          <Label htmlFor="savePaymentMethod" className="text-sm">
+            Save this payment method for future purchases
+          </Label>
+        </div>
 
-          {/* Error display */}
-          {paymentError && (
-            <Alert variant="destructive">
-              <AlertDescription>{paymentError}</AlertDescription>
-            </Alert>
-          )}
-        </CardContent>
-      </Card>
+        {/* Error display */}
+        {paymentError && (
+          <Alert variant="destructive">
+            <AlertDescription>{paymentError}</AlertDescription>
+          </Alert>
+        )}
+      </div>
 
       {/* Security notice */}
       <Card className="border-green-200 bg-green-50">
-        <CardContent className="pt-6">
+        <CardContent>
           <div className="flex items-center gap-2 text-green-800">
             <Shield className="h-4 w-4" />
             <span className="text-sm font-medium">
@@ -263,10 +246,6 @@ function PaymentForm({
 }
 
 export function StripePaymentForm(props: StripePaymentFormProps) {
-  const [clientSecret, setClientSecret] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
   // Don't initialize payment intent on mount - wait for form submission
   // This prevents creating unused payment intents
 
@@ -276,7 +255,7 @@ export function StripePaymentForm(props: StripePaymentFormProps) {
   const options = {
     mode: "payment" as const,
     amount: Math.round(props.amount * 100), // Convert to cents
-    currency: props.currency || "aud",
+    currency: props.currency ?? "aud",
     appearance: {
       theme: "stripe" as const,
       variables: {

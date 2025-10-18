@@ -10,7 +10,7 @@ export function CartSummary() {
 
   // Calculate shipping, tax, and total
   const shipping = subtotal > 50 ? 0 : 5.99;
-  const tax = subtotal * 0.08;
+  const tax = subtotal * 0.1; // 10% GST for Australia
   const total = subtotal + shipping + tax;
 
   return (
@@ -46,7 +46,7 @@ export function CartSummary() {
           <span>{shipping === 0 ? "Free" : `$${shipping.toFixed(2)}`}</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-sm">Tax (8%)</span>
+          <span className="text-sm">GST (10%)</span>
           <span>${tax.toFixed(2)}</span>
         </div>
       </div>

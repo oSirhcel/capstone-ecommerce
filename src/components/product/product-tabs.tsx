@@ -1,14 +1,15 @@
-"use client"
+"use client";
 
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ProductReviews } from "@/components/product/product-reviews"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ProductReviews } from "@/components/product/product-reviews";
 
 interface ProductTabsProps {
   product: {
-    description: string
-    features: string[]
-    specifications: { name: string; value: string }[]
-  }
+    id: string;
+    description: string;
+    features: string[];
+    specifications: { name: string; value: string }[];
+  };
 }
 
 export function ProductTabs({ product }: ProductTabsProps) {
@@ -21,11 +22,11 @@ export function ProductTabs({ product }: ProductTabsProps) {
           <TabsTrigger value="specifications">Specifications</TabsTrigger>
           <TabsTrigger value="reviews">Reviews</TabsTrigger>
         </TabsList>
-        <TabsContent value="description" className="mt-6 text-muted-foreground">
+        <TabsContent value="description" className="text-muted-foreground mt-6">
           <p className="whitespace-pre-line">{product.description}</p>
         </TabsContent>
         <TabsContent value="features" className="mt-6">
-          <ul className="list-inside list-disc space-y-2 text-muted-foreground">
+          <ul className="text-muted-foreground list-inside list-disc space-y-2">
             {product.features.map((feature, index) => (
               <li key={index}>{feature}</li>
             ))}
@@ -36,9 +37,14 @@ export function ProductTabs({ product }: ProductTabsProps) {
             <table className="w-full text-sm">
               <tbody className="divide-y">
                 {product.specifications.map((spec, index) => (
-                  <tr key={index} className={index % 2 === 0 ? "bg-muted/50" : ""}>
+                  <tr
+                    key={index}
+                    className={index % 2 === 0 ? "bg-muted/50" : ""}
+                  >
                     <td className="px-4 py-2 font-medium">{spec.name}</td>
-                    <td className="px-4 py-2 text-muted-foreground">{spec.value}</td>
+                    <td className="text-muted-foreground px-4 py-2">
+                      {spec.value}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -46,9 +52,9 @@ export function ProductTabs({ product }: ProductTabsProps) {
           </div>
         </TabsContent>
         <TabsContent value="reviews" className="mt-6">
-          <ProductReviews />
+          <ProductReviews productId={parseInt(product.id)} />
         </TabsContent>
       </Tabs>
     </div>
-  )
+  );
 }

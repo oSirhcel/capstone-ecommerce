@@ -2,12 +2,12 @@
 
 // Base URL for API calls
 export const getBaseUrl = (): string => {
-  if (typeof window !== 'undefined') {
+  if (typeof window !== "undefined") {
     // Client-side: use current origin
     return window.location.origin;
   }
   // Server-side: use localhost for development
-  return process.env.NEXTAUTH_URL;
+  return process.env.NEXTAUTH_URL ?? "";
 };
 
 // Common API response interface

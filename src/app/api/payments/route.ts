@@ -1,15 +1,15 @@
-import { type NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
-import { db } from '@/server/db';
-import { paymentTransactions, orders, zeroTrustVerifications } from '@/server/db/schema';
-import { eq, and, desc } from 'drizzle-orm';
+import { type NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
+import { db } from "@/server/db";
+import { paymentTransactions, orders, zeroTrustVerifications } from "@/server/db/schema";
+import { eq, and, desc } from "drizzle-orm";
 import {zeroTrustCheck } from '@/lib/zeroTrustMiddleware';
 import {
   createPaymentIntent,
   createOrRetrieveCustomer,
   confirmPaymentIntent,
   formatAmountForStripe,
-} from '@/lib/stripe';
+} from "@/lib/stripe";
 
 type SessionUser = {
   id: string;
@@ -43,9 +43,9 @@ interface ZeroTrustAssessment {
 export async function POST(request: NextRequest) {
   try {
     const session = await auth();
-    
+
     if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const user = session.user as SessionUser;
@@ -169,7 +169,7 @@ export async function POST(request: NextRequest) {
     
     const {
       amount,
-      currency = 'aud',
+      currency = "aud",
       orderId,
       paymentMethodId,
       savePaymentMethod = false,
@@ -178,16 +178,13 @@ export async function POST(request: NextRequest) {
 
     // Validate required fields
     if (!amount || amount <= 0) {
-      return NextResponse.json(
-        { error: 'Invalid amount' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Invalid amount" }, { status: 400 });
     }
 
     // Create or retrieve Stripe customer
     // Handle credentials users who have fake @local emails
-    const userEmail = user.email?.endsWith('@local') ? undefined : user.email;
-    
+    const userEmail = user.email?.endsWith("@local") ? undefined : user.email;
+
     const customer = await createOrRetrieveCustomer({
       userId: user.id,
       email: userEmail ?? undefined,
@@ -202,7 +199,7 @@ export async function POST(request: NextRequest) {
       paymentMethodId,
       metadata: {
         userId: user.id,
-        orderId: orderId?.toString() ?? '',
+        orderId: orderId?.toString() ?? "",
         savePaymentMethod: savePaymentMethod.toString(),
       },
     });
@@ -214,7 +211,7 @@ export async function POST(request: NextRequest) {
         orderId: orderId,
         amount: amount, // Amount is already in cents from the order
         currency,
-        status: 'pending',
+        status: "pending",
         transactionId: paymentIntent.id,
         gatewayResponse: JSON.stringify({
           paymentIntentId: paymentIntent.id,
@@ -229,12 +226,11 @@ export async function POST(request: NextRequest) {
       paymentIntentId: paymentIntent.id,
       customerId: customer.id,
     });
-
   } catch (error) {
-    console.error('Payment creation error:', error);
+    console.error("Payment creation error:", error);
     return NextResponse.json(
-      { error: 'Failed to create payment intent' },
-      { status: 500 }
+      { error: "Failed to create payment intent" },
+      { status: 500 },
     );
   }
 }
@@ -248,36 +244,36 @@ interface ConfirmPaymentRequest {
 export async function PUT(request: NextRequest) {
   try {
     const session = await auth();
-    
+
     if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = await request.json() as ConfirmPaymentRequest;
-    
+    const body = (await request.json()) as ConfirmPaymentRequest;
+
     const { paymentIntentId, paymentMethodId } = body;
 
     if (!paymentIntentId) {
       return NextResponse.json(
-        { error: 'Payment intent ID required' },
-        { status: 400 }
+        { error: "Payment intent ID required" },
+        { status: 400 },
       );
     }
 
     // Confirm the payment intent
     const paymentIntent = await confirmPaymentIntent(
       paymentIntentId,
-      paymentMethodId
+      paymentMethodId,
     );
 
     // Update transaction status in database
     if (paymentIntent.metadata?.orderId) {
       const orderId = parseInt(paymentIntent.metadata.orderId);
-      
+
       await db
         .update(paymentTransactions)
         .set({
-          status: paymentIntent.status === 'succeeded' ? 'completed' : 'failed',
+          status: paymentIntent.status === "succeeded" ? "completed" : "failed",
           gatewayResponse: JSON.stringify({
             paymentIntentId: paymentIntent.id,
             status: paymentIntent.status,
@@ -288,11 +284,12 @@ export async function PUT(request: NextRequest) {
         .where(eq(paymentTransactions.transactionId, paymentIntentId));
 
       // Update order status if payment succeeded
-      if (paymentIntent.status === 'succeeded') {
+      if (paymentIntent.status === "succeeded") {
         await db
           .update(orders)
           .set({
-            status: 'confirmed',
+            status: "Processing",
+            paymentStatus: "Paid",
             updatedAt: new Date(),
           })
           .where(eq(orders.id, orderId));
@@ -309,12 +306,11 @@ export async function PUT(request: NextRequest) {
         currency: paymentIntent.currency,
       },
     });
-
   } catch (error) {
-    console.error('Payment confirmation error:', error);
+    console.error("Payment confirmation error:", error);
     return NextResponse.json(
-      { error: 'Failed to confirm payment' },
-      { status: 500 }
+      { error: "Failed to confirm payment" },
+      { status: 500 },
     );
   }
 }
@@ -323,24 +319,24 @@ export async function PUT(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     const session = await auth();
-    
+
     if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { searchParams } = new URL(request.url);
-    const paymentIntentId = searchParams.get('paymentIntentId');
-    const orderId = searchParams.get('orderId');
+    const paymentIntentId = searchParams.get("paymentIntentId");
+    const orderId = searchParams.get("orderId");
 
     if (!paymentIntentId && !orderId) {
       return NextResponse.json(
-        { error: 'Payment intent ID or order ID required' },
-        { status: 400 }
+        { error: "Payment intent ID or order ID required" },
+        { status: 400 },
       );
     }
 
     let transaction;
-    
+
     if (paymentIntentId) {
       const [result] = await db
         .select()
@@ -359,8 +355,8 @@ export async function GET(request: NextRequest) {
 
     if (!transaction) {
       return NextResponse.json(
-        { error: 'Transaction not found' },
-        { status: 404 }
+        { error: "Transaction not found" },
+        { status: 404 },
       );
     }
 
@@ -376,12 +372,11 @@ export async function GET(request: NextRequest) {
         updatedAt: transaction.updatedAt,
       },
     });
-
   } catch (error) {
-    console.error('Payment status error:', error);
+    console.error("Payment status error:", error);
     return NextResponse.json(
-      { error: 'Failed to get payment status' },
-      { status: 500 }
+      { error: "Failed to get payment status" },
+      { status: 500 },
     );
   }
 }

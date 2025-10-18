@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Image from "next/image";
+import { useFormContext } from "react-hook-form";
 import {
   Card,
   CardContent,
@@ -12,79 +13,70 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Search, Package, Plus, Minus, Trash2 } from "lucide-react";
-import type { OrderItem } from "@/app/admin/orders/create/page";
-
-// Mock product data
-const mockProducts = [
-  {
-    id: "1",
-    name: "Handcrafted Ceramic Mug",
-    price: 24.99,
-    image: "/placeholder.svg?height=60&width=60",
-    sku: "CM-001",
-    stock: 45,
-  },
-  {
-    id: "2",
-    name: "Digital Marketing Course",
-    price: 129.99,
-    image: "/placeholder.svg?height=60&width=60",
-    sku: "DMC-001",
-    stock: 999,
-  },
-  {
-    id: "3",
-    name: "Organic Cotton T-Shirt",
-    price: 34.99,
-    image: "/placeholder.svg?height=60&width=60",
-    sku: "OCT-001",
-    stock: 12,
-  },
-  {
-    id: "4",
-    name: "Handmade Silver Earrings",
-    price: 45.99,
-    image: "/placeholder.svg?height=60&width=60",
-    sku: "HSE-001",
-    stock: 8,
-  },
-];
+import { Search, Package, Plus, Minus, Trash2, Loader2 } from "lucide-react";
+import type {
+  OrderItem,
+  OrderFormValues,
+} from "@/app/admin/orders/create/page";
+import { useProductsQuery } from "@/hooks/admin/orders/use-products-query";
+import { useDebounce } from "@/hooks/use-debounce";
 
 interface ProductSelectionFormProps {
-  orderItems: OrderItem[];
-  onOrderItemsChange: (items: OrderItem[]) => void;
+  storeId: string;
 }
 
-export function ProductSelectionForm({
-  orderItems,
-  onOrderItemsChange,
-}: ProductSelectionFormProps) {
+export function ProductSelectionForm({ storeId }: ProductSelectionFormProps) {
+  const { watch, setValue } = useFormContext<OrderFormValues>();
+  const orderItems = watch("orderItems");
   const [searchTerm, setSearchTerm] = useState("");
   const [showProductSearch, setShowProductSearch] = useState(false);
+  const debouncedSearch = useDebounce(searchTerm, 300);
 
-  const filteredProducts = mockProducts.filter(
-    (p) =>
-      p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.sku.toLowerCase().includes(searchTerm.toLowerCase()),
+  // Fetch products
+  const { data: productsData, isLoading: isLoadingProducts } = useProductsQuery(
+    storeId,
+    debouncedSearch,
   );
 
-  const addProduct = (product: (typeof mockProducts)[0]) => {
-    const existingItem = orderItems.find((item) => item.id === product.id);
+  const products = useMemo(() => {
+    // Filter for active products only
+    return (
+      productsData?.products.filter(
+        (p) => p.status === "active" && p.price !== null,
+      ) ?? []
+    );
+  }, [productsData]);
 
+  const addProduct = (product: {
+    id: number;
+    name: string;
+    price: number | null;
+    stock: number;
+    sku: string | null;
+    images: Array<{ imageUrl: string; isPrimary: boolean }>;
+  }) => {
+    if (!product.price) return;
+
+    // Check if product is already in order items
+    const existingItem = orderItems.find(
+      (item) => item.id === String(product.id),
+    );
+
+    // Don't add if already exists
     if (existingItem) {
-      updateQuantity(product.id, existingItem.quantity + 1);
-    } else {
-      const newItem: OrderItem = {
-        id: product.id,
-        name: product.name,
-        price: product.price,
-        quantity: 1,
-        image: product.image,
-        sku: product.sku,
-      };
-      onOrderItemsChange([...orderItems, newItem]);
+      return;
     }
+
+    const primaryImage = product.images.find((img) => img.isPrimary);
+    const newItem: OrderItem = {
+      id: String(product.id),
+      name: product.name,
+      price: product.price / 100, // Convert cents to dollars
+      quantity: 1,
+      image: primaryImage?.imageUrl ?? "/placeholder.svg",
+      sku: product.sku ?? "",
+    };
+    setValue("orderItems", [...orderItems, newItem]);
     setShowProductSearch(false);
     setSearchTerm("");
   };
@@ -98,12 +90,12 @@ export function ProductSelectionForm({
     const updatedItems = orderItems.map((item) =>
       item.id === productId ? { ...item, quantity: newQuantity } : item,
     );
-    onOrderItemsChange(updatedItems);
+    setValue("orderItems", updatedItems);
   };
 
   const removeProduct = (productId: string) => {
     const updatedItems = orderItems.filter((item) => item.id !== productId);
-    onOrderItemsChange(updatedItems);
+    setValue("orderItems", updatedItems);
   };
 
   return (
@@ -156,35 +148,64 @@ export function ProductSelectionForm({
             </div>
 
             <div className="max-h-60 space-y-2 overflow-y-auto">
-              {filteredProducts.map((product) => (
-                <div
-                  key={product.id}
-                  className="hover:bg-background flex cursor-pointer items-center gap-3 rounded-lg border p-3"
-                  onClick={() => addProduct(product)}
-                >
-                  <Image
-                    src={product.image || "/placeholder.svg"}
-                    alt={product.name}
-                    width={40}
-                    height={40}
-                    className="rounded-md object-cover"
-                  />
-                  <div className="flex-1">
-                    <p className="font-medium">{product.name}</p>
-                    <p className="text-muted-foreground text-sm">
-                      SKU: {product.sku}
-                    </p>
-                    <div className="mt-1 flex items-center gap-2">
-                      <span className="font-medium">
-                        ${product.price.toFixed(2)}
-                      </span>
-                      <Badge variant="outline" className="text-xs">
-                        {product.stock} in stock
-                      </Badge>
-                    </div>
-                  </div>
+              {isLoadingProducts ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin" />
                 </div>
-              ))}
+              ) : products.length > 0 ? (
+                products.map((product) => {
+                  const primaryImage = product.images.find(
+                    (img) => img.isPrimary,
+                  );
+                  const isAlreadyAdded = orderItems.some(
+                    (item) => item.id === String(product.id),
+                  );
+                  return (
+                    <div
+                      key={product.id}
+                      className={`flex items-center gap-3 rounded-lg border p-3 ${
+                        isAlreadyAdded
+                          ? "cursor-not-allowed opacity-60"
+                          : "hover:bg-background cursor-pointer"
+                      }`}
+                      onClick={() => !isAlreadyAdded && addProduct(product)}
+                    >
+                      <Image
+                        src={primaryImage?.imageUrl ?? "/placeholder.svg"}
+                        alt={product.name}
+                        width={40}
+                        height={40}
+                        className="rounded-md object-cover"
+                      />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium">{product.name}</p>
+                          {isAlreadyAdded && (
+                            <Badge variant="secondary" className="text-xs">
+                              Added
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-muted-foreground text-sm">
+                          SKU: {product.sku ?? "N/A"}
+                        </p>
+                        <div className="mt-1 flex items-center gap-2">
+                          <span className="font-medium">
+                            ${((product.price ?? 0) / 100).toFixed(2)}
+                          </span>
+                          <Badge variant="outline" className="text-xs">
+                            {product.stock} in stock
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <p className="text-muted-foreground py-8 text-center text-sm">
+                  No products found
+                </p>
+              )}
             </div>
           </div>
         )}

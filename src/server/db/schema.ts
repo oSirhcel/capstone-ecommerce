@@ -1,4 +1,5 @@
 //schemas
+import { sql } from "drizzle-orm";
 import {
   integer,
   pgTable,
@@ -7,6 +8,9 @@ import {
   boolean,
   text,
   decimal,
+  index,
+  unique,
+  pgEnum,
 } from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
@@ -82,12 +86,34 @@ export const cartItems = pgTable("cart_items", {
   quantity: integer().notNull().default(1),
 });
 
+export const orderStatusEnum = pgEnum("order_status", [
+  "Pending",
+  "Processing",
+  "Shipped",
+  "Completed",
+  "Cancelled",
+  "Refunded",
+  "On-hold",
+  "Failed",
+]);
+
+export const paymentStatusEnum = pgEnum("payment_status", [
+  "Pending",
+  "Paid",
+  "Failed",
+  "Refunded",
+]);
+
 export const orders = pgTable("orders", {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),
   userId: varchar("userId", { length: 255 })
     .references(() => users.id)
     .notNull(),
-  status: varchar({ length: 50 }).notNull().default("pending"),
+  storeId: varchar("storeId", { length: 255 })
+    .references(() => stores.id)
+    .notNull(), // Orders belong to a specific store
+  status: orderStatusEnum().notNull().default("Pending"),
+  paymentStatus: paymentStatusEnum().notNull().default("Pending"),
   totalAmount: integer().notNull(), // Total in cents
   createdAt: timestamp().defaultNow().notNull(),
   updatedAt: timestamp().defaultNow().notNull(),
@@ -117,6 +143,7 @@ export const reviews = pgTable("reviews", {
     .notNull(),
   rating: integer().notNull(),
   comment: varchar({ length: 1000 }),
+  verifiedPurchase: boolean().notNull().default(false),
   createdAt: timestamp().defaultNow().notNull(),
 });
 
@@ -155,10 +182,54 @@ export const userProfiles = pgTable("user_profiles", {
   lastName: varchar({ length: 100 }),
   email: varchar({ length: 255 }).notNull(),
   phone: varchar({ length: 20 }),
-  dateOfBirth: timestamp(),
   createdAt: timestamp().defaultNow().notNull(),
   updatedAt: timestamp().defaultNow().notNull(),
 });
+
+// Store-scoped customer profiles for per-store CRM data
+export const storeCustomerProfiles = pgTable(
+  "store_customer_profiles",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    userId: varchar("userId", { length: 255 })
+      .references(() => users.id)
+      .notNull(),
+    storeId: varchar("storeId", { length: 255 })
+      .references(() => stores.id)
+      .notNull(),
+
+    status: varchar({ length: 20 }).notNull().default("Active"),
+    adminNotes: text(),
+    tags: text("tags")
+      .array()
+      .notNull()
+      .default(sql`ARRAY[]::text[]`),
+
+    firstOrderAt: timestamp(),
+    lastOrderAt: timestamp(),
+    orderCount: integer().notNull().default(0),
+    totalSpent: integer().notNull().default(0), //Total spent in cents
+    marketingOptIn: timestamp(),
+
+    createdAt: timestamp().defaultNow().notNull(),
+    updatedAt: timestamp().defaultNow().notNull(),
+  },
+  (table) => [
+    unique("store_customer_profiles_user_store_unique").on(
+      table.userId,
+      table.storeId,
+    ),
+    index("store_customer_profiles_store_idx").on(table.storeId),
+    index("store_customer_profiles_user_idx").on(table.userId),
+    index("store_customer_profiles_status_idx").on(table.status),
+    index("store_customer_profiles_last_order_idx").on(table.lastOrderAt),
+  ],
+);
+
+export const addressTypesEnum = pgEnum("address_types", [
+  "shipping",
+  "billing",
+]);
 
 // Addresses for shipping and billing
 export const addresses = pgTable("addresses", {
@@ -166,16 +237,38 @@ export const addresses = pgTable("addresses", {
   userId: varchar("userId", { length: 255 })
     .references(() => users.id)
     .notNull(),
-  type: varchar({ length: 20 }).notNull(), // 'shipping' or 'billing'
+  type: addressTypesEnum().notNull(),
   firstName: varchar({ length: 100 }).notNull(),
   lastName: varchar({ length: 100 }).notNull(),
   addressLine1: varchar({ length: 255 }).notNull(),
   addressLine2: varchar({ length: 255 }),
   city: varchar({ length: 100 }).notNull(),
   state: varchar({ length: 100 }).notNull(),
-  postalCode: varchar({ length: 20 }).notNull(),
+  postcode: varchar({ length: 20 }).notNull(),
   country: varchar({ length: 100 }).notNull(),
   isDefault: boolean().notNull().default(false),
+  // Concurrency and lifecycle
+  version: integer().notNull().default(1),
+  updatedAt: timestamp().defaultNow().notNull(),
+  archivedAt: timestamp(),
+  createdAt: timestamp().defaultNow().notNull(),
+});
+
+// Order address snapshots (normalized, immutable per order)
+export const orderAddresses = pgTable("order_addresses", {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  orderId: integer()
+    .references(() => orders.id)
+    .notNull(),
+  type: addressTypesEnum().notNull(),
+  firstName: varchar({ length: 100 }).notNull(),
+  lastName: varchar({ length: 100 }).notNull(),
+  addressLine1: varchar({ length: 255 }).notNull(),
+  addressLine2: varchar({ length: 255 }),
+  city: varchar({ length: 100 }).notNull(),
+  state: varchar({ length: 100 }).notNull(),
+  postcode: varchar({ length: 20 }).notNull(),
+  country: varchar({ length: 100 }).notNull(),
   createdAt: timestamp().defaultNow().notNull(),
 });
 
@@ -377,7 +470,11 @@ export const storeSettings = pgTable("store_settings", {
     .notNull()
     .unique(),
   currency: varchar({ length: 3 }).notNull().default("AUD"),
-  taxRate: decimal({ precision: 5, scale: 4 }).notNull().default("0.00"), // Tax rate as decimal
+  taxRate: decimal({ precision: 5, scale: 4 }).notNull().default("0.10"), // Tax rate as decimal (10% GST)
+  abn: varchar({ length: 11 }), // Australian Business Number
+  businessName: varchar({ length: 255 }),
+  contactEmail: varchar({ length: 255 }),
+  gstRegistered: boolean().notNull().default(false),
   shippingPolicy: text(),
   returnPolicy: text(),
   privacyPolicy: text(),

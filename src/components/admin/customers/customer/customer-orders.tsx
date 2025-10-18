@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import {
   Card,
@@ -10,58 +12,39 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Eye, Package } from "lucide-react";
 import { DataTable } from "@/components/admin/data-table";
+import { useCustomerDetail } from "@/contexts/customer-detail-context";
+import { useCustomerOrdersQuery } from "@/hooks/admin/customers/use-customer-orders-query";
+import { type CustomerOrder } from "@/lib/api/admin/customers";
+import { useSession } from "next-auth/react";
+import {
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+  EmptyContent,
+} from "@/components/ui/empty";
 
 interface CustomerOrdersProps {
-  customerId: string;
   isOverview?: boolean;
 }
 
-// Mock orders data
-const orders = [
-  {
-    id: "ORD-1234",
-    date: "2024-01-10",
-    status: "delivered",
-    total: "$89.99",
-    items: 3,
-    paymentStatus: "paid",
-  },
-  {
-    id: "ORD-1235",
-    date: "2024-01-05",
-    status: "shipped",
-    total: "$156.50",
-    items: 2,
-    paymentStatus: "paid",
-  },
-  {
-    id: "ORD-1236",
-    date: "2023-12-28",
-    status: "delivered",
-    total: "$45.00",
-    items: 1,
-    paymentStatus: "paid",
-  },
-  {
-    id: "ORD-1237",
-    date: "2023-12-15",
-    status: "delivered",
-    total: "$234.99",
-    items: 5,
-    paymentStatus: "paid",
-  },
-  {
-    id: "ORD-1238",
-    date: "2023-12-01",
-    status: "delivered",
-    total: "$67.50",
-    items: 2,
-    paymentStatus: "paid",
-  },
-];
+interface OrderRow {
+  original: CustomerOrder;
+}
+
+interface CellContext {
+  row: OrderRow;
+}
+
+interface Column {
+  header: string;
+  accessorKey?: string;
+  cell?: (context: CellContext) => React.ReactNode;
+}
 
 const getStatusBadge = (status: string) => {
-  switch (status) {
+  switch (status.toLowerCase()) {
     case "delivered":
       return (
         <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
@@ -87,43 +70,46 @@ const getStatusBadge = (status: string) => {
   }
 };
 
-const columns = [
+const columns: Column[] = [
   {
     header: "Order",
-    accessorKey: "id",
-    cell: ({ row }: any) => (
+    accessorKey: "orderNumber",
+    cell: ({ row }: CellContext) => (
       <Link
         href={`/admin/orders/${row.original.id}`}
         className="font-medium hover:underline"
       >
-        {row.original.id}
+        {row.original.orderNumber}
       </Link>
     ),
   },
   {
     header: "Date",
-    accessorKey: "date",
-    cell: ({ row }: any) => new Date(row.original.date).toLocaleDateString(),
+    accessorKey: "createdAt",
+    cell: ({ row }: CellContext) =>
+      new Date(row.original.createdAt).toLocaleDateString(),
   },
   {
     header: "Status",
     accessorKey: "status",
-    cell: ({ row }: any) => getStatusBadge(row.original.status),
+    cell: ({ row }: CellContext) => getStatusBadge(row.original.status),
   },
   {
     header: "Items",
-    accessorKey: "items",
+    accessorKey: "itemCount",
   },
   {
     header: "Total",
-    accessorKey: "total",
-    cell: ({ row }: any) => (
-      <div className="font-medium">{row.original.total}</div>
+    accessorKey: "totalAmount",
+    cell: ({ row }: CellContext) => (
+      <div className="font-medium">
+        ${(row.original.totalAmount / 100).toFixed(2)}
+      </div>
     ),
   },
   {
     header: "Actions",
-    cell: ({ row }: any) => (
+    cell: ({ row }: CellContext) => (
       <Button variant="ghost" size="sm" asChild>
         <Link href={`/admin/orders/${row.original.id}`}>
           <Eye className="mr-1 h-3 w-3" />
@@ -134,11 +120,17 @@ const columns = [
   },
 ];
 
-export function CustomerOrders({
-  customerId,
-  isOverview = false,
-}: CustomerOrdersProps) {
-  const displayOrders = isOverview ? orders.slice(0, 5) : orders;
+export function CustomerOrders({ isOverview = false }: CustomerOrdersProps) {
+  const { customerId } = useCustomerDetail();
+  const session = useSession();
+  const storeId = session.data?.store?.id ?? "";
+
+  const { data, isLoading, error } = useCustomerOrdersQuery({
+    customerId,
+    storeId,
+    page: 1,
+    limit: 5,
+  });
 
   return (
     <Card>
@@ -155,7 +147,7 @@ export function CustomerOrders({
           </div>
           {isOverview && (
             <Button variant="outline" size="sm" asChild>
-              <Link href={`/admin/users/${customerId}?tab=orders`}>
+              <Link href={`/admin/customers/${customerId}?tab=orders`}>
                 View All
               </Link>
             </Button>
@@ -163,7 +155,35 @@ export function CustomerOrders({
         </div>
       </CardHeader>
       <CardContent>
-        <DataTable columns={columns} data={displayOrders} />
+        {isLoading ? (
+          <div className="flex h-32 items-center justify-center">
+            <p className="text-muted-foreground text-sm">Loading orders...</p>
+          </div>
+        ) : error ? (
+          <div className="flex h-32 items-center justify-center">
+            <p className="text-destructive text-sm">Failed to load orders</p>
+          </div>
+        ) : !data?.orders.length ? (
+          <Empty>
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <Package />
+              </EmptyMedia>
+              <EmptyTitle>No orders yet</EmptyTitle>
+              <EmptyDescription>
+                This customer hasn&apos;t placed any orders yet. When they do,
+                they&apos;ll appear here.
+              </EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent>
+              <Button asChild>
+                <Link href="/admin/orders/create">Create Order</Link>
+              </Button>
+            </EmptyContent>
+          </Empty>
+        ) : (
+          <DataTable columns={columns} data={data.orders} />
+        )}
       </CardContent>
     </Card>
   );

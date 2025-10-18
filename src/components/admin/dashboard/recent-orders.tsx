@@ -11,35 +11,35 @@ import { Eye } from "lucide-react";
 
 const orders = [
   {
-    id: "ORD-1234",
+    id: "#001",
     customer: "John Doe",
     amount: "$89.99",
     status: "completed",
     date: "2024-01-15",
   },
   {
-    id: "ORD-1235",
+    id: "#002",
     customer: "Sarah Johnson",
     amount: "$156.50",
     status: "processing",
     date: "2024-01-15",
   },
   {
-    id: "ORD-1236",
+    id: "#003",
     customer: "Mike Chen",
     amount: "$45.00",
     status: "shipped",
     date: "2024-01-14",
   },
   {
-    id: "ORD-1237",
+    id: "#004",
     customer: "Emily Rodriguez",
     amount: "$234.99",
     status: "pending",
     date: "2024-01-14",
   },
   {
-    id: "ORD-1238",
+    id: "#005",
     customer: "David Wilson",
     amount: "$67.50",
     status: "completed",

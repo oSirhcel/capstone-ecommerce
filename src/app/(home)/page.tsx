@@ -109,7 +109,7 @@ export default function Home() {
                   id={store.id}
                   name={store.name}
                   description={store.description}
-                  productCount={store.productCount || 0}
+                  productCount={store.productCount ?? 0}
                   createdAt={store.createdAt.toString()}
                   ownerId={store.ownerId}
                 />

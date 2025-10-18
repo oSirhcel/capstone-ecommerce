@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Save, X } from "lucide-react";
@@ -10,6 +9,12 @@ import { ProductSelectionForm } from "@/components/admin/orders/product-selectio
 import { OrderSummaryForm } from "@/components/admin/orders/order-summary-form";
 import { PaymentForm } from "@/components/admin/orders/payment-form";
 import { toast } from "sonner";
+import { useSession } from "next-auth/react";
+import { useOrderMutations } from "@/hooks/admin/orders/use-order-mutations";
+import { formatOrderNumber } from "@/lib/utils/order-number";
+import { useForm, FormProvider } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 
 export type OrderItem = {
   id: string;
@@ -24,7 +29,7 @@ export type CustomerData = {
   id: string;
   name: string;
   email: string;
-  phone: string;
+  phone?: string;
   avatar?: string;
 };
 
@@ -36,7 +41,7 @@ export type ShippingAddress = {
   address2?: string;
   city: string;
   state: string;
-  zipCode: string;
+  postcode: string;
   country: string;
   phone?: string;
 };
@@ -47,99 +52,180 @@ export type PaymentData = {
   notes?: string;
 };
 
+const orderFormSchema = z.object({
+  customer: z
+    .object({
+      id: z.string().min(1, "Customer is required"),
+      name: z.string(),
+      email: z.string(),
+      phone: z.string().optional(),
+    })
+    .nullable()
+    .refine((val) => val !== null, { message: "Please select a customer" }),
+  orderItems: z
+    .array(
+      z.object({
+        id: z.string(),
+        name: z.string(),
+        price: z.number(),
+        quantity: z.number().min(1),
+        image: z.string(),
+        sku: z.string(),
+      }),
+    )
+    .min(1, "At least one product is required"),
+  selectedAddressId: z.number().nullable(),
+  shippingAddress: z.object({
+    firstName: z.string().min(1, "First name is required"),
+    lastName: z.string().min(1, "Last name is required"),
+    company: z.string().optional(),
+    address1: z.string().min(1, "Address is required"),
+    address2: z.string().optional(),
+    city: z.string().min(1, "City is required"),
+    state: z.string().min(1, "State is required"),
+    postcode: z.string().min(1, "Postcode is required"),
+    country: z.string().min(1, "Country is required"),
+    phone: z.string().optional(),
+  }),
+  paymentData: z.object({
+    method: z.enum(["card", "cash", "bank_transfer"]),
+    status: z.enum(["paid", "pending", "failed"]),
+    notes: z.string().optional(),
+  }),
+  orderNotes: z.string().optional(),
+});
+
+export type OrderFormValues = z.infer<typeof orderFormSchema>;
+
 export default function CreateOrderPage() {
   const router = useRouter();
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const session = useSession();
+  const storeId = session?.data?.store?.id ?? "";
+  const { create } = useOrderMutations(storeId);
 
-  // Order state
-  const [customer, setCustomer] = useState<CustomerData | null>(null);
-  const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
-  const [shippingAddress, setShippingAddress] = useState<ShippingAddress>({
-    firstName: "",
-    lastName: "",
-    company: "",
-    address1: "",
-    address2: "",
-    city: "",
-    state: "",
-    zipCode: "",
-    country: "US",
-    phone: "",
+  const form = useForm<OrderFormValues>({
+    resolver: zodResolver(orderFormSchema),
+    defaultValues: {
+      customer: null,
+      orderItems: [],
+      selectedAddressId: null,
+      shippingAddress: {
+        firstName: "",
+        lastName: "",
+        company: "",
+        address1: "",
+        address2: "",
+        city: "",
+        state: "",
+        postcode: "",
+        country: "AU",
+        phone: "",
+      },
+      paymentData: {
+        method: "card",
+        status: "pending",
+        notes: "",
+      },
+      orderNotes: "",
+    },
   });
-  const [paymentData, setPaymentData] = useState<PaymentData>({
-    method: "card",
-    status: "pending",
-    notes: "",
-  });
-  const [orderNotes, setOrderNotes] = useState("");
 
-  // Calculations
+  const { watch, handleSubmit: createHandleSubmit } = form;
+
+  // Calculations - still needed for submit handler
+  const orderItems = watch("orderItems");
   const subtotal = orderItems.reduce(
     (sum, item) => sum + item.price * item.quantity,
     0,
   );
   const shipping = subtotal > 100 ? 0 : 9.99;
-  const tax = subtotal * 0.08;
+  const tax = subtotal * 0.1; // 10% GST for Australia
   const total = subtotal + shipping + tax;
 
-  const handleSubmit = async () => {
-    // Validation
-    if (!customer) {
-      toast.error("Customer Required", {
-        description: "Please select a customer for this order.",
-      });
-      return;
-    }
-
-    if (orderItems.length === 0) {
-      toast.error("Products Required", {
-        description: "Please add at least one product to the order.",
-      });
-      return;
-    }
-
-    if (
-      !shippingAddress.firstName ||
-      !shippingAddress.lastName ||
-      !shippingAddress.address1
-    ) {
-      toast.error("Shipping Address Required", {
-        description: "Please fill in the shipping address details.",
-      });
-      return;
-    }
-
-    setIsSubmitting(true);
-
+  const onSubmit = async (data: OrderFormValues) => {
     try {
-      const orderData = {
-        customer,
-        items: orderItems,
-        shippingAddress,
-        payment: paymentData,
-        notes: orderNotes,
-        subtotal,
-        shipping,
-        tax,
-        total,
+      const payload: {
+        storeId: string;
+        customerId: string;
+        items: Array<{
+          productId: number;
+          quantity: number;
+          priceAtTime: number;
+        }>;
+        totalAmount: number;
+        addressId?: number;
+        shippingAddress?: {
+          firstName: string;
+          lastName: string;
+          addressLine1: string;
+          addressLine2?: string;
+          city: string;
+          state: string;
+          postcode: string;
+          country: string;
+        };
+        notes?: string;
+      } = {
+        storeId,
+        customerId: data.customer!.id,
+        items: data.orderItems.map((i) => ({
+          productId: Number(i.id),
+          quantity: i.quantity,
+          priceAtTime: Math.round(i.price * 100),
+        })),
+        totalAmount: Math.round(total * 100),
+        notes: data.orderNotes ?? undefined,
       };
 
-      console.log("Creating order:", orderData);
+      // Include either addressId or shippingAddress
+      if (data.selectedAddressId) {
+        payload.addressId = data.selectedAddressId;
+      } else {
+        payload.shippingAddress = {
+          firstName: data.shippingAddress.firstName,
+          lastName: data.shippingAddress.lastName,
+          addressLine1: data.shippingAddress.address1,
+          addressLine2: data.shippingAddress.address2 ?? undefined,
+          city: data.shippingAddress.city,
+          state: data.shippingAddress.state,
+          postcode: data.shippingAddress.postcode,
+          country: data.shippingAddress.country,
+        };
+      }
 
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      const result = await create.mutateAsync(payload);
 
       toast.success("Order Created Successfully", {
-        description: `Order has been created and assigned ID ORD-${Date.now()}`,
+        description: `Order ${formatOrderNumber(result.orderId)} has been created.`,
       });
-
-      router.push("/admin/orders");
+      router.push(`/admin/orders/${result.orderId}`);
     } catch (error) {
       toast.error("Error Creating Order", {
-        description: "There was an error creating the order. Please try again.",
+        description:
+          error instanceof Error ? error.message : "Please try again.",
       });
-    } finally {
-      setIsSubmitting(false);
+    }
+  };
+
+  const onError = () => {
+    const errors = form.formState.errors;
+    if (errors.customer) {
+      toast.error("Customer Required", {
+        description: errors.customer.message ?? "Please select a customer.",
+      });
+    } else if (errors.orderItems) {
+      toast.error("Products Required", {
+        description:
+          errors.orderItems.message ?? "Please add at least one product.",
+      });
+    } else if (errors.shippingAddress) {
+      toast.error("Shipping Address Incomplete", {
+        description: "Please fill in all required address fields.",
+      });
+    } else {
+      toast.error("Validation Error", {
+        description: "Please check all required fields.",
+      });
     }
   };
 
@@ -148,79 +234,65 @@ export default function CreateOrderPage() {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="space-y-1">
-          <div className="text-muted-foreground flex items-center gap-2 text-sm">
-            <Link
-              href="/admin/orders"
-              className="hover:text-foreground flex items-center gap-1"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Back to orders
-            </Link>
+    <FormProvider {...form}>
+      <div className="mx-4 space-y-6 xl:mx-64">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div className="space-y-1">
+            <div className="text-muted-foreground flex items-center gap-2 text-sm">
+              <Link
+                href="/admin/orders"
+                className="hover:text-foreground flex items-center gap-1"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back to orders
+              </Link>
+            </div>
+            <h1 className="text-3xl font-bold">Create New Order</h1>
+            <p className="text-muted-foreground">
+              Manually create an order for a customer
+            </p>
           </div>
-          <h1 className="text-3xl font-bold">Create New Order</h1>
-          <p className="text-muted-foreground">
-            Manually create an order for a customer
-          </p>
+
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={handleCancel}
+              disabled={create.isPending}
+            >
+              <X className="mr-2 h-4 w-4" />
+              Cancel
+            </Button>
+            <Button
+              onClick={createHandleSubmit(onSubmit, onError)}
+              disabled={create.isPending}
+            >
+              <Save className="mr-2 h-4 w-4" />
+              {create.isPending ? "Creating..." : "Create Order"}
+            </Button>
+          </div>
         </div>
 
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={handleCancel}
-            disabled={isSubmitting}
-          >
-            <X className="mr-2 h-4 w-4" />
-            Cancel
-          </Button>
-          <Button onClick={handleSubmit} disabled={isSubmitting}>
-            <Save className="mr-2 h-4 w-4" />
-            {isSubmitting ? "Creating..." : "Create Order"}
-          </Button>
-        </div>
-      </div>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_380px]">
+          {/* Main Content - Left Column */}
+          <div className="space-y-6">
+            {/* Product Selection */}
+            <ProductSelectionForm storeId={storeId} />
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Main Content */}
-        <div className="space-y-6 lg:col-span-2">
-          {/* Customer Selection */}
-          <CustomerSelectionForm
-            customer={customer}
-            onCustomerChange={setCustomer}
-            shippingAddress={shippingAddress}
-            onShippingAddressChange={setShippingAddress}
-          />
+            {/* Payment Summary */}
+            <OrderSummaryForm />
+          </div>
 
-          {/* Product Selection */}
-          <ProductSelectionForm
-            orderItems={orderItems}
-            onOrderItemsChange={setOrderItems}
-          />
+          {/* Sidebar - Right Column */}
+          <div className="space-y-6">
+            {/* Customer Selection & Shipping */}
+            <CustomerSelectionForm storeId={storeId} />
 
-          {/* Payment Information */}
-          <PaymentForm
-            paymentData={paymentData}
-            onPaymentDataChange={setPaymentData}
-            orderNotes={orderNotes}
-            onOrderNotesChange={setOrderNotes}
-          />
-        </div>
-
-        {/* Sidebar - Order Summary */}
-        <div>
-          <OrderSummaryForm
-            customer={customer}
-            orderItems={orderItems}
-            subtotal={subtotal}
-            shipping={shipping}
-            tax={tax}
-            total={total}
-          />
+            {/* Payment Information & Notes */}
+            <PaymentForm />
+          </div>
         </div>
       </div>
-    </div>
+    </FormProvider>
   );
 }

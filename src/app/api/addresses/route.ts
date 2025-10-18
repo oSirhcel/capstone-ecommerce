@@ -1,8 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/server/db";
 import { addresses } from "@/server/db/schema";
 import { eq, and } from "drizzle-orm";
+import { z } from "zod";
 
 export const runtime = "nodejs";
 
@@ -27,7 +28,10 @@ export async function GET(_request: NextRequest) {
     return NextResponse.json({ addresses: rows });
   } catch (error) {
     console.error("Get addresses error:", error);
-    return NextResponse.json({ error: "Failed to get addresses" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to get addresses" },
+      { status: 500 },
+    );
   }
 }
 
@@ -40,31 +44,50 @@ export async function POST(request: NextRequest) {
     }
 
     const user = session.user as SessionUser;
-    const body = await request.json();
 
-    // Validate required fields
-    const { type, firstName, lastName, addressLine1, city, state, postalCode, country, isDefault } = body;
-    
-    if (!type || !firstName || !lastName || !addressLine1 || !city || !state || !postalCode || !country) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
-    }
+    const CreateAddressSchema = z.object({
+      type: z.enum(["shipping", "billing"]),
+      firstName: z.string().min(1),
+      lastName: z.string().min(1),
+      addressLine1: z.string().min(1),
+      addressLine2: z.string().optional().nullable(),
+      city: z.string().min(1),
+      state: z.string().min(1),
+      postcode: z.string().min(1),
+      country: z.string().min(1),
+      isDefault: z.boolean().optional(),
+    });
 
-    // Validate address type
-    if (type !== "shipping" && type !== "billing") {
-      return NextResponse.json({ error: "Invalid address type. Must be 'shipping' or 'billing'" }, { status: 400 });
+    const createParsed = CreateAddressSchema.safeParse(await request.json());
+
+    if (!createParsed.success) {
+      return NextResponse.json(
+        {
+          error: "Validation error",
+          details: z.treeifyError(createParsed.error),
+        },
+        { status: 400 },
+      );
     }
+    const {
+      type,
+      firstName,
+      lastName,
+      addressLine1,
+      addressLine2,
+      city,
+      state,
+      postcode,
+      country,
+      isDefault,
+    } = createParsed.data;
 
     // If this address is being set as default, unset all other default addresses of the same type
     if (isDefault) {
       await db
         .update(addresses)
         .set({ isDefault: false })
-        .where(
-          and(
-            eq(addresses.userId, user.id),
-            eq(addresses.type, type)
-          )
-        );
+        .where(and(eq(addresses.userId, user.id), eq(addresses.type, type)));
     }
 
     // Create the new address
@@ -76,19 +99,22 @@ export async function POST(request: NextRequest) {
         firstName,
         lastName,
         addressLine1,
-        addressLine2: body.addressLine2 || null,
+        addressLine2: addressLine2 ?? null,
         city,
         state,
-        postalCode,
+        postcode,
         country,
-        isDefault: isDefault || false,
+        isDefault: isDefault ?? false,
       })
       .returning();
 
     return NextResponse.json({ address: newAddress }, { status: 201 });
   } catch (error) {
     console.error("Create address error:", error);
-    return NextResponse.json({ error: "Failed to create address" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to create address" },
+      { status: 500 },
+    );
   }
 }
 
@@ -101,23 +127,49 @@ export async function PUT(request: NextRequest) {
     }
 
     const user = session.user as SessionUser;
-    const body = await request.json();
-    const { id, type, firstName, lastName, addressLine1, addressLine2, city, state, postalCode, country, isDefault } = body;
+    const UpdateAddressSchema = z.object({
+      id: z.number().int().positive(),
+      type: z.enum(["shipping", "billing"]).optional(),
+      firstName: z.string().min(1).optional(),
+      lastName: z.string().min(1).optional(),
+      addressLine1: z.string().min(1).optional(),
+      addressLine2: z.string().optional().nullable(),
+      city: z.string().min(1).optional(),
+      state: z.string().min(1).optional(),
+      postcode: z.string().min(1).optional(),
+      country: z.string().min(1).optional(),
+      isDefault: z.boolean().optional(),
+    });
+    const updateParsed = UpdateAddressSchema.safeParse(await request.json());
 
-    if (!id) {
-      return NextResponse.json({ error: "Address ID is required" }, { status: 400 });
+    if (!updateParsed.success) {
+      return NextResponse.json(
+        {
+          error: "Validation error",
+          details: z.treeifyError(updateParsed.error),
+        },
+        { status: 400 },
+      );
     }
+    const {
+      id,
+      type,
+      firstName,
+      lastName,
+      addressLine1,
+      addressLine2,
+      city,
+      state,
+      postcode,
+      country,
+      isDefault,
+    } = updateParsed.data;
 
     // Validate that the address belongs to the user
     const existingAddress = await db
       .select()
       .from(addresses)
-      .where(
-        and(
-          eq(addresses.id, id),
-          eq(addresses.userId, user.id)
-        )
-      )
+      .where(and(eq(addresses.id, id), eq(addresses.userId, user.id)))
       .limit(1);
 
     if (!existingAddress.length) {
@@ -126,20 +178,20 @@ export async function PUT(request: NextRequest) {
 
     // Validate address type if provided
     if (type && type !== "shipping" && type !== "billing") {
-      return NextResponse.json({ error: "Invalid address type. Must be 'shipping' or 'billing'" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Invalid address type. Must be 'shipping' or 'billing'" },
+        { status: 400 },
+      );
     }
 
     // If this address is being set as default, unset all other default addresses of the same type
     if (isDefault) {
-      const addressType = type || existingAddress[0].type;
+      const addressType = type ?? existingAddress[0].type;
       await db
         .update(addresses)
         .set({ isDefault: false })
         .where(
-          and(
-            eq(addresses.userId, user.id),
-            eq(addresses.type, addressType)
-          )
+          and(eq(addresses.userId, user.id), eq(addresses.type, addressType)),
         );
     }
 
@@ -154,22 +206,20 @@ export async function PUT(request: NextRequest) {
         ...(addressLine2 !== undefined && { addressLine2 }),
         ...(city && { city }),
         ...(state && { state }),
-        ...(postalCode && { postalCode }),
+        ...(postcode && { postcode }),
         ...(country && { country }),
         ...(isDefault !== undefined && { isDefault }),
       })
-      .where(
-        and(
-          eq(addresses.id, id),
-          eq(addresses.userId, user.id)
-        )
-      )
+      .where(and(eq(addresses.id, id), eq(addresses.userId, user.id)))
       .returning();
 
     return NextResponse.json({ address: updatedAddress });
   } catch (error) {
     console.error("Update address error:", error);
-    return NextResponse.json({ error: "Failed to update address" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to update address" },
+      { status: 500 },
+    );
   }
 }
 
@@ -183,22 +233,17 @@ export async function DELETE(request: NextRequest) {
 
     const user = session.user as SessionUser;
     const { searchParams } = new URL(request.url);
-    const id = searchParams.get("id");
+    const id = Number(searchParams.get("id"));
 
-    if (!id) {
-      return NextResponse.json({ error: "Address ID is required" }, { status: 400 });
+    if (isNaN(id)) {
+      return NextResponse.json({ error: "Invalid id" }, { status: 400 });
     }
 
     // Get the address to check if it's default
     const [addressToDelete] = await db
       .select()
       .from(addresses)
-      .where(
-        and(
-          eq(addresses.id, parseInt(id)),
-          eq(addresses.userId, user.id)
-        )
-      )
+      .where(and(eq(addresses.id, id), eq(addresses.userId, user.id)))
       .limit(1);
 
     if (!addressToDelete) {
@@ -208,12 +253,7 @@ export async function DELETE(request: NextRequest) {
     // Delete the address
     await db
       .delete(addresses)
-      .where(
-        and(
-          eq(addresses.id, parseInt(id)),
-          eq(addresses.userId, user.id)
-        )
-      );
+      .where(and(eq(addresses.id, id), eq(addresses.userId, user.id)));
 
     // If the deleted address was default, set another address of the same type as default
     if (addressToDelete.isDefault) {
@@ -223,8 +263,8 @@ export async function DELETE(request: NextRequest) {
         .where(
           and(
             eq(addresses.userId, user.id),
-            eq(addresses.type, addressToDelete.type)
-          )
+            eq(addresses.type, addressToDelete.type),
+          ),
         )
         .limit(1);
 
@@ -236,10 +276,15 @@ export async function DELETE(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ success: true, message: "Address deleted successfully" });
+    return NextResponse.json({
+      success: true,
+      message: "Address deleted successfully",
+    });
   } catch (error) {
     console.error("Delete address error:", error);
-    return NextResponse.json({ error: "Failed to delete address" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to delete address" },
+      { status: 500 },
+    );
   }
 }
-

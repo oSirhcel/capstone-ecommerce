@@ -1,6 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
+import { useForm, type Resolver } from "react-hook-form";
+import * as z from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/contexts/cart-context";
@@ -8,33 +11,65 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import {
-  ArrowLeft,
-  CreditCard,
-  Mail,
-  MapPin,
-  Plus,
-  Package,
-} from "lucide-react";
+import { ArrowLeft, CreditCard, Mail, Plus, Package } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Breadcrumb } from "@/components/product/breadcrumb";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Form, FormControl, FormField } from "@/components/ui/form";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { toast } from "sonner";
 import { StripePaymentForm } from "@/components/checkout/stripe-payment-form";
+import { AddressForm } from "@/components/checkout/address-form";
 import { useAddressesByType } from "@/hooks/use-addresses";
-import type { AddressDTO } from "@/lib/api/addresses";
+import { createOrders as createOrdersAPI } from "@/lib/api/orders";
+
+// Form schemas
+const contactFormSchema = z.object({
+  email: z
+    .string()
+    .min(1, "Email is required")
+    .email("Please enter a valid email address")
+    .max(255, "Email is too long"),
+  phone: z
+    .string()
+    .min(1, "Phone number is required")
+    .regex(
+      /^[\d\s\-\+\(\)]+$/,
+      "Please enter a valid phone number (digits, spaces, +, -, or parentheses only)",
+    )
+    .min(8, "Phone number must be at least 8 digits")
+    .max(20, "Phone number is too long"),
+});
+
+const addressFormSchema = z.object({
+  firstName: z.string().min(1, "First name is required"),
+  lastName: z.string().min(1, "Last name is required"),
+  addressLine1: z.string().min(3, "Address is required"),
+  addressLine2: z.string().optional(),
+  city: z.string().min(1, "City is required"),
+  state: z.string().min(1, "State is required"),
+  postcode: z.string().min(2, "Postcode is required"),
+  country: z.string().min(2, "Country is required"),
+  isDefault: z.boolean().default(false),
+});
+
+type ContactFormData = z.infer<typeof contactFormSchema>;
+type AddressFormData = {
+  firstName: string;
+  lastName: string;
+  addressLine1: string;
+  addressLine2?: string;
+  city: string;
+  state: string;
+  postcode: string;
+  country: string;
+  isDefault: boolean;
+};
 
 export function CheckoutClient() {
   const { data: session } = useSession();
@@ -49,7 +84,10 @@ export function CheckoutClient() {
     clearCart,
   } = useCart();
 
-  // Fetch saved addresses
+  const [currentStep, setCurrentStep] = useState<"address" | "payment">(
+    "address",
+  );
+
   const {
     addresses: shippingAddresses,
     defaultAddress: defaultShipping,
@@ -61,101 +99,69 @@ export function CheckoutClient() {
     isLoading: loadingBilling,
   } = useAddressesByType("billing");
 
-  // Form states
-  const [currentStep, setCurrentStep] = useState<
-    "contact" | "shipping" | "billing" | "payment"
-  >("contact");
-  const [contactData, setContactData] = useState({
-    email: session?.user?.email || "",
-    phone: "",
+  // Form instances
+  const contactForm = useForm<ContactFormData>({
+    resolver: zodResolver(contactFormSchema),
+    defaultValues: {
+      email: session?.user?.email ?? "",
+      phone: "",
+    },
   });
 
-  // Shipping address state
-  const [useExistingShipping, setUseExistingShipping] = useState(false);
+  const shippingForm = useForm<AddressFormData>({
+    resolver: zodResolver(addressFormSchema) as Resolver<AddressFormData>,
+    defaultValues: {
+      firstName: "",
+      lastName: "",
+      addressLine1: "",
+      addressLine2: "",
+      city: "",
+      state: "",
+      postcode: "",
+      country: "Australia",
+      isDefault: false,
+    },
+  });
+
+  const billingForm = useForm<AddressFormData>({
+    resolver: zodResolver(addressFormSchema) as Resolver<AddressFormData>,
+    defaultValues: {
+      firstName: "",
+      lastName: "",
+      addressLine1: "",
+      addressLine2: "",
+      city: "",
+      state: "",
+      postcode: "",
+      country: "Australia",
+      isDefault: false,
+    },
+  });
+
+  // Address selection state
   const [selectedShippingId, setSelectedShippingId] = useState<number | null>(
-    null,
+    defaultShipping?.id ?? null,
   );
-  const [shippingData, setShippingData] = useState({
-    firstName: "",
-    lastName: "",
-    addressLine1: "",
-    addressLine2: "",
-    city: "",
-    state: "",
-    postalCode: "",
-    country: "Australia",
-  });
-
-  // Billing address state
-  const [sameAsShipping, setSameAsShipping] = useState(true);
-  const [useExistingBilling, setUseExistingBilling] = useState(false);
   const [selectedBillingId, setSelectedBillingId] = useState<number | null>(
-    null,
+    defaultBilling?.id ?? null,
   );
-  const [billingData, setBillingData] = useState({
-    firstName: "",
-    lastName: "",
-    addressLine1: "",
-    addressLine2: "",
-    city: "",
-    state: "",
-    postalCode: "",
-    country: "Australia",
-  });
-
-  const [isProcessingOrder, setIsProcessingOrder] = useState(false);
-
-  // Set default addresses when loaded
-  useEffect(() => {
-    if (defaultShipping && !selectedShippingId) {
-      setSelectedShippingId(defaultShipping.id);
-      setUseExistingShipping(true);
-      // Populate form data as backup
-      setShippingData({
-        firstName: defaultShipping.firstName,
-        lastName: defaultShipping.lastName,
-        addressLine1: defaultShipping.addressLine1,
-        addressLine2: defaultShipping.addressLine2 || "",
-        city: defaultShipping.city,
-        state: defaultShipping.state,
-        postalCode: defaultShipping.postalCode,
-        country: defaultShipping.country,
-      });
-    }
-  }, [defaultShipping, selectedShippingId]);
-
-  useEffect(() => {
-    if (defaultBilling && !selectedBillingId && !sameAsShipping) {
-      setSelectedBillingId(defaultBilling.id);
-      setUseExistingBilling(true);
-      // Populate form data as backup
-      setBillingData({
-        firstName: defaultBilling.firstName,
-        lastName: defaultBilling.lastName,
-        addressLine1: defaultBilling.addressLine1,
-        addressLine2: defaultBilling.addressLine2 || "",
-        city: defaultBilling.city,
-        state: defaultBilling.state,
-        postalCode: defaultBilling.postalCode,
-        country: defaultBilling.country,
-      });
-    }
-  }, [defaultBilling, selectedBillingId, sameAsShipping]);
+  const [sameAsShipping, setSameAsShipping] = useState(true);
 
   // Handle shipping address selection
   const handleShippingAddressSelect = (addressId: number) => {
     const address = shippingAddresses.find((a) => a.id === addressId);
     if (address) {
       setSelectedShippingId(addressId);
-      setShippingData({
+      shippingForm.reset({
         firstName: address.firstName,
         lastName: address.lastName,
         addressLine1: address.addressLine1,
-        addressLine2: address.addressLine2 || "",
+        addressLine2: address.addressLine2 ?? "",
         city: address.city,
         state: address.state,
-        postalCode: address.postalCode,
+        postcode: address.postcode,
         country: address.country,
+        isDefault: address.isDefault,
       });
     }
   };
@@ -165,16 +171,27 @@ export function CheckoutClient() {
     const address = billingAddresses.find((a) => a.id === addressId);
     if (address) {
       setSelectedBillingId(addressId);
-      setBillingData({
+      billingForm.reset({
         firstName: address.firstName,
         lastName: address.lastName,
         addressLine1: address.addressLine1,
-        addressLine2: address.addressLine2 || "",
+        addressLine2: address.addressLine2 ?? "",
         city: address.city,
         state: address.state,
-        postalCode: address.postalCode,
+        postcode: address.postcode,
         country: address.country,
+        isDefault: address.isDefault,
       });
+    }
+  };
+
+  // Handle same as shipping toggle
+  const handleSameAsShippingChange = (checked: boolean) => {
+    setSameAsShipping(checked);
+    if (checked) {
+      setSelectedBillingId(null);
+      const shippingData = shippingForm.getValues();
+      billingForm.reset(shippingData);
     }
   };
 
@@ -257,70 +274,78 @@ export function CheckoutClient() {
 
   // Calculate shipping, tax, and total
   const shipping = subtotal > 50 ? 0 : 5.99;
-  const tax = subtotal * 0.08;
+  const tax = subtotal * 0.1; // 10% GST for Australia
   const total = subtotal + shipping + tax;
 
-  // Get final shipping and billing data
-  const getFinalShippingData = () => {
-    if (useExistingShipping && selectedShippingId) {
-      const address = shippingAddresses.find(
-        (a) => a.id === selectedShippingId,
-      );
-      if (!address) {
-        throw new Error(
-          "Selected shipping address not found. Please try again.",
-        );
-      }
-      return address;
+  // Validate address step and proceed to payment
+  const handleProceedToPayment = async () => {
+    // Validate contact form
+    const contactValid = await contactForm.trigger();
+    if (!contactValid) {
+      toast.error("Please complete your contact information", {
+        description: "Email and phone number are required",
+      });
+      return;
     }
-    return shippingData;
+
+    // Validate shipping address
+    const shippingValid = selectedShippingId
+      ? true
+      : await shippingForm.trigger();
+    if (!shippingValid) {
+      toast.error("Please complete your shipping address", {
+        description: "All required shipping fields must be filled",
+      });
+      return;
+    }
+
+    // Validate billing address if not same as shipping
+    if (!sameAsShipping) {
+      const billingValid = selectedBillingId
+        ? true
+        : await billingForm.trigger();
+      if (!billingValid) {
+        toast.error("Please complete your billing address", {
+          description: "All required billing fields must be filled",
+        });
+        return;
+      }
+    }
+
+    setCurrentStep("payment");
   };
 
-  const getFinalBillingData = () => {
-    if (sameAsShipping) {
-      return getFinalShippingData();
-    }
-    if (useExistingBilling && selectedBillingId) {
-      const address = billingAddresses.find((a) => a.id === selectedBillingId);
-      if (!address) {
-        throw new Error(
-          "Selected billing address not found. Please try again.",
-        );
-      }
-      return address;
-    }
-    return billingData;
-  };
-
-  // Create order in database
-  const createOrder = async () => {
+  const handleCreateOrders = async () => {
     try {
-      // Validation
+      // Get form data
+      const contactData = contactForm.getValues();
+      const shippingData = shippingForm.getValues();
+      const billingData = sameAsShipping
+        ? shippingData
+        : billingForm.getValues();
+
       if (!contactData.email || !contactData.phone) {
         throw new Error("Please provide your email and phone number");
       }
 
-      const finalShipping = getFinalShippingData();
-      const finalBilling = getFinalBillingData();
-
       if (
-        !finalShipping.firstName ||
-        !finalShipping.lastName ||
-        !finalShipping.addressLine1 ||
-        !finalShipping.city ||
-        !finalShipping.state ||
-        !finalShipping.postalCode
+        !shippingData.firstName ||
+        !shippingData.lastName ||
+        !shippingData.addressLine1 ||
+        !shippingData.city ||
+        !shippingData.state ||
+        !shippingData.postcode
       ) {
         throw new Error("Please complete your shipping information");
       }
 
       if (
-        !finalBilling.firstName ||
-        !finalBilling.lastName ||
-        !finalBilling.addressLine1 ||
-        !finalBilling.city ||
-        !finalBilling.state ||
-        !finalBilling.postalCode
+        !billingData.firstName ||
+        !billingData.lastName ||
+        !billingData.addressLine1 ||
+        !billingData.city ||
+        !billingData.state ||
+        !billingData.postcode
       ) {
         throw new Error("Please complete your billing information");
       }
@@ -328,41 +353,16 @@ export function CheckoutClient() {
       if (!items.length) {
         throw new Error("Your cart is empty");
       }
-
-      const orderPayload = {
-        items: items.map((item) => ({
-          productId:
-            typeof item.id === "string"
-              ? parseInt((item.id as unknown as string) || "", 10)
-              : item.id,
-          quantity: item.quantity,
-          price: item.price,
-        })),
-        totalAmount: Math.round(total * 100), // Convert to cents
+      const result = await createOrdersAPI(
+        storeGroups,
         contactData,
-        shippingAddress: finalShipping,
-        billingAddress: finalBilling,
-      };
+        shippingData,
+        billingData,
+        shipping,
+        tax,
+      );
 
-      const response = await fetch("/api/orders", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(orderPayload),
-      });
-
-      if (!response.ok) {
-        let serverMessage = "Failed to create order";
-        try {
-          const err = await response.json();
-          if (err?.error) serverMessage = err.error as string;
-        } catch (_) {}
-        throw new Error(serverMessage);
-      }
-
-      const orderData = await response.json();
-      return orderData.orderId;
+      return result;
     } catch (error) {
       const msg =
         error instanceof Error ? error.message : "Failed to create order";
@@ -372,12 +372,18 @@ export function CheckoutClient() {
     }
   };
 
-  // Create order and handle payment
+  // Create orders and handle payment
   const handlePaymentInit = async () => {
     try {
-      setIsProcessingOrder(true);
-      const orderId = await createOrder();
-      return orderId;
+      const orderResult = await handleCreateOrders();
+
+      if (orderResult.storeCount > 1) {
+        toast.info(`Creating ${orderResult.storeCount} orders`, {
+          description: `Your items will be shipped separately by each store.`,
+        });
+      }
+
+      return orderResult.primaryOrderId;
     } catch (error) {
       console.error("Order creation error:", error);
       toast.error("Failed to create order", {
@@ -411,24 +417,27 @@ export function CheckoutClient() {
   };
 
   // Handle successful payment
-  const handlePaymentSuccess = async (paymentResult: any) => {
+  const handlePaymentSuccess = async (paymentResult: {
+    paymentIntentId: string;
+    orderId?: number;
+  }) => {
     try {
-      toast.success("Payment successful!", {
-        description:
-          "Your order has been confirmed and will be processed shortly.",
-        duration: 5000,
-      });
-
       clearCart();
 
-      setTimeout(() => {
-        const params = new URLSearchParams();
-        params.set("payment_intent", paymentResult.paymentIntentId);
-        if (paymentResult.orderId) {
-          params.set("order_id", paymentResult.orderId.toString());
-        }
-        router.push(`/checkout/success?${params.toString()}`);
-      }, 2000);
+      // Navigate immediately to success page
+      const params = new URLSearchParams();
+      params.set("payment_intent", paymentResult.paymentIntentId);
+      if (paymentResult.orderId) {
+        params.set("order_id", paymentResult.orderId.toString());
+      }
+
+      // Pass store count for success page messaging
+      const storeCount = getStoreCount();
+      if (storeCount > 1) {
+        params.set("store_count", storeCount.toString());
+      }
+
+      router.push(`/checkout/success?${params.toString()}`);
     } catch (error) {
       console.error("Post-payment processing error:", error);
       toast.error("Payment successful but order processing failed", {
@@ -438,55 +447,7 @@ export function CheckoutClient() {
   };
 
   // Handle payment error
-  const handlePaymentError = (error: string | Error) => {
-    console.log("handlePaymentError called with:", error);
-    console.log("Error type:", typeof error);
-    console.log("Is Error instance:", error instanceof Error);
-
-    if (error instanceof Error) {
-      console.log("Error properties:", {
-        isZeroTrustBlock: (error as any).isZeroTrustBlock,
-        isZeroTrustVerification: (error as any).isZeroTrustVerification,
-      });
-    }
-
-    // Check if this is a zero trust block
-    if (error instanceof Error && (error as any).isZeroTrustBlock) {
-      const zeroTrustError = error as any;
-      console.log("Redirecting to blocked page");
-
-      // Redirect to blocked page with risk details
-      const params = new URLSearchParams();
-      params.set("score", zeroTrustError.riskScore?.toString() || "0");
-      params.set("factors", zeroTrustError.riskFactors?.join(",") || "");
-      params.set(
-        "support",
-        zeroTrustError.supportContact || "support@yourstore.com",
-      );
-
-      router.push(`/checkout/blocked?${params.toString()}`);
-      return;
-    }
-
-    // Check if this is a zero trust verification required
-    if (error instanceof Error && (error as any).isZeroTrustVerification) {
-      const verificationError = error as any;
-      console.log("Redirecting to OTP verification page");
-      console.log("Verification token:", verificationError.verificationToken);
-
-      // Redirect to OTP verification page
-      const params = new URLSearchParams();
-      params.set("token", verificationError.verificationToken || "");
-      params.set("score", verificationError.riskScore?.toString() || "0");
-      params.set("email", verificationError.userEmail || "");
-
-      router.push(`/checkout/verify-otp?${params.toString()}`);
-      return;
-    }
-
-    // Handle regular payment errors
-    console.log("Handling as regular payment error");
-    const errorMessage = error instanceof Error ? error.message : error;
+  const handlePaymentError = (error: string) => {
     toast.error("Payment failed", {
       description: errorMessage,
       duration: 5000,
@@ -549,613 +510,436 @@ export function CheckoutClient() {
           <p className="text-muted-foreground mt-2">
             Complete your purchase securely
           </p>
+
+          {/* Step Indicator */}
+          <div className="mt-6 flex items-center gap-2">
+            <div
+              className={`flex items-center gap-2 ${currentStep === "address" ? "text-primary font-semibold" : "text-muted-foreground"}`}
+            >
+              <div
+                className={`flex h-8 w-8 items-center justify-center rounded-full ${currentStep === "address" ? "bg-primary text-primary-foreground" : "bg-muted"}`}
+              >
+                1
+              </div>
+              <span>Address & Contact</span>
+            </div>
+            <div className="bg-border h-px flex-1" />
+            <div
+              className={`flex items-center gap-2 ${currentStep === "payment" ? "text-primary font-semibold" : "text-muted-foreground"}`}
+            >
+              <div
+                className={`flex h-8 w-8 items-center justify-center rounded-full ${currentStep === "payment" ? "bg-primary text-primary-foreground" : "bg-muted"}`}
+              >
+                2
+              </div>
+              <span>Payment</span>
+            </div>
+          </div>
         </div>
 
         <div className="grid gap-8 lg:grid-cols-3">
           {/* Checkout Forms */}
           <div className="space-y-6 lg:col-span-2">
-            {/* Contact Information */}
-            {currentStep === "contact" && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Mail className="h-5 w-5" />
-                    Contact Information
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="email">Email Address</Label>
-                      <Input
-                        id="email"
-                        type="email"
-                        placeholder="your@email.com"
-                        value={contactData.email}
-                        onChange={(e) =>
-                          setContactData({
-                            ...contactData,
-                            email: e.target.value,
-                          })
-                        }
-                      />
-                      <p className="text-muted-foreground text-xs">
-                        Security codes will be sent to your account email:{" "}
-                        {session?.user?.email}
-                      </p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="phone">Phone Number</Label>
-                      <Input
-                        id="phone"
-                        type="tel"
-                        placeholder="+61 4 1234 5678"
-                        value={contactData.phone}
-                        onChange={(e) =>
-                          setContactData({
-                            ...contactData,
-                            phone: e.target.value,
-                          })
-                        }
-                      />
-                    </div>
-                  </div>
-                  <Button
-                    size="default"
-                    className="w-full"
-                    onClick={() => setCurrentStep("shipping")}
-                    disabled={!canProceedToShipping()}
-                  >
-                    Continue to Shipping
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Shipping Information */}
-            {currentStep === "shipping" && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Package className="h-5 w-5" />
-                    Shipping Address
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {/* Saved Addresses */}
-                  {shippingAddresses.length > 0 && (
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <Label>Use Saved Address</Label>
-                        <Button variant="link" size="sm" asChild>
-                          <Link href="/account/addresses" target="_blank">
-                            Manage Addresses
-                          </Link>
-                        </Button>
-                      </div>
-                      <RadioGroup
-                        value={
-                          useExistingShipping
-                            ? selectedShippingId?.toString()
-                            : "new"
-                        }
-                        onValueChange={(value) => {
-                          if (value === "new") {
-                            setUseExistingShipping(false);
-                            setSelectedShippingId(null);
-                          } else {
-                            setUseExistingShipping(true);
-                            const addressId = parseInt(value);
-                            setSelectedShippingId(addressId);
-                            handleShippingAddressSelect(addressId);
-                          }
-                        }}
-                      >
-                        {shippingAddresses.map((address) => (
-                          <div
-                            key={address.id}
-                            className="flex items-start space-x-2 rounded-lg border p-3"
-                          >
-                            <RadioGroupItem
-                              value={address.id.toString()}
-                              id={`shipping-${address.id}`}
-                            />
-                            <Label
-                              htmlFor={`shipping-${address.id}`}
-                              className="flex-1 cursor-pointer"
-                            >
-                              <div className="font-medium">
-                                {address.firstName} {address.lastName}
-                              </div>
-                              <div className="text-muted-foreground text-sm">
-                                {address.addressLine1}
-                                {address.addressLine2 &&
-                                  `, ${address.addressLine2}`}
-                              </div>
-                              <div className="text-muted-foreground text-sm">
-                                {address.city}, {address.state}{" "}
-                                {address.postalCode}
-                              </div>
-                              {address.isDefault && (
-                                <Badge variant="secondary" className="mt-1">
-                                  Default
-                                </Badge>
-                              )}
-                            </Label>
-                          </div>
-                        ))}
-                        <div className="flex items-start space-x-2 rounded-lg border p-3">
-                          <RadioGroupItem value="new" id="shipping-new" />
-                          <Label
-                            htmlFor="shipping-new"
-                            className="flex-1 cursor-pointer"
-                          >
-                            <div className="flex items-center gap-2">
-                              <Plus className="h-4 w-4" />
-                              <span className="font-medium">
-                                Use a different address
-                              </span>
-                            </div>
-                          </Label>
+            {/* Address & Contact Step */}
+            {currentStep === "address" && (
+              <>
+                {/* Contact Information */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Mail className="h-5 w-5" />
+                      Contact Information
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Form {...contactForm}>
+                      <form className="space-y-4">
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <FormField
+                            control={contactForm.control}
+                            name="email"
+                            render={({ field, fieldState }) => (
+                              <Field data-invalid={!!fieldState.error}>
+                                <FieldLabel htmlFor="email">
+                                  Email Address
+                                </FieldLabel>
+                                <FormControl>
+                                  <Input
+                                    id="email"
+                                    type="email"
+                                    placeholder="your@email.com"
+                                    aria-invalid={!!fieldState.error}
+                                    {...field}
+                                  />
+                                </FormControl>
+                                {fieldState.error && (
+                                  <p className="text-destructive mt-1 text-sm">
+                                    {fieldState.error.message}
+                                  </p>
+                                )}
+                              </Field>
+                            )}
+                          />
+                          <FormField
+                            control={contactForm.control}
+                            name="phone"
+                            render={({ field, fieldState }) => (
+                              <Field data-invalid={!!fieldState.error}>
+                                <FieldLabel htmlFor="phone">
+                                  Phone Number
+                                </FieldLabel>
+                                <FormControl>
+                                  <Input
+                                    id="phone"
+                                    type="tel"
+                                    placeholder="+61 4 1234 5678"
+                                    aria-invalid={!!fieldState.error}
+                                    {...field}
+                                  />
+                                </FormControl>
+                                {fieldState.error && (
+                                  <p className="text-destructive mt-1 text-sm">
+                                    {fieldState.error.message}
+                                  </p>
+                                )}
+                              </Field>
+                            )}
+                          />
                         </div>
-                      </RadioGroup>
-                    </div>
-                  )}
-
-                  {/* New Address Form */}
-                  {(!useExistingShipping || shippingAddresses.length === 0) && (
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label htmlFor="shippingFirstName">First Name</Label>
-                        <Input
-                          id="shippingFirstName"
-                          placeholder="John"
-                          value={shippingData.firstName}
-                          onChange={(e) =>
-                            setShippingData({
-                              ...shippingData,
-                              firstName: e.target.value,
-                            })
-                          }
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="shippingLastName">Last Name</Label>
-                        <Input
-                          id="shippingLastName"
-                          placeholder="Doe"
-                          value={shippingData.lastName}
-                          onChange={(e) =>
-                            setShippingData({
-                              ...shippingData,
-                              lastName: e.target.value,
-                            })
-                          }
-                        />
-                      </div>
-                      <div className="col-span-2 space-y-2">
-                        <Label htmlFor="shippingAddress1">Address Line 1</Label>
-                        <Input
-                          id="shippingAddress1"
-                          placeholder="123 Main Street"
-                          value={shippingData.addressLine1}
-                          onChange={(e) =>
-                            setShippingData({
-                              ...shippingData,
-                              addressLine1: e.target.value,
-                            })
-                          }
-                        />
-                      </div>
-                      <div className="col-span-2 space-y-2">
-                        <Label htmlFor="shippingAddress2">
-                          Address Line 2 (Optional)
-                        </Label>
-                        <Input
-                          id="shippingAddress2"
-                          placeholder="Apt, suite, etc."
-                          value={shippingData.addressLine2}
-                          onChange={(e) =>
-                            setShippingData({
-                              ...shippingData,
-                              addressLine2: e.target.value,
-                            })
-                          }
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="shippingCity">City</Label>
-                        <Input
-                          id="shippingCity"
-                          placeholder="Sydney"
-                          value={shippingData.city}
-                          onChange={(e) =>
-                            setShippingData({
-                              ...shippingData,
-                              city: e.target.value,
-                            })
-                          }
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="shippingState">State</Label>
-                        <Select
-                          value={shippingData.state}
-                          onValueChange={(value) =>
-                            setShippingData({ ...shippingData, state: value })
-                          }
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select state" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="NSW">New South Wales</SelectItem>
-                            <SelectItem value="VIC">Victoria</SelectItem>
-                            <SelectItem value="QLD">Queensland</SelectItem>
-                            <SelectItem value="WA">
-                              Western Australia
-                            </SelectItem>
-                            <SelectItem value="SA">South Australia</SelectItem>
-                            <SelectItem value="TAS">Tasmania</SelectItem>
-                            <SelectItem value="ACT">
-                              Australian Capital Territory
-                            </SelectItem>
-                            <SelectItem value="NT">
-                              Northern Territory
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="shippingPostalCode">Postal Code</Label>
-                        <Input
-                          id="shippingPostalCode"
-                          placeholder="2000"
-                          value={shippingData.postalCode}
-                          onChange={(e) =>
-                            setShippingData({
-                              ...shippingData,
-                              postalCode: e.target.value,
-                            })
-                          }
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="shippingCountry">Country</Label>
-                        <Input
-                          id="shippingCountry"
-                          value={shippingData.country}
-                          onChange={(e) =>
-                            setShippingData({
-                              ...shippingData,
-                              country: e.target.value,
-                            })
-                          }
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="flex flex-col gap-3 sm:flex-row sm:gap-4">
-                    <Button
-                      variant="outline"
-                      size="default"
-                      className="flex-1"
-                      onClick={() => setCurrentStep("contact")}
-                    >
-                      Back to Contact
-                    </Button>
-                    <Button
-                      size="default"
-                      className="flex-1"
-                      onClick={() => setCurrentStep("billing")}
-                      disabled={!canProceedToBilling()}
-                    >
-                      Continue to Billing
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Billing Information */}
-            {currentStep === "billing" && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <CreditCard className="h-5 w-5" />
-                    Billing Address
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {/* Same as Shipping Checkbox */}
-                  <div className="flex items-center space-x-2 rounded-lg border p-3">
-                    <Checkbox
-                      id="sameAsShipping"
-                      checked={sameAsShipping}
-                      onCheckedChange={(checked) => {
-                        setSameAsShipping(checked as boolean);
-                        if (checked) {
-                          setUseExistingBilling(false);
-                          setSelectedBillingId(null);
-                        }
-                      }}
-                    />
-                    <Label htmlFor="sameAsShipping" className="cursor-pointer">
-                      Same as shipping address
-                    </Label>
-                  </div>
-
-                  {!sameAsShipping && (
-                    <>
-                      {/* Saved Billing Addresses */}
-                      {billingAddresses.length > 0 && (
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-between">
-                            <Label>Use Saved Billing Address</Label>
-                            <Button variant="link" size="sm" asChild>
-                              <Link href="/account/addresses" target="_blank">
-                                Manage Addresses
-                              </Link>
-                            </Button>
-                          </div>
-                          <RadioGroup
-                            value={
-                              useExistingBilling
-                                ? selectedBillingId?.toString()
-                                : "new"
+                      </form>
+                    </Form>
+                  </CardContent>
+                </Card>
+                {/* Contact Information */}
+                {currentStep === "contact" && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Mail className="h-5 w-5" />
+                        Contact Information
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label htmlFor="email">Email Address</Label>
+                          <Input
+                            id="email"
+                            type="email"
+                            placeholder="your@email.com"
+                            value={contactData.email}
+                            onChange={(e) =>
+                              setContactData({
+                                ...contactData,
+                                email: e.target.value,
+                              })
                             }
-                            onValueChange={(value) => {
-                              if (value === "new") {
-                                setUseExistingBilling(false);
-                                setSelectedBillingId(null);
-                              } else {
-                                setUseExistingBilling(true);
-                                const addressId = parseInt(value);
-                                setSelectedBillingId(addressId);
-                                handleBillingAddressSelect(addressId);
-                              }
-                            }}
-                          >
-                            {billingAddresses.map((address) => (
-                              <div
-                                key={address.id}
-                                className="flex items-start space-x-2 rounded-lg border p-3"
-                              >
-                                <RadioGroupItem
-                                  value={address.id.toString()}
-                                  id={`billing-${address.id}`}
-                                />
-                                <Label
-                                  htmlFor={`billing-${address.id}`}
-                                  className="flex-1 cursor-pointer"
-                                >
-                                  <div className="font-medium">
-                                    {address.firstName} {address.lastName}
-                                  </div>
-                                  <div className="text-muted-foreground text-sm">
-                                    {address.addressLine1}
-                                    {address.addressLine2 &&
-                                      `, ${address.addressLine2}`}
-                                  </div>
-                                  <div className="text-muted-foreground text-sm">
-                                    {address.city}, {address.state}{" "}
-                                    {address.postalCode}
-                                  </div>
-                                  {address.isDefault && (
-                                    <Badge variant="secondary" className="mt-1">
-                                      Default
-                                    </Badge>
-                                  )}
-                                </Label>
-                              </div>
-                            ))}
-                            <div className="flex items-start space-x-2 rounded-lg border p-3">
-                              <RadioGroupItem value="new" id="billing-new" />
+                          />
+                          <p className="text-muted-foreground text-xs">
+                            Security codes will be sent to your account email:{" "}
+                            {session?.user?.email}
+                          </p>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="phone">Phone Number</Label>
+                          <Input
+                            id="phone"
+                            type="tel"
+                            placeholder="+61 4 1234 5678"
+                            value={contactData.phone}
+                            onChange={(e) =>
+                              setContactData({
+                                ...contactData,
+                                phone: e.target.value,
+                              })
+                            }
+                          />
+                        </div>
+                      </div>
+                      <Button
+                        size="default"
+                        className="w-full"
+                        onClick={() => setCurrentStep("shipping")}
+                        disabled={!canProceedToShipping()}
+                      >
+                        Continue to Shipping
+                      </Button>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Shipping Information */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Package className="h-5 w-5" />
+                      Shipping Address
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {/* Saved Addresses */}
+                    {shippingAddresses.length > 0 && (
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <Label>Use Saved Address</Label>
+                          <Button variant="link" size="sm" asChild>
+                            <Link href="/account/addresses" target="_blank">
+                              Manage Addresses
+                            </Link>
+                          </Button>
+                        </div>
+                        <RadioGroup
+                          value={
+                            selectedShippingId
+                              ? selectedShippingId.toString()
+                              : "new"
+                          }
+                          onValueChange={(value) => {
+                            if (value === "new") {
+                              setSelectedShippingId(null);
+                            } else {
+                              const addressId = parseInt(value);
+                              handleShippingAddressSelect(addressId);
+                            }
+                          }}
+                        >
+                          {shippingAddresses.map((address) => (
+                            <div
+                              key={address.id}
+                              className="flex items-start space-x-2 rounded-lg border p-3"
+                            >
+                              <RadioGroupItem
+                                value={address.id.toString()}
+                                id={`shipping-${address.id}`}
+                              />
                               <Label
-                                htmlFor="billing-new"
+                                htmlFor={`shipping-${address.id}`}
                                 className="flex-1 cursor-pointer"
                               >
-                                <div className="flex items-center gap-2">
-                                  <Plus className="h-4 w-4" />
-                                  <span className="font-medium">
-                                    Use a different address
-                                  </span>
+                                <div className="font-medium">
+                                  {address.firstName} {address.lastName}
                                 </div>
+                                <div className="text-muted-foreground text-sm">
+                                  {address.addressLine1}
+                                  {address.addressLine2 &&
+                                    `, ${address.addressLine2}`}
+                                </div>
+                                <div className="text-muted-foreground text-sm">
+                                  {address.city}, {address.state}{" "}
+                                  {address.postcode}
+                                </div>
+                                {address.isDefault && (
+                                  <Badge variant="secondary" className="mt-1">
+                                    Default
+                                  </Badge>
+                                )}
                               </Label>
                             </div>
-                          </RadioGroup>
-                        </div>
-                      )}
-
-                      {/* New Billing Address Form */}
-                      {(!useExistingBilling ||
-                        billingAddresses.length === 0) && (
-                        <div className="grid gap-4 md:grid-cols-2">
-                          <div className="space-y-2">
-                            <Label htmlFor="billingFirstName">First Name</Label>
-                            <Input
-                              id="billingFirstName"
-                              placeholder="John"
-                              value={billingData.firstName}
-                              onChange={(e) =>
-                                setBillingData({
-                                  ...billingData,
-                                  firstName: e.target.value,
-                                })
-                              }
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="billingLastName">Last Name</Label>
-                            <Input
-                              id="billingLastName"
-                              placeholder="Doe"
-                              value={billingData.lastName}
-                              onChange={(e) =>
-                                setBillingData({
-                                  ...billingData,
-                                  lastName: e.target.value,
-                                })
-                              }
-                            />
-                          </div>
-                          <div className="col-span-2 space-y-2">
-                            <Label htmlFor="billingAddress1">
-                              Address Line 1
-                            </Label>
-                            <Input
-                              id="billingAddress1"
-                              placeholder="123 Main Street"
-                              value={billingData.addressLine1}
-                              onChange={(e) =>
-                                setBillingData({
-                                  ...billingData,
-                                  addressLine1: e.target.value,
-                                })
-                              }
-                            />
-                          </div>
-                          <div className="col-span-2 space-y-2">
-                            <Label htmlFor="billingAddress2">
-                              Address Line 2 (Optional)
-                            </Label>
-                            <Input
-                              id="billingAddress2"
-                              placeholder="Apt, suite, etc."
-                              value={billingData.addressLine2}
-                              onChange={(e) =>
-                                setBillingData({
-                                  ...billingData,
-                                  addressLine2: e.target.value,
-                                })
-                              }
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="billingCity">City</Label>
-                            <Input
-                              id="billingCity"
-                              placeholder="Sydney"
-                              value={billingData.city}
-                              onChange={(e) =>
-                                setBillingData({
-                                  ...billingData,
-                                  city: e.target.value,
-                                })
-                              }
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="billingState">State</Label>
-                            <Select
-                              value={billingData.state}
-                              onValueChange={(value) =>
-                                setBillingData({ ...billingData, state: value })
-                              }
+                          ))}
+                          <div className="flex items-start space-x-2 rounded-lg border p-3">
+                            <RadioGroupItem value="new" id="shipping-new" />
+                            <Label
+                              htmlFor="shipping-new"
+                              className="flex-1 cursor-pointer"
                             >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select state" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="NSW">
-                                  New South Wales
-                                </SelectItem>
-                                <SelectItem value="VIC">Victoria</SelectItem>
-                                <SelectItem value="QLD">Queensland</SelectItem>
-                                <SelectItem value="WA">
-                                  Western Australia
-                                </SelectItem>
-                                <SelectItem value="SA">
-                                  South Australia
-                                </SelectItem>
-                                <SelectItem value="TAS">Tasmania</SelectItem>
-                                <SelectItem value="ACT">
-                                  Australian Capital Territory
-                                </SelectItem>
-                                <SelectItem value="NT">
-                                  Northern Territory
-                                </SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="billingPostalCode">
-                              Postal Code
+                              <div className="flex items-center gap-2">
+                                <Plus className="h-4 w-4" />
+                                <span className="font-medium">
+                                  Use a different address
+                                </span>
+                              </div>
                             </Label>
-                            <Input
-                              id="billingPostalCode"
-                              placeholder="2000"
-                              value={billingData.postalCode}
-                              onChange={(e) =>
-                                setBillingData({
-                                  ...billingData,
-                                  postalCode: e.target.value,
-                                })
-                              }
-                            />
                           </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="billingCountry">Country</Label>
-                            <Input
-                              id="billingCountry"
-                              value={billingData.country}
-                              onChange={(e) =>
-                                setBillingData({
-                                  ...billingData,
-                                  country: e.target.value,
-                                })
-                              }
-                            />
-                          </div>
-                        </div>
-                      )}
-                    </>
-                  )}
+                        </RadioGroup>
+                      </div>
+                    )}
 
-                  <div className="flex flex-col gap-3 sm:flex-row sm:gap-4">
-                    <Button
-                      variant="outline"
-                      size="default"
-                      className="flex-1"
-                      onClick={() => setCurrentStep("shipping")}
-                    >
-                      Back to Shipping
-                    </Button>
-                    <Button
-                      size="default"
-                      className="flex-1"
-                      onClick={() => setCurrentStep("payment")}
-                      disabled={!canProceedToPayment()}
-                    >
-                      Continue to Payment
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
+                    {/* New Address Form */}
+                    {!selectedShippingId && (
+                      <AddressForm
+                        type="shipping"
+                        form={shippingForm}
+                        hideButtons={true}
+                      />
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Billing Information */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <CreditCard className="h-5 w-5" />
+                      Billing Address
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {/* Same as Shipping Checkbox */}
+                    <div className="flex items-center space-x-2 rounded-lg border p-3">
+                      <Checkbox
+                        id="sameAsShipping"
+                        checked={sameAsShipping}
+                        onCheckedChange={handleSameAsShippingChange}
+                      />
+                      <Label
+                        htmlFor="sameAsShipping"
+                        className="cursor-pointer"
+                      >
+                        Same as shipping address
+                      </Label>
+                    </div>
+
+                    {!sameAsShipping && (
+                      <>
+                        {/* Saved Billing Addresses */}
+                        {billingAddresses.length > 0 && (
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                              <Label>Use Saved Billing Address</Label>
+                              <Button variant="link" size="sm" asChild>
+                                <Link href="/account/addresses" target="_blank">
+                                  Manage Addresses
+                                </Link>
+                              </Button>
+                            </div>
+                            <RadioGroup
+                              value={
+                                selectedBillingId
+                                  ? selectedBillingId.toString()
+                                  : "new"
+                              }
+                              onValueChange={(value) => {
+                                if (value === "new") {
+                                  setSelectedBillingId(null);
+                                } else {
+                                  const addressId = parseInt(value);
+                                  handleBillingAddressSelect(addressId);
+                                }
+                              }}
+                            >
+                              {billingAddresses.map((address) => (
+                                <div
+                                  key={address.id}
+                                  className="flex items-start space-x-2 rounded-lg border p-3"
+                                >
+                                  <RadioGroupItem
+                                    value={address.id.toString()}
+                                    id={`billing-${address.id}`}
+                                  />
+                                  <Label
+                                    htmlFor={`billing-${address.id}`}
+                                    className="flex-1 cursor-pointer"
+                                  >
+                                    <div className="font-medium">
+                                      {address.firstName} {address.lastName}
+                                    </div>
+                                    <div className="text-muted-foreground text-sm">
+                                      {address.addressLine1}
+                                      {address.addressLine2 &&
+                                        `, ${address.addressLine2}`}
+                                    </div>
+                                    <div className="text-muted-foreground text-sm">
+                                      {address.city}, {address.state}{" "}
+                                      {address.postcode}
+                                    </div>
+                                    {address.isDefault && (
+                                      <Badge
+                                        variant="secondary"
+                                        className="mt-1"
+                                      >
+                                        Default
+                                      </Badge>
+                                    )}
+                                  </Label>
+                                </div>
+                              ))}
+                              <div className="flex items-start space-x-2 rounded-lg border p-3">
+                                <RadioGroupItem value="new" id="billing-new" />
+                                <Label
+                                  htmlFor="billing-new"
+                                  className="flex-1 cursor-pointer"
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <Plus className="h-4 w-4" />
+                                    <span className="font-medium">
+                                      Use a different address
+                                    </span>
+                                  </div>
+                                </Label>
+                              </div>
+                            </RadioGroup>
+                          </div>
+                        )}
+
+                        {/* New Billing Address Form */}
+                        {!selectedBillingId && (
+                          <AddressForm
+                            type="billing"
+                            form={billingForm}
+                            hideButtons={true}
+                          />
+                        )}
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Proceed to Payment Button */}
+                <div className="flex justify-end">
+                  <Button
+                    size="lg"
+                    onClick={handleProceedToPayment}
+                    className="min-w-[200px]"
+                  >
+                    Proceed to Payment
+                  </Button>
+                </div>
+              </>
             )}
 
-            {/* Payment */}
+            {/* Payment Step */}
             {currentStep === "payment" && (
               <>
+                {/* Back Button */}
                 <Button
-                  variant="outline"
-                  size="default"
+                  variant="ghost"
+                  onClick={() => setCurrentStep("address")}
                   className="mb-4"
-                  onClick={() => setCurrentStep("billing")}
                 >
                   <ArrowLeft className="mr-2 h-4 w-4" />
-                  Back to Billing
+                  Back to Address & Contact
                 </Button>
 
-                <StripePaymentForm
-                  amount={total}
-                  currency="aud"
-                  onSuccess={handlePaymentSuccess}
-                  onError={handlePaymentError}
-                  onCreateOrder={handlePaymentInit}
-                  orderData={getOrderDataForVerification()}
-                />
+                {/* Payment */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <CreditCard className="h-5 w-5" />
+                      Payment
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {getStoreCount() > 1 && (
+                      <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm dark:border-blue-800 dark:bg-blue-950">
+                        <p className="mb-1 font-medium text-blue-900 dark:text-blue-100">
+                          Processing {getStoreCount()} Orders
+                        </p>
+                        <p className="text-xs text-blue-700 dark:text-blue-300">
+                          Your payment will be processed once for the total
+                          amount, and {getStoreCount()} separate orders will be
+                          created for each store.
+                        </p>
+                      </div>
+                    )}
+                    <StripePaymentForm
+                      amount={total}
+                      currency="aud"
+                      onSuccess={handlePaymentSuccess}
+                      onError={handlePaymentError}
+                      onCreateOrder={handlePaymentInit}
+                    />
+                  </CardContent>
+                </Card>
               </>
             )}
           </div>
@@ -1230,7 +1014,7 @@ export function CheckoutClient() {
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Tax (8%)</span>
+                    <span>GST (10%)</span>
                     <span>${tax.toFixed(2)}</span>
                   </div>
                 </div>
@@ -1245,11 +1029,17 @@ export function CheckoutClient() {
                 {getStoreCount() > 1 && (
                   <div className="bg-muted text-muted-foreground rounded-md p-3 text-sm">
                     <p className="mb-1 font-medium">Multi-Store Order</p>
-                    <p>
-                      Your order contains items from {getStoreCount()} different
-                      stores. Each store will process and ship your items
-                      separately.
+                    <p className="mb-2">
+                      Your cart contains items from {getStoreCount()} different
+                      stores. We will create {getStoreCount()} separate orders.
                     </p>
+                    <ul className="list-inside list-disc space-y-1 text-xs">
+                      <li>
+                        Each store will process and ship your items separately
+                      </li>
+                      <li>You will receive separate order confirmations</li>
+                      <li>Shipping and taxes are split proportionally</li>
+                    </ul>
                   </div>
                 )}
 

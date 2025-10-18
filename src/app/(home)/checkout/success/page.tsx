@@ -13,6 +13,7 @@ import Link from "next/link";
 // and implement retry logic if the transaction record is not yet available.
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCart } from "@/contexts/cart-context";
+import { formatOrderNumber } from "@/lib/utils/order-number";
 
 interface PaymentDetails {
   transaction: {
@@ -237,7 +238,7 @@ export default function CheckoutSuccessPage() {
                 <div className="flex items-center justify-between">
                   <span>Order Number</span>
                   <Badge variant="outline">
-                    #{paymentDetails.transaction.orderId}
+                    {formatOrderNumber(paymentDetails.transaction.orderId)}
                   </Badge>
                 </div>
 

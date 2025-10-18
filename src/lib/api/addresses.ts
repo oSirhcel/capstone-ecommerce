@@ -75,9 +75,13 @@ export async function createAddress(
   });
 
   if (!res.ok) {
-    throw new Error("Failed to create address");
+    const errorData = (await res.json().catch(() => ({}))) as {
+      message?: string;
+    };
+    const message = errorData.message ?? "Failed to create address";
+    throw new Error(message);
   }
-  return res.json() as Promise<{ address: Address }>;
+  return (await res.json()) as { address: Address };
 }
 
 export async function updateAddress(
@@ -95,9 +99,13 @@ export async function updateAddress(
   });
 
   if (!res.ok) {
-    throw new Error("Failed to update address");
+    const errorData = (await res.json().catch(() => ({}))) as {
+      message?: string;
+    };
+    const message = errorData.message ?? "Failed to update address";
+    throw new Error(message);
   }
-  return res.json() as Promise<{ address: Address }>;
+  return (await res.json()) as { address: Address };
 }
 
 export async function deleteAddress(
@@ -111,9 +119,13 @@ export async function deleteAddress(
     credentials: "include",
   });
   if (!res.ok) {
-    throw new Error("Failed to delete address");
+    const errorData = (await res.json().catch(() => ({}))) as {
+      message?: string;
+    };
+    const message = errorData.message ?? "Failed to delete address";
+    throw new Error(message);
   }
-  return res.json() as Promise<{ success: boolean; message: string }>;
+  return (await res.json()) as { success: boolean; message: string };
 }
 
 export async function setDefaultAddress(

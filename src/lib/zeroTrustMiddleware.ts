@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { db } from "@/server/db";
-import { orderItems, products, cartItems, carts, zeroTrustAssessments, users, stores, orders } from "@/server/db/schema";
+import { orderItems, products, cartItems, carts, zeroTrustAssessments, users, stores } from "@/server/db/schema";
 import { eq, and, sql, inArray } from "drizzle-orm";
 import { generateJustificationBackground } from "@/lib/api/risk-justification-server";
 
@@ -159,11 +159,22 @@ const RISK_FACTORS = {
     Zero Trust Check - Analyzes payment requests for fraud risk
     Returns risk score and decision (allow/warn/deny)
 */
+// Type for checkout session data
+interface CheckoutSessionItem {
+    productId: string | number;
+    price: number;
+    quantity: number;
+}
+
+interface CheckoutSessionData {
+    items: CheckoutSessionItem[];
+}
+
 export async function zeroTrustCheck(
     req: NextRequest, 
     body: PaymentRequestBody, 
     session?: { user?: { id?: string; email?: string | null; userType?: string } },
-    checkoutSessionData?: any // Complete checkout session data for multi-store analysis
+    checkoutSessionData?: CheckoutSessionData // Complete checkout session data for multi-store analysis
 ): Promise<NextResponse> {
     try {
         // Extract and validate basic payment data
@@ -189,8 +200,10 @@ export async function zeroTrustCheck(
             // Enrich checkout session data with product and store information
             try {
                 const productIds = checkoutSessionData.items
-                    .map((item: any) => item.productId)
-                    .filter((id: any) => id != null);
+                    .map((item: CheckoutSessionItem) => item.productId)
+                    .filter((id: string | number) => id != null)
+                    .map((id: string | number) => Number(id))
+                    .filter((id: number) => !isNaN(id));
                 
                 if (productIds.length > 0) {
                     const productData = await db
@@ -208,8 +221,8 @@ export async function zeroTrustCheck(
                     // Create a lookup map for product data
                     const productMap = new Map(productData.map(p => [p.id, p]));
                     
-                    enrichedItems = checkoutSessionData.items.map((item: any) => {
-                        const productInfo = productMap.get(item.productId);
+                    enrichedItems = checkoutSessionData.items.map((item: CheckoutSessionItem) => {
+                        const productInfo = productMap.get(Number(item.productId));
                         return {
                             id: item.productId?.toString() ?? 'unknown',
                             productId: item.productId?.toString() ?? 'unknown',
@@ -224,7 +237,7 @@ export async function zeroTrustCheck(
                     console.log(`Zero Trust: Enriched ${enrichedItems.length} items with product and store data`);
                 } else {
                     // Fallback if no valid product IDs
-                    enrichedItems = checkoutSessionData.items.map((item: any) => ({
+                    enrichedItems = checkoutSessionData.items.map((item: CheckoutSessionItem) => ({
                         id: item.productId?.toString() ?? 'unknown',
                         productId: item.productId?.toString() ?? 'unknown',
                         name: 'Unknown Product',
@@ -237,7 +250,7 @@ export async function zeroTrustCheck(
             } catch (error) {
                 console.error('Failed to enrich checkout session data:', error);
                 // Fallback to basic mapping
-                enrichedItems = checkoutSessionData.items.map((item: any) => ({
+                enrichedItems = checkoutSessionData.items.map((item: CheckoutSessionItem) => ({
                     id: item.productId?.toString() ?? 'unknown',
                     productId: item.productId?.toString() ?? 'unknown',
                     name: 'Unknown Product',

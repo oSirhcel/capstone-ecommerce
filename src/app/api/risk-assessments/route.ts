@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { and, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
+import { and, desc, eq, ilike, inArray, or, sql, asc } from "drizzle-orm";
 import { db } from "@/server/db";
 import { orders, products, stores, users, zeroTrustAssessments } from "@/server/db/schema";
 import { auth } from "@/lib/auth";
@@ -10,6 +10,8 @@ import { auth } from "@/lib/auth";
 // - storeId: optional; if provided limits to orders for the store owner's products
 // - search: optional; matches userId or ipAddress
 // - page, limit: pagination
+// - sortBy: column to sort by (e.g., createdAt, riskScore, decision, transactionAmount)
+// - sortOrder: asc or desc
 export async function GET(req: NextRequest) {
   try {
     const session = await auth();
@@ -24,10 +26,21 @@ export async function GET(req: NextRequest) {
     const page = parseInt(searchParams.get("page") ?? "1", 10);
     const limit = Math.min(parseInt(searchParams.get("limit") ?? "20", 10), 100);
     const offset = (page - 1) * limit;
+    const sortBy = searchParams.get("sortBy") ?? "createdAt";
+    const sortOrder = searchParams.get("sortOrder") ?? "desc";
 
     // decisions filter defaults to warn,deny for this endpoint
     const decisions = (decisionParam?.split(",").filter(Boolean) as Array<"allow"|"warn"|"deny">) ?? ["warn", "deny"];
     const filteredDecisions = decisions.length > 0 ? decisions : ["warn", "deny"];
+
+    // Create order by clause based on sortBy and sortOrder
+    const getOrderBy = () => {
+      const column = zeroTrustAssessments[sortBy as keyof typeof zeroTrustAssessments];
+      if (!column) {
+        return desc(zeroTrustAssessments.createdAt); // fallback to createdAt desc
+      }
+      return sortOrder === "asc" ? asc(column) : desc(column);
+    };
 
     console.log("🔍 Risk assessments API debug:");
     console.log("  - decisionParam:", decisionParam);
@@ -35,6 +48,8 @@ export async function GET(req: NextRequest) {
     console.log("  - filteredDecisions:", filteredDecisions);
     console.log("  - storeIdParam:", storeIdParam);
     console.log("  - search:", search);
+    console.log("  - sortBy:", sortBy);
+    console.log("  - sortOrder:", sortOrder);
 
     // Build where clause
     const conditions: any[] = [inArray(zeroTrustAssessments.decision, filteredDecisions)];
@@ -79,7 +94,7 @@ export async function GET(req: NextRequest) {
         })
         .from(zeroTrustAssessments)
         .where(and(...conditions))
-        .orderBy(desc(zeroTrustAssessments.createdAt))
+        .orderBy(getOrderBy())
         .limit(limit)
         .offset(offset);
 
@@ -147,7 +162,7 @@ export async function GET(req: NextRequest) {
         })
         .from(zeroTrustAssessments)
         .where(and(...conditions))
-        .orderBy(desc(zeroTrustAssessments.createdAt))
+        .orderBy(getOrderBy())
         .limit(limit)
         .offset(offset);
 

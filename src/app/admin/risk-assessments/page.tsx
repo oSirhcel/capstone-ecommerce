@@ -25,6 +25,7 @@ const columns = [
   {
     header: "Score",
     accessorKey: "riskScore",
+    sortable: true,
     cell: ({ row }: { row: { original: RiskAssessmentListItem } }) => (
       <span className="font-semibold">{row.original.riskScore}</span>
     ),
@@ -32,6 +33,7 @@ const columns = [
   {
     header: "Decision",
     accessorKey: "decision",
+    sortable: true,
     cell: ({ row }: { row: { original: RiskAssessmentListItem } }) => {
       const d = row.original.decision;
       const variant =
@@ -42,6 +44,7 @@ const columns = [
   {
     header: "Confidence",
     accessorKey: "confidence",
+    sortable: true,
     cell: ({ row }: { row: { original: RiskAssessmentListItem } }) => (
       <span>{row.original.confidence}%</span>
     ),
@@ -49,6 +52,7 @@ const columns = [
   {
     header: "Amount",
     accessorKey: "transactionAmount",
+    sortable: true,
     cell: ({ row }: { row: { original: RiskAssessmentListItem } }) => (
       <span>${(row.original.transactionAmount / 100).toFixed(2)}</span>
     ),
@@ -56,10 +60,12 @@ const columns = [
   {
     header: "IP",
     accessorKey: "ipAddress",
+    sortable: true,
   },
   {
     header: "Created",
     accessorKey: "createdAt",
+    sortable: true,
     cell: ({ row }: { row: { original: RiskAssessmentListItem } }) => (
       <span>{new Date(row.original.createdAt).toLocaleString()}</span>
     ),
@@ -86,6 +92,8 @@ export default function RiskAssessmentsPage() {
   const [onlyWarn, setOnlyWarn] = useState(true);
   const [onlyDeny, setOnlyDeny] = useState(true);
   const [showAllStores, setShowAllStores] = useState(false);
+  const [sortBy, setSortBy] = useState("createdAt");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
   const decisions = useMemo(() => {
     const arr: Array<"warn" | "deny"> = [];
@@ -94,10 +102,25 @@ export default function RiskAssessmentsPage() {
     return arr.length ? arr : ["warn", "deny"];
   }, [onlyWarn, onlyDeny]);
 
+  const handleSort = (column: string) => {
+    if (sortBy === column) {
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    } else {
+      setSortBy(column);
+      setSortOrder("asc");
+    }
+  };
+
   const { data, isLoading, refetch, isFetching } = useQuery({
     queryKey: [
       "risk-assessments",
-      { storeId: showAllStores ? undefined : storeId, search, decisions },
+      {
+        storeId: showAllStores ? undefined : storeId,
+        search,
+        decisions,
+        sortBy,
+        sortOrder,
+      },
     ],
     queryFn: () => {
       console.log("🔍 Frontend: Fetching with decisions:", decisions);
@@ -107,6 +130,8 @@ export default function RiskAssessmentsPage() {
         decision: decisions,
         page: 1,
         limit: 50,
+        sortBy,
+        sortOrder,
       });
     },
   });
@@ -177,7 +202,13 @@ export default function RiskAssessmentsPage() {
                 Loading assessments…
               </div>
             ) : (
-              <DataTable columns={columns} data={assessments} />
+              <DataTable
+                columns={columns}
+                data={assessments}
+                sortBy={sortBy}
+                sortOrder={sortOrder}
+                onSort={handleSort}
+              />
             )}
           </div>
         </CardContent>

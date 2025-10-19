@@ -34,6 +34,8 @@ export async function fetchRiskAssessments(params?: {
   search?: string;
   page?: number;
   limit?: number;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
 }): Promise<RiskAssessmentsResponse> {
   const qs = new URLSearchParams();
   if (params?.decision?.length) qs.set("decision", params.decision.join(","));
@@ -41,6 +43,8 @@ export async function fetchRiskAssessments(params?: {
   if (params?.search) qs.set("search", params.search);
   if (params?.page) qs.set("page", String(params.page));
   if (params?.limit) qs.set("limit", String(params.limit));
+  if (params?.sortBy) qs.set("sortBy", params.sortBy);
+  if (params?.sortOrder) qs.set("sortOrder", params.sortOrder);
 
   const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL ?? ""}/api/risk-assessments?${qs.toString()}`);
   if (!res.ok) {

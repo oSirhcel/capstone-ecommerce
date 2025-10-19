@@ -110,8 +110,7 @@ export const orders = pgTable("orders", {
     .references(() => users.id)
     .notNull(),
   storeId: varchar("storeId", { length: 255 })
-    .references(() => stores.id)
-    .notNull(), // Orders belong to a specific store
+    .references(() => stores.id), // Orders belong to a specific store
   status: orderStatusEnum().notNull().default("Pending"),
   paymentStatus: paymentStatusEnum().notNull().default("Pending"),
   totalAmount: integer().notNull(), // Total in cents

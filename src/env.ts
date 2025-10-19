@@ -9,6 +9,7 @@ export const env = createEnv({
   server: {
     DATABASE_URL: z.url(),
     //OPEN_AI_API_KEY: z.string().min(1),
+    GOOGLE_GENERATIVE_AI_API_KEY: z.string().min(1),
     NEXTAUTH_SECRET: z.string().min(1),
     NEXTAUTH_URL: z.url().optional(),
     GOOGLE_CLIENT_ID: z.string().min(1),
@@ -27,6 +28,7 @@ export const env = createEnv({
   runtimeEnv: {
     DATABASE_URL: process.env.DATABASE_URL,
     //OPEN_AI_API_KEY: process.env.OPEN_AI_API_KEY,
+    GOOGLE_GENERATIVE_AI_API_KEY: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
     NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
     NEXTAUTH_URL: process.env.NEXTAUTH_URL,
     GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,

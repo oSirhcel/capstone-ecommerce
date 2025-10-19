@@ -209,7 +209,7 @@ export async function POST(request: NextRequest) {
     if (orderId) {
       await db.insert(paymentTransactions).values({
         orderId: orderId,
-        amount: amount, // Amount is already in cents from the order
+        amount: Math.round(amount * 100), // Convert dollars to cents for database storage
         currency,
         status: "pending",
         transactionId: paymentIntent.id,

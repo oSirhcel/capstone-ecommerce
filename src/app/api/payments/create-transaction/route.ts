@@ -50,14 +50,14 @@ export async function POST(request: NextRequest) {
     // Create the payment transaction record
     await db.insert(paymentTransactions).values({
       orderId: orderId,
-      amount: amount,
+      amount: Math.round(amount * 100), // Convert dollars to cents for database storage
       currency: currency || 'aud',
       status: 'completed', // Payment is already processed at this point
       transactionId: paymentIntentId,
       gatewayResponse: JSON.stringify({
         paymentIntentId: paymentIntentId,
         status: 'succeeded',
-        amount: amount,
+        amount: amount, // Keep original amount in gateway response for reference
         currency: currency || 'aud',
       }),
     });

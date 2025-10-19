@@ -87,6 +87,7 @@ export function CheckoutClient() {
   const [currentStep, setCurrentStep] = useState<"address" | "payment">(
     "address",
   );
+  const [isProcessingOrder, setIsProcessingOrder] = useState(false);
 
   const {
     addresses: shippingAddresses,
@@ -395,10 +396,33 @@ export function CheckoutClient() {
     }
   };
 
+  // Helper functions to get final address data
+  const getFinalShippingData = () => {
+    if (selectedShippingId) {
+      const address = shippingAddresses.find(
+        (a) => a.id === selectedShippingId,
+      );
+      if (address) return address;
+    }
+    return shippingForm.getValues();
+  };
+
+  const getFinalBillingData = () => {
+    if (sameAsShipping) {
+      return getFinalShippingData();
+    }
+    if (selectedBillingId) {
+      const address = billingAddresses.find((a) => a.id === selectedBillingId);
+      if (address) return address;
+    }
+    return billingForm.getValues();
+  };
+
   // Prepare order data for verification flow
   const getOrderDataForVerification = () => {
     const finalShipping = getFinalShippingData();
     const finalBilling = getFinalBillingData();
+    const contactData = contactForm.getValues();
 
     return {
       items: items.map((item) => ({
@@ -447,40 +471,77 @@ export function CheckoutClient() {
   };
 
   // Handle payment error
-  const handlePaymentError = (error: string) => {
+  const handlePaymentError = (error: string | Error) => {
+    let errorMessage: string;
+
+    // Check if this is a zero trust error
+    if (error instanceof Error) {
+      const isZeroTrustBlock = (error as any).isZeroTrustBlock;
+      const isZeroTrustVerification = (error as any).isZeroTrustVerification;
+      const verificationToken = (error as any).verificationToken;
+      const riskScore = (error as any).riskScore;
+      const riskFactors = (error as any).riskFactors;
+
+      if (isZeroTrustBlock) {
+        // Redirect to blocked page
+        const params = new URLSearchParams();
+        if (riskScore) params.set("score", riskScore.toString());
+        if (riskFactors) params.set("factors", riskFactors.join(","));
+        router.push(`/checkout/blocked?${params.toString()}`);
+        return;
+      }
+
+      if (isZeroTrustVerification && verificationToken) {
+        // Redirect to OTP verification page
+        const params = new URLSearchParams();
+        params.set("token", verificationToken);
+        if (riskScore) params.set("score", riskScore.toString());
+        if (session?.user?.email) params.set("email", session.user.email);
+        router.push(`/checkout/verify-otp?${params.toString()}`);
+        return;
+      }
+
+      errorMessage = error.message;
+    } else {
+      errorMessage = error;
+    }
+
     toast.error("Payment failed", {
       description: errorMessage,
       duration: 5000,
     });
   };
 
-  // Step navigation
+  // Step navigation helpers
   const canProceedToShipping = () => {
+    const contactData = contactForm.getValues();
     return contactData.email && contactData.phone;
   };
 
   const canProceedToBilling = () => {
-    if (useExistingShipping && selectedShippingId) return true;
+    if (selectedShippingId) return true;
+    const shippingData = shippingForm.getValues();
     return (
       shippingData.firstName &&
       shippingData.lastName &&
       shippingData.addressLine1 &&
       shippingData.city &&
       shippingData.state &&
-      shippingData.postalCode
+      shippingData.postcode
     );
   };
 
   const canProceedToPayment = () => {
     if (sameAsShipping) return canProceedToBilling();
-    if (useExistingBilling && selectedBillingId) return true;
+    if (selectedBillingId) return true;
+    const billingData = billingForm.getValues();
     return (
       billingData.firstName &&
       billingData.lastName &&
       billingData.addressLine1 &&
       billingData.city &&
       billingData.state &&
-      billingData.postalCode
+      billingData.postcode
     );
   };
 
@@ -610,63 +671,6 @@ export function CheckoutClient() {
                     </Form>
                   </CardContent>
                 </Card>
-                {/* Contact Information */}
-                {currentStep === "contact" && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <Mail className="h-5 w-5" />
-                        Contact Information
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="grid gap-4 md:grid-cols-2">
-                        <div className="space-y-2">
-                          <Label htmlFor="email">Email Address</Label>
-                          <Input
-                            id="email"
-                            type="email"
-                            placeholder="your@email.com"
-                            value={contactData.email}
-                            onChange={(e) =>
-                              setContactData({
-                                ...contactData,
-                                email: e.target.value,
-                              })
-                            }
-                          />
-                          <p className="text-muted-foreground text-xs">
-                            Security codes will be sent to your account email:{" "}
-                            {session?.user?.email}
-                          </p>
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="phone">Phone Number</Label>
-                          <Input
-                            id="phone"
-                            type="tel"
-                            placeholder="+61 4 1234 5678"
-                            value={contactData.phone}
-                            onChange={(e) =>
-                              setContactData({
-                                ...contactData,
-                                phone: e.target.value,
-                              })
-                            }
-                          />
-                        </div>
-                      </div>
-                      <Button
-                        size="default"
-                        className="w-full"
-                        onClick={() => setCurrentStep("shipping")}
-                        disabled={!canProceedToShipping()}
-                      >
-                        Continue to Shipping
-                      </Button>
-                    </CardContent>
-                  </Card>
-                )}
 
                 {/* Shipping Information */}
                 <Card>

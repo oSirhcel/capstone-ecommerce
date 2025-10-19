@@ -30,7 +30,7 @@ interface StripePaymentFormProps {
     paymentIntentId: string;
     orderId?: number;
   }) => void;
-  onError: (error: string) => void;
+  onError: (error: string | Error) => void;
   onCreateOrder?: () => Promise<number>;
   orderData?: any; // Order data for verification flow
 }
@@ -74,22 +74,7 @@ function PaymentForm({
         return;
       }
 
-      // Create payment intent first (without order ID for risk assessment)
-      let paymentData;
-      try {
-        paymentData = await processPayment({
-          amount: Math.round(amount * 100), // Convert to cents for API
-          currency,
-          orderId: undefined, // Don't create order until after risk assessment
-          savePaymentMethod,
-          orderData, // Include order data for verification flow
-        });
-      } catch (paymentError) {
-        // If this is a zero trust verification or block error, it will be handled in the outer catch
-        throw paymentError;
-      }
-
-      // Create order only after successful risk assessment (pass result)
+      // Create order first if needed
       let currentOrderId = orderId;
       if (!currentOrderId && onCreateOrder) {
         try {
@@ -103,12 +88,13 @@ function PaymentForm({
         }
       }
 
-      // Create payment intent
+      // Create payment intent with order ID (includes zero trust assessment)
       const paymentResponse: ProcessPaymentResponse = await processPayment({
-        amount,
+        amount: amount, // Amount will be converted to cents in the API
         currency,
         orderId: currentOrderId,
         savePaymentMethod,
+        orderData, // Include order data for verification flow
       });
 
       const clientSecret: string = paymentResponse.clientSecret;

@@ -432,7 +432,7 @@ export async function zeroTrustCheck(
                 riskScore: riskScore.score,
                 decision: riskScore.decision,
                 confidence: Math.round(riskScore.confidence * 100),
-                transactionAmount: riskPayload.totalAmount,
+                transactionAmount: Math.round(riskPayload.totalAmount * 100), // Convert dollars to cents
                 currency: riskPayload.currency,
                 itemCount: riskPayload.itemCount,
                 storeCount: riskPayload.uniqueStoreCount,

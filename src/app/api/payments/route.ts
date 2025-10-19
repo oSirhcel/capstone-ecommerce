@@ -67,6 +67,26 @@ export async function POST(request: NextRequest) {
     // Handle zero trust decisions
     if (riskAssessment.decision === 'deny') {
       console.log(`Payment BLOCKED by Zero Trust: Score ${riskAssessment.score}, User: ${user.id}`);
+      
+      // Update order status to Failed if orderId is provided
+      if (body.orderId) {
+        try {
+          await db
+            .update(orders)
+            .set({
+              status: "Failed",
+              paymentStatus: "Failed",
+              updatedAt: new Date(),
+            })
+            .where(eq(orders.id, body.orderId));
+          
+          console.log(`Order ${body.orderId} status updated to Failed due to zero trust denial`);
+        } catch (error) {
+          console.error(`Failed to update order ${body.orderId} status:`, error);
+          // Continue with the denial response even if order update fails
+        }
+      }
+      
       return NextResponse.json({
         error: 'Transaction blocked for security reasons',
         errorCode: 'ZERO_TRUST_DENIED',
@@ -283,13 +303,25 @@ export async function PUT(request: NextRequest) {
         })
         .where(eq(paymentTransactions.transactionId, paymentIntentId));
 
-      // Update order status if payment succeeded
+      // Update order status based on payment result
       if (paymentIntent.status === "succeeded") {
         await db
           .update(orders)
           .set({
             status: "Processing",
             paymentStatus: "Paid",
+            updatedAt: new Date(),
+          })
+          .where(eq(orders.id, orderId));
+      } else if (paymentIntent.status === "requires_payment_method" || 
+                 paymentIntent.status === "canceled" ||
+                 paymentIntent.status === "requires_action") {
+        // Set order status to Denied for denied/failed transactions
+        await db
+          .update(orders)
+          .set({
+            status: "Denied",
+            paymentStatus: "Failed",
             updatedAt: new Date(),
           })
           .where(eq(orders.id, orderId));

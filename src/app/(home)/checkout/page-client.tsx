@@ -953,6 +953,7 @@ export function CheckoutClient() {
                       onSuccess={handlePaymentSuccess}
                       onError={handlePaymentError}
                       onCreateOrder={handlePaymentInit}
+                      orderData={getOrderDataForVerification()}
                     />
                   </CardContent>
                 </Card>

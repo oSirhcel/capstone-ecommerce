@@ -2,7 +2,7 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { db } from "@/server/db";
 import { orderItems, products, cartItems, carts, zeroTrustAssessments, users, stores, orders } from "@/server/db/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, inArray } from "drizzle-orm";
 import { generateJustificationBackground } from "@/lib/api/risk-justification-server";
 
 export type RiskDecision = "allow" | "deny" | "warn";
@@ -162,7 +162,8 @@ const RISK_FACTORS = {
 export async function zeroTrustCheck(
     req: NextRequest, 
     body: PaymentRequestBody, 
-    session?: { user?: { id?: string; email?: string | null; userType?: string } }
+    session?: { user?: { id?: string; email?: string | null; userType?: string } },
+    checkoutSessionData?: any // Complete checkout session data for multi-store analysis
 ): Promise<NextResponse> {
     try {
         // Extract and validate basic payment data
@@ -178,10 +179,75 @@ export async function zeroTrustCheck(
         const userEmail = session?.user?.email ?? body.auth?.user?.email ?? null;
         const userType = session?.user?.userType ?? body.auth?.user?.userType ?? null;
 
-        // If items are not provided, try to fetch them from database
+        // Prioritize complete checkout session data for multi-store analysis
         let enrichedItems: PaymentItem[] = items;
         
-        if (items.length === 0 && orderId && userId) {
+        // Use complete checkout session data if available (for multi-store analysis)
+        if (checkoutSessionData?.items && Array.isArray(checkoutSessionData.items)) {
+            console.log(`Zero Trust: Using complete checkout session data with ${checkoutSessionData.items.length} items`);
+            
+            // Enrich checkout session data with product and store information
+            try {
+                const productIds = checkoutSessionData.items
+                    .map((item: any) => item.productId)
+                    .filter((id: any) => id != null);
+                
+                if (productIds.length > 0) {
+                    const productData = await db
+                        .select({
+                            id: products.id,
+                            name: products.name,
+                            price: products.price,
+                            storeId: products.storeId,
+                            storeName: stores.name,
+                        })
+                        .from(products)
+                        .leftJoin(stores, eq(products.storeId, stores.id))
+                        .where(inArray(products.id, productIds));
+                    
+                    // Create a lookup map for product data
+                    const productMap = new Map(productData.map(p => [p.id, p]));
+                    
+                    enrichedItems = checkoutSessionData.items.map((item: any) => {
+                        const productInfo = productMap.get(item.productId);
+                        return {
+                            id: item.productId?.toString() ?? 'unknown',
+                            productId: item.productId?.toString() ?? 'unknown',
+                            name: productInfo?.name ?? 'Unknown Product',
+                            price: item.price ?? 0,
+                            quantity: item.quantity ?? 1,
+                            storeId: productInfo?.storeId?.toString() ?? 'unknown',
+                            storeName: productInfo?.storeName ?? 'Unknown Store'
+                        };
+                    });
+                    
+                    console.log(`Zero Trust: Enriched ${enrichedItems.length} items with product and store data`);
+                } else {
+                    // Fallback if no valid product IDs
+                    enrichedItems = checkoutSessionData.items.map((item: any) => ({
+                        id: item.productId?.toString() ?? 'unknown',
+                        productId: item.productId?.toString() ?? 'unknown',
+                        name: 'Unknown Product',
+                        price: item.price ?? 0,
+                        quantity: item.quantity ?? 1,
+                        storeId: 'unknown',
+                        storeName: 'Unknown Store'
+                    }));
+                }
+            } catch (error) {
+                console.error('Failed to enrich checkout session data:', error);
+                // Fallback to basic mapping
+                enrichedItems = checkoutSessionData.items.map((item: any) => ({
+                    id: item.productId?.toString() ?? 'unknown',
+                    productId: item.productId?.toString() ?? 'unknown',
+                    name: 'Unknown Product',
+                    price: item.price ?? 0,
+                    quantity: item.quantity ?? 1,
+                    storeId: 'unknown',
+                    storeName: 'Unknown Store'
+                }));
+            }
+        } else if (items.length === 0 && orderId && userId) {
             // Fetch order items from database
             try {
                 const orderData = await db

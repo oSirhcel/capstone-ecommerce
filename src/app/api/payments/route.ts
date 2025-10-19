@@ -24,7 +24,7 @@ interface CreatePaymentRequest {
   paymentMethodId?: string;
   savePaymentMethod?: boolean;
   verificationToken?: string; // required for 'warn' flows
-  orderData?: any; // Order data for verification flow
+  orderData?: any; // Complete checkout session data for risk assessment
 }
 
 interface ZeroTrustAssessment {
@@ -51,8 +51,8 @@ export async function POST(request: NextRequest) {
     const user = session.user as SessionUser;
     const body = await request.json() as CreatePaymentRequest;
 
-    // Perform zero trust risk assessment
-    const zeroTrustResponse = await zeroTrustCheck(request, body, session);
+    // Perform zero trust risk assessment using complete checkout session data
+    const zeroTrustResponse = await zeroTrustCheck(request, body, session, body.orderData);
     if (zeroTrustResponse.status !== 200) {
       return zeroTrustResponse;
     }

@@ -347,31 +347,32 @@ export async function zeroTrustCheck(
                 
                 accountRole = store ? 'vendor' : 'customer';
 
-                // Calculate transaction success rate
-                const orderStats = await db
+                // Calculate transaction success rate based on risk assessment decisions
+                // A transaction is considered successful if the risk assessment decision was 'allow'
+                const riskStats = await db
                     .select({
                         total: sql<number>`count(*)`,
-                        successful: sql<number>`count(case when ${orders.status} = 'completed' then 1 end)`,
+                        successful: sql<number>`count(case when ${zeroTrustAssessments.decision} = 'allow' then 1 end)`,
                     })
-                    .from(orders)
-                    .where(eq(orders.userId, userId));
+                    .from(zeroTrustAssessments)
+                    .where(eq(zeroTrustAssessments.userId, userId));
 
-                if (orderStats.length > 0 && orderStats[0].total > 0) {
-                    totalPastTransactions = orderStats[0].total;
-                    successfulPastTransactions = orderStats[0].successful;
+                if (riskStats.length > 0 && riskStats[0].total > 0) {
+                    totalPastTransactions = riskStats[0].total;
+                    successfulPastTransactions = riskStats[0].successful;
                     transactionSuccessRate = (successfulPastTransactions / totalPastTransactions) * 100;
                 }
 
-                // Count recent failed transactions (last hour)
+                // Count recent failed transactions (last hour) based on risk assessment decisions
                 const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
                 const failedTransactions = await db
                     .select({ count: sql<number>`count(*)` })
-                    .from(orders)
+                    .from(zeroTrustAssessments)
                     .where(
                         and(
-                            eq(orders.userId, userId),
-                            eq(orders.status, 'failed'),
-                            sql`${orders.createdAt} >= ${oneHourAgo}`
+                            eq(zeroTrustAssessments.userId, userId),
+                            eq(zeroTrustAssessments.decision, 'deny'),
+                            sql`${zeroTrustAssessments.createdAt} >= ${oneHourAgo}`
                         )
                     );
 

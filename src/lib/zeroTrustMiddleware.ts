@@ -587,7 +587,7 @@ export async function zeroTrustCheck(
     - Lower thresholds and higher impact scores
     - Multiple tiers (unusual vs extreme) for better granularity
 */
-function calculateRiskScore(payload: RiskPayload): RiskScore {
+export function calculateRiskScore(payload: RiskPayload): RiskScore {
     const factors: Array<{ factor: string; impact: number; description: string }> = [];
     let totalScore = 0;
 

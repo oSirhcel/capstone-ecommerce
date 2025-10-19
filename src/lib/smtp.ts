@@ -48,7 +48,7 @@ export function generateOTP(): string {
  */
 function getOTPEmailTemplate(otp: string, userName?: string, transactionAmount?: number): string {
   const formattedAmount = transactionAmount 
-    ? `$${(transactionAmount / 100).toFixed(2)}` 
+    ? `$${transactionAmount.toFixed(2)}` 
     : 'your transaction';
 
   return `
@@ -163,7 +163,7 @@ function getOTPEmailTemplate(otp: string, userName?: string, transactionAmount?:
  */
 function getOTPEmailPlainText(otp: string, userName?: string, transactionAmount?: number): string {
   const formattedAmount = transactionAmount 
-    ? `$${(transactionAmount / 100).toFixed(2)}` 
+    ? `$${transactionAmount.toFixed(2)}` 
     : 'your transaction';
 
   return `

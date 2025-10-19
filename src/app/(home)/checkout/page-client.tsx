@@ -354,11 +354,23 @@ export function CheckoutClient() {
       if (!items.length) {
         throw new Error("Your cart is empty");
       }
+
+      // Prepare address data with IDs if existing addresses are selected
+      const shippingAddressData = selectedShippingId
+        ? { ...shippingData, id: selectedShippingId }
+        : shippingData;
+
+      const billingAddressData = sameAsShipping
+        ? shippingAddressData // Use the same data (including ID if selected)
+        : selectedBillingId
+          ? { ...billingData, id: selectedBillingId }
+          : billingData;
+
       const result = await createOrdersAPI(
         storeGroups,
         contactData,
-        shippingData,
-        billingData,
+        shippingAddressData,
+        billingAddressData,
         shipping,
         tax,
       );

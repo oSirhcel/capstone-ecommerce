@@ -366,7 +366,19 @@ export const zeroTrustAssessments = pgTable("zero_trust_assessments", {
   shippingState: varchar({ length: 100 }),
   shippingCity: varchar({ length: 100 }),
   
-  createdAt: timestamp().defaultNow().notNull(),
+  createdAt: timestamp({ withTimezone: true }).defaultNow().notNull(),
+});
+
+// Risk Assessment to Order Links (for multi-store transactions)
+export const riskAssessmentOrderLinks = pgTable("risk_assessment_order_links", {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  riskAssessmentId: integer()
+    .references(() => zeroTrustAssessments.id)
+    .notNull(),
+  orderId: integer()
+    .references(() => orders.id)
+    .notNull(),
+  createdAt: timestamp({ withTimezone: true }).defaultNow().notNull(),
 });
 
 // Zero Trust Verification Tokens

@@ -504,11 +504,12 @@ export async function zeroTrustCheck(
         const riskScore = calculateRiskScore(riskPayload);
         
         // Log the risk assessment to database and get the inserted ID
+        // For multi-store transactions, create a single assessment that can be linked to multiple orders
         let assessmentId: number | null = null;
         try {
             const [insertedAssessment] = await db.insert(zeroTrustAssessments).values({
                 userId: riskPayload.userId,
-                orderId: riskPayload.orderId,
+                orderId: riskPayload.orderId, // This will be null for multi-store transactions initially
                 riskScore: riskScore.score,
                 decision: riskScore.decision,
                 confidence: Math.round(riskScore.confidence * 100),
@@ -519,6 +520,7 @@ export async function zeroTrustCheck(
                 riskFactors: JSON.stringify(riskScore.factors),
                 userAgent: riskPayload.userAgent,
                 ipAddress: riskPayload.ipAddress,
+                createdAt: new Date(), // Explicit timestamp for consistency
             }).returning({ id: zeroTrustAssessments.id });
             
             assessmentId = insertedAssessment?.id ?? null;
@@ -547,10 +549,11 @@ export async function zeroTrustCheck(
             itemsSource: items.length > 0 ? 'provided' : enrichedItems.length > 0 ? 'fetched' : 'none'
         });
 
-        // Return risk assessment
+        // Return risk assessment with ID for linking to orders
         return NextResponse.json({
             success: true,
             riskAssessment: {
+                id: assessmentId,
                 decision: riskScore.decision,
                 score: riskScore.score,
                 confidence: riskScore.confidence,

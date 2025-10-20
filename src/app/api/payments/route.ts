@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Parse the zero trust assessment result
-    const zeroTrustData = await zeroTrustResponse.json() as { riskAssessment: ZeroTrustAssessment };
+    const zeroTrustData = await zeroTrustResponse.json() as { riskAssessment: ZeroTrustAssessment & { id?: number } };
     const riskAssessment = zeroTrustData.riskAssessment;
 
     // Extract orderData early for use in verification

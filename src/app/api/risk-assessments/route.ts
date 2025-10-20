@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { and, desc, eq, ilike, inArray, or, sql, asc } from "drizzle-orm";
 import { db } from "@/server/db";
-import { orders, products, stores, users, userProfiles, zeroTrustAssessments } from "@/server/db/schema";
+import { orders, products, stores, users, userProfiles, zeroTrustAssessments, riskAssessmentOrderLinks } from "@/server/db/schema";
 import { auth } from "@/lib/auth";
 
 // GET /api/risk-assessments
@@ -69,9 +69,8 @@ export async function GET(req: NextRequest) {
     let totalCount: number = 0;
 
     if (storeIdParam) {
-      // We will filter by assessments where order has items from this store
-      // Since assessments store only orderId, we match orderId exists and at least one order_item.product.storeId = storeIdParam
-      // Simpler approach: fetch assessments by decision then post-filter by store ownership with a subquery
+      // For store filtering: include assessments that are linked to orders from this store
+      // This includes both direct order associations and multi-store transaction links
       const base = db
         .select({
           id: zeroTrustAssessments.id,
@@ -99,6 +98,7 @@ export async function GET(req: NextRequest) {
         .from(zeroTrustAssessments)
         .leftJoin(users, eq(zeroTrustAssessments.userId, users.id))
         .leftJoin(userProfiles, eq(zeroTrustAssessments.userId, userProfiles.userId))
+        .leftJoin(riskAssessmentOrderLinks, eq(zeroTrustAssessments.id, riskAssessmentOrderLinks.riskAssessmentId))
         .where(and(...conditions))
         .orderBy(getOrderBy())
         .limit(limit)
@@ -110,31 +110,35 @@ export async function GET(req: NextRequest) {
       const countRows = await db
         .select({ count: sql<number>`count(*)` })
         .from(zeroTrustAssessments)
+        .leftJoin(riskAssessmentOrderLinks, eq(zeroTrustAssessments.id, riskAssessmentOrderLinks.riskAssessmentId))
         .where(and(...conditions));
       totalCount = Number(countRows[0]?.count ?? 0);
 
-      // Fetch orderIds and determine which belong to this store
-      const orderIds = rows.map((r) => r.orderId).filter((id): id is number => typeof id === "number");
+      // Get all order IDs (both direct and linked)
+      const allOrderIds = new Set<number>();
+      rows.forEach((r) => {
+        if (r.orderId) allOrderIds.add(r.orderId);
+      });
 
       console.log("🏪 Store filtering debug:");
-      console.log("  - Found orderIds:", orderIds);
+      console.log("  - Found orderIds:", Array.from(allOrderIds));
       console.log("  - Filtering for storeId:", storeIdParam);
 
       let orderIdForStore = new Set<number>();
-      if (orderIds.length > 0) {
+      if (allOrderIds.size > 0) {
         // Join order_items -> products to get store ownership
         const orderItemsTable = (await import("@/server/db/schema")).orderItems;
         const productRows = await db
           .select({ orderId: orderItemsTable.orderId })
           .from(orderItemsTable)
           .leftJoin(products, eq(orderItemsTable.productId, products.id))
-          .where(and(inArray(orderItemsTable.orderId, orderIds), eq(products.storeId, storeIdParam)));
+          .where(and(inArray(orderItemsTable.orderId, Array.from(allOrderIds)), eq(products.storeId, storeIdParam)));
         orderIdForStore = new Set(productRows.map((r) => r.orderId).filter(Boolean) as number[]);
         console.log("  - Orders belonging to store:", Array.from(orderIdForStore));
       }
 
       // For store filtering: include assessments with null orderId (they're not tied to specific orders)
-      // and assessments with orderIds that belong to this store
+      // and assessments with orderIds that belong to this store (including multi-store transactions)
       results = rows.filter((r) => {
         if (r.orderId === null) {
           // Include assessments with no order association (they're general risk assessments)

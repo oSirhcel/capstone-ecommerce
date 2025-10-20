@@ -316,7 +316,7 @@ export function CheckoutClient() {
     setCurrentStep("payment");
   };
 
-  const handleCreateOrders = async () => {
+  const handleCreateOrders = async (riskAssessmentId?: number) => {
     try {
       // Get form data
       const contactData = contactForm.getValues();
@@ -373,6 +373,7 @@ export function CheckoutClient() {
         billingAddressData,
         shipping,
         tax,
+        riskAssessmentId,
       );
 
       return result;
@@ -388,7 +389,31 @@ export function CheckoutClient() {
   // Create orders and handle payment
   const handlePaymentInit = async () => {
     try {
-      const orderResult = await handleCreateOrders();
+      // First, perform risk assessment to get assessment ID
+      const orderData = getOrderDataForVerification();
+
+      const riskAssessmentResponse = await fetch("/api/payments", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          amount: total,
+          currency: "aud",
+          orderData,
+        }),
+      });
+
+      if (!riskAssessmentResponse.ok) {
+        const errorData = await riskAssessmentResponse.json();
+        throw new Error(errorData.error || "Risk assessment failed");
+      }
+
+      const riskData = await riskAssessmentResponse.json();
+      const riskAssessmentId = riskData.riskAssessment?.id;
+
+      // Create orders with risk assessment ID
+      const orderResult = await handleCreateOrders(riskAssessmentId);
 
       if (orderResult.storeCount > 1) {
         toast.info(`Creating ${orderResult.storeCount} orders`, {

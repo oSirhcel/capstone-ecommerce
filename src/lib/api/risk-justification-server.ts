@@ -52,25 +52,6 @@ export async function getRiskAssessment(
   }
 }
 
-/**
- * Fetch a risk assessment by order ID
- */
-export async function getRiskAssessmentByOrderId(
-  orderId: number
-): Promise<RiskAssessmentWithJustification | null> {
-  try {
-    const [assessment] = await db
-      .select()
-      .from(zeroTrustAssessments)
-      .where(eq(zeroTrustAssessments.orderId, orderId))
-      .limit(1);
-
-    return assessment ?? null;
-  } catch (error) {
-    console.error("Error fetching risk assessment by order ID:", error);
-    throw new Error("Failed to fetch risk assessment");
-  }
-}
 
 /**
  * Get existing justification or generate a new one if missing

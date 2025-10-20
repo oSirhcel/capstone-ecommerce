@@ -137,23 +137,5 @@ function generateFallbackJustification(
   return explanation;
 }
 
-/**
- * Generate a short summary for display in tables/lists
- */
-export function generateShortSummary(riskScore: RiskScore): string {
-  const { score, factors } = riskScore;
-
-  if (factors.length === 0) {
-    return "No significant risk factors detected.";
-  }
-
-  // Get top 2 risk factors
-  const topFactors = factors
-    .sort((a, b) => Math.abs(b.impact) - Math.abs(a.impact))
-    .slice(0, 2)
-    .map((f) => f.factor.toLowerCase().replace(/_/g, " "));
-
-  return `Risk ${score}/100: ${topFactors.join(", ")}`;
-}
 
 

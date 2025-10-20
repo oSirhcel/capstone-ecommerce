@@ -134,6 +134,13 @@
       "when": 1760940400330,
       "tag": "0018_demonic_lady_bullseye",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1760959309745,
+      "tag": "0019_wooden_scarecrow",
+      "breakpoints": true
     }
   ]
 }

@@ -381,6 +381,35 @@ export const riskAssessmentOrderLinks = pgTable("risk_assessment_order_links", {
   createdAt: timestamp({ withTimezone: true }).defaultNow().notNull(),
 });
 
+// Risk Assessment to Store Links (direct association for multi-store transactions)
+export const riskAssessmentStoreLinks = pgTable(
+  "risk_assessment_store_links",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    riskAssessmentId: integer("risk_assessment_id")
+      .references(() => zeroTrustAssessments.id, { onDelete: "cascade" })
+      .notNull(),
+    storeId: varchar("store_id", { length: 255 })
+      .references(() => stores.id, { onDelete: "cascade" })
+      .notNull(),
+    storeOrderId: integer("store_order_id").references(() => orders.id),
+    storeSubtotal: integer("store_subtotal").notNull(), // in cents
+    storeItemCount: integer("store_item_count").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    unique("ras_links_assessment_store_unique").on(
+      table.riskAssessmentId,
+      table.storeId,
+    ),
+    index("ras_links_assessment_idx").on(table.riskAssessmentId),
+    index("ras_links_store_idx").on(table.storeId),
+    index("ras_links_order_idx").on(table.storeOrderId),
+  ],
+);
+
 // Zero Trust Verification Tokens
 export const zeroTrustVerifications = pgTable("zero_trust_verifications", {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),

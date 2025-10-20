@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { and, desc, eq, ilike, inArray, or, sql, asc } from "drizzle-orm";
 import { db } from "@/server/db";
-import { orders, products, stores, users, userProfiles, zeroTrustAssessments, riskAssessmentOrderLinks } from "@/server/db/schema";
+import { orders, products, stores, users, userProfiles, zeroTrustAssessments, riskAssessmentOrderLinks, riskAssessmentStoreLinks } from "@/server/db/schema";
 import { auth } from "@/lib/auth";
 
 // GET /api/risk-assessments
@@ -42,14 +42,6 @@ export async function GET(req: NextRequest) {
       return sortOrder === "asc" ? asc(column) : desc(column);
     };
 
-    console.log("🔍 Risk assessments API debug:");
-    console.log("  - decisionParam:", decisionParam);
-    console.log("  - parsed decisions:", decisions);
-    console.log("  - filteredDecisions:", filteredDecisions);
-    console.log("  - storeIdParam:", storeIdParam);
-    console.log("  - search:", search);
-    console.log("  - sortBy:", sortBy);
-    console.log("  - sortOrder:", sortOrder);
 
     // Build where clause
     const conditions: any[] = [inArray(zeroTrustAssessments.decision, filteredDecisions)];
@@ -64,13 +56,15 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // If store scoping is set (store owner), join through orders->order_items->products to limit to their store
+    // If store scoping is set (store owner), use the efficient riskAssessmentStoreLinks table
     let results;
     let totalCount: number = 0;
 
     if (storeIdParam) {
-      // For store filtering: include assessments that are linked to orders from this store
-      // This includes both direct order associations and multi-store transaction links
+      // Use riskAssessmentStoreLinks for direct store filtering
+      // This includes both single-store and multi-store transaction assessments
+      const storeConditions = [...conditions, eq(riskAssessmentStoreLinks.storeId, storeIdParam)];
+
       const base = db
         .select({
           id: zeroTrustAssessments.id,
@@ -94,60 +88,28 @@ export async function GET(req: NextRequest) {
           userName: userProfiles.firstName,
           userLastName: userProfiles.lastName,
           username: users.username,
+          // Include store-specific data from the link table
+          storeSubtotal: riskAssessmentStoreLinks.storeSubtotal,
+          storeItemCount: riskAssessmentStoreLinks.storeItemCount,
         })
         .from(zeroTrustAssessments)
+        .innerJoin(riskAssessmentStoreLinks, eq(zeroTrustAssessments.id, riskAssessmentStoreLinks.riskAssessmentId))
         .leftJoin(users, eq(zeroTrustAssessments.userId, users.id))
         .leftJoin(userProfiles, eq(zeroTrustAssessments.userId, userProfiles.userId))
-        .leftJoin(riskAssessmentOrderLinks, eq(zeroTrustAssessments.id, riskAssessmentOrderLinks.riskAssessmentId))
-        .where(and(...conditions))
+        .where(and(...storeConditions))
         .orderBy(getOrderBy())
         .limit(limit)
         .offset(offset);
 
-      const rows = await base;
+      results = await base;
 
-      // Count total
+      // Count total with store filter
       const countRows = await db
-        .select({ count: sql<number>`count(*)` })
+        .select({ count: sql<number>`count(DISTINCT ${zeroTrustAssessments.id})` })
         .from(zeroTrustAssessments)
-        .leftJoin(riskAssessmentOrderLinks, eq(zeroTrustAssessments.id, riskAssessmentOrderLinks.riskAssessmentId))
-        .where(and(...conditions));
+        .innerJoin(riskAssessmentStoreLinks, eq(zeroTrustAssessments.id, riskAssessmentStoreLinks.riskAssessmentId))
+        .where(and(...storeConditions));
       totalCount = Number(countRows[0]?.count ?? 0);
-
-      // Get all order IDs (both direct and linked)
-      const allOrderIds = new Set<number>();
-      rows.forEach((r) => {
-        if (r.orderId) allOrderIds.add(r.orderId);
-      });
-
-      console.log("🏪 Store filtering debug:");
-      console.log("  - Found orderIds:", Array.from(allOrderIds));
-      console.log("  - Filtering for storeId:", storeIdParam);
-
-      let orderIdForStore = new Set<number>();
-      if (allOrderIds.size > 0) {
-        // Join order_items -> products to get store ownership
-        const orderItemsTable = (await import("@/server/db/schema")).orderItems;
-        const productRows = await db
-          .select({ orderId: orderItemsTable.orderId })
-          .from(orderItemsTable)
-          .leftJoin(products, eq(orderItemsTable.productId, products.id))
-          .where(and(inArray(orderItemsTable.orderId, Array.from(allOrderIds)), eq(products.storeId, storeIdParam)));
-        orderIdForStore = new Set(productRows.map((r) => r.orderId).filter(Boolean) as number[]);
-        console.log("  - Orders belonging to store:", Array.from(orderIdForStore));
-      }
-
-      // For store filtering: include assessments with null orderId (they're not tied to specific orders)
-      // and assessments with orderIds that belong to this store (including multi-store transactions)
-      results = rows.filter((r) => {
-        if (r.orderId === null) {
-          // Include assessments with no order association (they're general risk assessments)
-          return true;
-        }
-        return orderIdForStore.has(r.orderId);
-      });
-      console.log("  - Results after store filtering:", results.length);
-      console.log("  - Filtered results decisions:", results.map(r => ({ id: r.id, decision: r.decision, orderId: r.orderId })));
     } else {
       // Global admin view: return all
       const base = db
@@ -195,11 +157,6 @@ export async function GET(req: NextRequest) {
       ...r,
       riskFactors: r.riskFactors ? (() => { try { return JSON.parse(r.riskFactors as unknown as string); } catch { return []; } })() : [],
     }));
-
-    console.log("📊 Query results:");
-    console.log("  - Total count:", totalCount);
-    console.log("  - Results found:", results.length);
-    console.log("  - Sample decisions:", results.slice(0, 5).map(r => ({ id: r.id, decision: r.decision, score: r.riskScore })));
 
     return NextResponse.json({
       assessments: parsed,

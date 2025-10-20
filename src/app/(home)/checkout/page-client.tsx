@@ -37,6 +37,8 @@ interface RiskAssessmentResponse {
     confidence?: number;
     factors?: string[];
   };
+  verificationToken?: string; // For WARN flows
+  riskAssessmentId?: number; // For WARN flows (at top level)
 }
 
 interface ZeroTrustError extends Error {
@@ -423,8 +425,14 @@ export function CheckoutClient() {
       });
 
       const riskData =
-        (await riskAssessmentResponse.json()) as RiskAssessmentResponse;
-      const riskAssessmentId = riskData.riskAssessment?.id;
+        (await riskAssessmentResponse.json()) as RiskAssessmentResponse & {
+          riskAssessmentId?: number;
+        };
+
+      // For WARN responses (202), riskAssessmentId is at top level
+      // For ALLOW responses (200), it's nested in riskAssessment
+      const riskAssessmentId =
+        riskData.riskAssessmentId ?? riskData.riskAssessment?.id;
 
       // Create orders with risk assessment ID
       const orderResult = await handleCreateOrders(riskAssessmentId);
@@ -433,6 +441,33 @@ export function CheckoutClient() {
         toast.info(`Creating ${orderResult.storeCount} orders`, {
           description: `Your items will be shipped separately by each store.`,
         });
+      }
+
+      // For WARN flows, store orderIds in the verification by updating it
+      // This allows the verified page to link all orders to the risk assessment
+      if (riskAssessmentResponse.status === 202 && riskData.verificationToken) {
+        try {
+          await fetch("/api/verification/update-payment-data", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              token: riskData.verificationToken,
+              orderIds: orderResult.orderIds,
+            }),
+          });
+          console.log(
+            "Updated verification with orderIds:",
+            orderResult.orderIds,
+          );
+        } catch (updateError) {
+          console.error(
+            "Failed to update verification with orderIds:",
+            updateError,
+          );
+          // Don't fail the flow if this update fails
+        }
       }
 
       return orderResult.primaryOrderId;
@@ -581,7 +616,7 @@ export function CheckoutClient() {
         />
 
         {/* Header */}
-        <div className="mt-6 mb-8">
+        <div className="mb-8 mt-6">
           <div className="mb-4 flex items-center gap-4">
             <Button variant="ghost" size="sm" asChild>
               <Link href="/cart" className="flex items-center gap-2">

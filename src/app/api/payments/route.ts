@@ -159,7 +159,11 @@ export async function POST(request: NextRequest) {
             userId: user.id,
             userEmail: user.email ?? '',
             userName: user.name ?? undefined,
-            paymentData: { ...body, orderData }, // Include order data for verification flow
+            paymentData: { 
+              ...body, 
+              orderData,
+              riskAssessmentId: riskAssessment.id, // Include risk assessment ID for linking
+            }, // Include order data for verification flow
             riskScore: riskAssessment.score,
             riskFactors: riskAssessment.factors,
             transactionAmount: body.amount,
@@ -170,6 +174,7 @@ export async function POST(request: NextRequest) {
             errorCode: 'ZERO_TRUST_VERIFICATION_REQUIRED',
             riskScore: riskAssessment.score,
             riskFactors: riskAssessment.factors.map(f => f.factor),
+            riskAssessmentId: riskAssessment.id, // Include risk assessment ID for order linking
             verificationToken,
             expiresAt: expiresAt.toISOString(),
             message: 'A verification code has been sent to your email. Please enter it to complete your transaction.',

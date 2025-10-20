@@ -133,19 +133,6 @@ function PaymentForm({
     } catch (error) {
       console.error("Payment processing error:", error);
 
-      // Check if this is a zero trust error
-      if (error instanceof Error) {
-        const isZeroTrust =
-          (error as any).isZeroTrustBlock ||
-          (error as any).isZeroTrustVerification;
-        console.log("Error is zero trust:", isZeroTrust);
-        console.log("Error properties:", {
-          isZeroTrustBlock: (error as any).isZeroTrustBlock,
-          isZeroTrustVerification: (error as any).isZeroTrustVerification,
-          verificationToken: (error as any).verificationToken,
-        });
-      }
-
       const errorMessage =
         error instanceof Error ? error.message : "Payment processing failed";
       setPaymentError(errorMessage);

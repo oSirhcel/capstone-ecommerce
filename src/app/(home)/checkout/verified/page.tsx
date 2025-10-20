@@ -57,8 +57,58 @@ function VerifiedContent() {
       const { paymentData } = await dataResponse.json();
 
       // Handle order creation for warn transactions
+      // Note: For multi-store transactions, orders should have been created before OTP verification
+      // The orderId and orderIds should already be present in paymentData
       let orderId = paymentData.orderId;
-      if (paymentData.orderData && !orderId) {
+      let orderIds: number[] =
+        paymentData.orderIds || (orderId ? [orderId] : []);
+      const riskAssessmentId = paymentData.riskAssessmentId;
+
+      console.log("Verified page - paymentData:", {
+        orderId,
+        orderIds,
+        riskAssessmentId,
+        hasOrderData: !!paymentData.orderData,
+        hasStoreGroups: !!paymentData.orderData?.storeGroups,
+      });
+
+      // If we have orderIds from paymentData, use them directly
+      // This happens when orders were created during checkout flow
+      if (orderIds.length > 0) {
+        console.log(
+          `Using ${orderIds.length} orderIds from paymentData:`,
+          orderIds,
+        );
+      }
+      // Otherwise, if we have riskAssessmentId but no orderIds,
+      // query the database for all orders created during this transaction
+      else if (riskAssessmentId && paymentData.orderData?.storeGroups) {
+        try {
+          console.log("Fetching recent orders for this user...");
+          // Fetch all orders created in the last 10 minutes for this user
+          const ordersResponse = await fetch(
+            `/api/orders?recent=true&limit=10`,
+          );
+          if (ordersResponse.ok) {
+            const ordersData = await ordersResponse.json();
+            const recentOrderIds =
+              ordersData.orders?.map((o: any) => o.id) || [];
+
+            if (recentOrderIds.length > 0) {
+              orderIds = recentOrderIds;
+              orderId = orderIds[0];
+              console.log(`Found ${orderIds.length} recent orders:`, orderIds);
+            }
+          }
+        } catch (error) {
+          console.error("Failed to fetch recent orders:", error);
+          // Continue with single orderId
+        }
+      }
+
+      // Only try to create orders if we don't have an orderId AND orderData exists
+      // AND it's a single-store transaction (orderData has a storeId)
+      if (paymentData.orderData && !orderId && paymentData.orderData.storeId) {
         // Use idempotent creation on the server; POST /api/orders already avoids duplicates
         const orderResponse = await fetch("/api/orders", {
           method: "POST",
@@ -75,7 +125,68 @@ function VerifiedContent() {
 
         const orderResult = await orderResponse.json();
         orderId = orderResult.orderId;
-        console.log("Order ensured (idempotent):", orderId);
+        orderIds.push(orderId);
+
+        // Link risk assessment to order if we have both
+        if (riskAssessmentId && orderId) {
+          try {
+            console.log("Linking risk assessment to single order:", {
+              riskAssessmentId,
+              orderId,
+            });
+            await fetch("/api/risk-assessments/link-orders", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                riskAssessmentId,
+                orderIds: [orderId],
+              }),
+            });
+            console.log("Successfully linked risk assessment to order");
+          } catch (error) {
+            console.error("Failed to link risk assessment:", error);
+            // Don't fail the order if linking fails
+          }
+        }
+      }
+
+      // Link risk assessment to ALL orders (single or multi-store)
+      // This handles both cases:
+      // - Orders created during checkout (multi-store)
+      // - Orders just created above (single-store)
+      if (riskAssessmentId && orderIds.length > 0) {
+        try {
+          console.log(
+            `Linking risk assessment ${riskAssessmentId} to ${orderIds.length} order(s):`,
+            orderIds,
+          );
+          const linkResponse = await fetch(
+            "/api/risk-assessments/link-orders",
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                riskAssessmentId,
+                orderIds,
+              }),
+            },
+          );
+
+          if (linkResponse.ok) {
+            const linkResult = await linkResponse.json();
+            console.log("Successfully linked risk assessment:", linkResult);
+          } else {
+            const errorData = await linkResponse.json();
+            console.error("Failed to link risk assessment:", errorData);
+          }
+        } catch (error) {
+          console.error("Failed to link risk assessment to orders:", error);
+          // Don't fail the order if linking fails
+        }
       }
 
       // Now process the payment with the original payment data and order ID

@@ -5,7 +5,7 @@
 
 import { db } from "@/server/db";
 import { zeroTrustVerifications } from "@/server/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 import { generateOTP, sendOTPEmail } from "@/lib/smtp";
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
@@ -41,12 +41,105 @@ export async function createOTPVerification(params: {
   userId: string;
   userEmail: string;
   userName?: string;
-  paymentData: any;
+  paymentData: Record<string, unknown>;
   riskScore: number;
-  riskFactors: any[];
+  riskFactors: Array<{ factor: string; impact: number; description: string }>;
   transactionAmount?: number;
 }): Promise<{ token: string; otp: string; expiresAt: Date }> {
   try {
+    // Check for existing pending verification for this user with same transaction amount
+    // This prevents duplicate OTP emails during multi-store checkout flows
+    const paymentDataParsed = typeof params.paymentData === 'string' 
+      ? JSON.parse(params.paymentData as string) as Record<string, unknown>
+      : params.paymentData;
+    const transactionAmount = params.transactionAmount ?? (paymentDataParsed.amount as number | undefined) ?? 0;
+    
+    // Look for recent pending verifications (within last 2 minutes) for same user and amount
+    // Use a shorter window since checkout flows happen quickly
+    const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
+    const now = new Date();
+    
+    const existingVerifications = await db
+      .select()
+      .from(zeroTrustVerifications)
+      .where(
+        and(
+          eq(zeroTrustVerifications.userId, params.userId),
+          eq(zeroTrustVerifications.status, 'pending'),
+          sql`${zeroTrustVerifications.createdAt} >= ${twoMinutesAgo}`
+        )
+      )
+      .orderBy(desc(zeroTrustVerifications.createdAt))
+      .limit(10);
+    
+    console.log(`Found ${existingVerifications.length} recent pending verifications for user ${params.userId}`);
+    
+    // Check if any existing verification matches the transaction amount
+    // Also check that it hasn't expired (manual check to avoid timezone issues)
+    const matchingVerification = existingVerifications.find(v => {
+      try {
+        // Check if expired (compare dates in JavaScript to avoid timezone issues)
+        const isExpired = v.expiresAt < now;
+        if (isExpired) {
+          console.log(`Verification ${v.token} is expired, skipping`);
+          return false;
+        }
+        
+        const storedPaymentData = JSON.parse(v.paymentData || '{}') as Record<string, unknown>;
+        const storedAmount = (storedPaymentData.amount as number | undefined) ?? 0;
+        // Match if amounts are within 1 cent (to handle floating point rounding)
+        const amountsMatch = Math.abs(storedAmount - transactionAmount) < 0.01;
+        
+        console.log(`Checking verification ${v.id}: storedAmount=${storedAmount}, transactionAmount=${transactionAmount}, match=${amountsMatch}`);
+        
+        return amountsMatch;
+      } catch (e) {
+        console.error(`Error checking verification ${v.id}:`, e);
+        return false;
+      }
+    });
+    
+    if (matchingVerification?.otpHash) {
+      console.log(`✓ Reusing existing OTP verification ${matchingVerification.token} for user ${params.userId} (multi-store transaction)`);
+      
+      // Update the stored paymentData with any new information (like orderId)
+      // This ensures that after OTP verification, we have the complete payment data
+      try {
+        const storedData = JSON.parse(matchingVerification.paymentData || '{}') as Record<string, unknown>;
+        const newData = typeof params.paymentData === 'string' 
+          ? JSON.parse(params.paymentData as string) as Record<string, unknown>
+          : params.paymentData;
+        
+        // Merge the data, with new data taking precedence
+        const mergedData: Record<string, unknown> = { ...storedData, ...newData };
+        
+        // Update the verification record with merged payment data
+        await db
+          .update(zeroTrustVerifications)
+          .set({
+            paymentData: JSON.stringify(mergedData),
+          })
+          .where(eq(zeroTrustVerifications.token, matchingVerification.token));
+        
+        console.log(`Updated OTP verification ${matchingVerification.token} with new payment data (orderId: ${(newData.orderId as number | undefined) ?? 'none'})`);
+      } catch (error) {
+        console.error('Failed to update OTP verification payment data:', error);
+        // Continue anyway - not critical
+      }
+      
+      // Return the existing verification token
+      // Note: We can't return the original OTP since it's hashed, but the token is what matters
+      // The client will use the same token and the user will use the OTP from the first email
+      return {
+        token: matchingVerification.token,
+        otp: '', // Can't retrieve original OTP (it's hashed), but not needed since email already sent
+        expiresAt: matchingVerification.expiresAt,
+      };
+    }
+    
+    console.log(`No matching OTP verification found, creating new one for user ${params.userId}`);
+    
+    // No existing verification found, create a new one
     const otp = generateOTP();
     const token = generateVerificationToken();
     const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
@@ -55,7 +148,7 @@ export async function createOTPVerification(params: {
     const otpHash = await bcrypt.hash(otp, 10);
 
     // Store OTP verification in database
-    const [verification] = await db.insert(zeroTrustVerifications).values({
+    await db.insert(zeroTrustVerifications).values({
       token,
       userId: params.userId,
       userEmail: params.userEmail,

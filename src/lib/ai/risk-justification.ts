@@ -30,7 +30,7 @@ export async function generateRiskJustification(
     const result = await generateText({
       model,
       prompt,
-      temperature: 0.4, // Lower temperature for more consistent, factual output
+      temperature: 0.5, // Lower temperature for more consistent, factual output
     });
 
     return result.text;
@@ -95,9 +95,9 @@ Please provide a response with the following sections:
 
 3. **Recommended Actions** (3-5 specific actionable steps for the admin reviewing this transaction)
 
-4. **Business Context** (Brief note on balancing fraud prevention with customer experience)
+4. **Business Context** (Brief note on fraud prevention with the business and customer experience in mind)
 
-Keep the explanation professional, clear, and actionable. Focus on helping the admin make an informed decision.`;
+Keep the explanation professional, clear, actionable and easy to understand for all demographics. Focus on helping the admin or shop owner make an informed decision.`;
 }
 
 /**

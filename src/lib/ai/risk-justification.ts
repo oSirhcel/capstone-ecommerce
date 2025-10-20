@@ -64,7 +64,7 @@ function buildJustificationPrompt(
     ? `${payload.successfulPastTransactions}/${payload.totalPastTransactions} successful (${payload.transactionSuccessRate?.toFixed(1)}%)`
     : "no history";
 
-  return `You are a fraud detection expert analyzing a transaction risk assessment. Provide a clear, professional explanation of why this transaction received its risk score. Your target audience is a small business owner who is reviewing the transaction.
+  return `You are a fraud detection expert analyzing a transaction risk assessment. Provide a clear, professional explanation of why this transaction received its risk score. Your target audience is a small business owner who is reviewing the transaction as a part of an E-commerce platform that hosts many different vendors and products.
 
 RISK ASSESSMENT RESULTS:
 - Risk Score: ${score}/100
@@ -77,8 +77,8 @@ TRANSACTION DETAILS:
 - Stores: ${payload.uniqueStoreCount} vendor(s)
 - User Type: ${payload.userType ?? "guest"}
 - Account Role: ${payload.accountRole ?? "customer"}
-- Account Age: ${accountAgeInfo}
-- Transaction History: ${transactionHistory}
+- Account Age (keep in mind that account age does not necessarily translate to amount of transactions the customer has made - successful or not): ${accountAgeInfo}
+- Transaction History (use this to determine if the customer is a repeat offender or has multiple suspicious attempts): ${transactionHistory}
 
 RISK FACTORS DETECTED:
 ${factorsList}

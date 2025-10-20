@@ -370,16 +370,27 @@ export const zeroTrustAssessments = pgTable("zero_trust_assessments", {
 });
 
 // Risk Assessment to Order Links (for multi-store transactions)
-export const riskAssessmentOrderLinks = pgTable("risk_assessment_order_links", {
-  id: integer().primaryKey().generatedAlwaysAsIdentity(),
-  riskAssessmentId: integer()
-    .references(() => zeroTrustAssessments.id)
-    .notNull(),
-  orderId: integer()
-    .references(() => orders.id)
-    .notNull(),
-  createdAt: timestamp({ withTimezone: true }).defaultNow().notNull(),
-});
+export const riskAssessmentOrderLinks = pgTable(
+  "risk_assessment_order_links",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    riskAssessmentId: integer()
+      .references(() => zeroTrustAssessments.id)
+      .notNull(),
+    orderId: integer()
+      .references(() => orders.id)
+      .notNull(),
+    createdAt: timestamp({ withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    unique("raol_assessment_order_unique").on(
+      table.riskAssessmentId,
+      table.orderId,
+    ),
+    index("raol_assessment_idx").on(table.riskAssessmentId),
+    index("raol_order_idx").on(table.orderId),
+  ],
+);
 
 // Risk Assessment to Store Links (direct association for multi-store transactions)
 export const riskAssessmentStoreLinks = pgTable(

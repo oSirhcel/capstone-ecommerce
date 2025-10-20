@@ -128,9 +128,11 @@ function VerifiedContent() {
         orderIds.push(orderId);
 
         // Link risk assessment to order if we have both
+        // Note: For multi-store orders, linking already happened during order creation
+        // This only applies to single-store orders created in the verified page
         if (riskAssessmentId && orderId) {
           try {
-            console.log("Linking risk assessment to single order:", {
+            console.log("Linking risk assessment to newly created order:", {
               riskAssessmentId,
               orderId,
             });
@@ -152,42 +154,9 @@ function VerifiedContent() {
         }
       }
 
-      // Link risk assessment to ALL orders (single or multi-store)
-      // This handles both cases:
-      // - Orders created during checkout (multi-store)
-      // - Orders just created above (single-store)
-      if (riskAssessmentId && orderIds.length > 0) {
-        try {
-          console.log(
-            `Linking risk assessment ${riskAssessmentId} to ${orderIds.length} order(s):`,
-            orderIds,
-          );
-          const linkResponse = await fetch(
-            "/api/risk-assessments/link-orders",
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                riskAssessmentId,
-                orderIds,
-              }),
-            },
-          );
-
-          if (linkResponse.ok) {
-            const linkResult = await linkResponse.json();
-            console.log("Successfully linked risk assessment:", linkResult);
-          } else {
-            const errorData = await linkResponse.json();
-            console.error("Failed to link risk assessment:", errorData);
-          }
-        } catch (error) {
-          console.error("Failed to link risk assessment to orders:", error);
-          // Don't fail the order if linking fails
-        }
-      }
+      // NOTE: For multi-store orders, linking to risk assessment already happened
+      // during order creation in handlePaymentInit via createOrders()
+      // No need to link again here to avoid duplicates
 
       // Now process the payment with the original payment data and order ID
       const paymentResponse = await fetch("/api/payments", {

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { and, desc, eq, ilike, inArray, or, sql, asc } from "drizzle-orm";
 import { db } from "@/server/db";
-import { orders, products, stores, users, zeroTrustAssessments } from "@/server/db/schema";
+import { orders, products, stores, users, userProfiles, zeroTrustAssessments } from "@/server/db/schema";
 import { auth } from "@/lib/auth";
 
 // GET /api/risk-assessments
@@ -91,8 +91,14 @@ export async function GET(req: NextRequest) {
           userAgent: zeroTrustAssessments.userAgent,
           ipAddress: zeroTrustAssessments.ipAddress,
           createdAt: zeroTrustAssessments.createdAt,
+          userEmail: userProfiles.email,
+          userName: userProfiles.firstName,
+          userLastName: userProfiles.lastName,
+          username: users.username,
         })
         .from(zeroTrustAssessments)
+        .leftJoin(users, eq(zeroTrustAssessments.userId, users.id))
+        .leftJoin(userProfiles, eq(zeroTrustAssessments.userId, userProfiles.userId))
         .where(and(...conditions))
         .orderBy(getOrderBy())
         .limit(limit)
@@ -159,8 +165,14 @@ export async function GET(req: NextRequest) {
           userAgent: zeroTrustAssessments.userAgent,
           ipAddress: zeroTrustAssessments.ipAddress,
           createdAt: zeroTrustAssessments.createdAt,
+          userEmail: userProfiles.email,
+          userName: userProfiles.firstName,
+          userLastName: userProfiles.lastName,
+          username: users.username,
         })
         .from(zeroTrustAssessments)
+        .leftJoin(users, eq(zeroTrustAssessments.userId, users.id))
+        .leftJoin(userProfiles, eq(zeroTrustAssessments.userId, userProfiles.userId))
         .where(and(...conditions))
         .orderBy(getOrderBy())
         .limit(limit)

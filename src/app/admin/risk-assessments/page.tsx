@@ -42,6 +42,31 @@ const columns = [
     },
   },
   {
+    header: "User",
+    accessorKey: "userName",
+    sortable: true,
+    cell: ({ row }: { row: { original: RiskAssessmentListItem } }) => {
+      const user = row.original;
+      if (!user.userName && !user.userEmail && !user.username) {
+        return <span className="text-muted-foreground">Guest</span>;
+      }
+      const fullName = [user.userName, user.userLastName]
+        .filter(Boolean)
+        .join(" ");
+      const displayName = fullName || user.username || "Unknown";
+      return (
+        <div className="flex flex-col">
+          <span className="font-medium">{displayName}</span>
+          {user.userEmail && (
+            <span className="text-muted-foreground text-xs">
+              {user.userEmail}
+            </span>
+          )}
+        </div>
+      );
+    },
+  },
+  {
     header: "Confidence",
     accessorKey: "confidence",
     sortable: true,

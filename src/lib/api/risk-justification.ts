@@ -21,6 +21,10 @@ export interface RiskAssessmentListItem {
   userAgent: string | null;
   ipAddress: string | null;
   createdAt: Date;
+  userEmail: string | null;
+  userName: string | null;
+  userLastName: string | null;
+  username: string | null;
 }
 
 export interface RiskAssessmentsResponse {

@@ -4,7 +4,7 @@
  */
 
 import { db } from "@/server/db";
-import { zeroTrustAssessments } from "@/server/db/schema";
+import { zeroTrustAssessments, users, userProfiles } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
 import { generateRiskJustification } from "@/lib/ai/risk-justification";
 import type { RiskScore, RiskPayload } from "@/lib/zeroTrustMiddleware";
@@ -30,6 +30,10 @@ export interface RiskAssessmentWithJustification {
   shippingState: string | null;
   shippingCity: string | null;
   createdAt: Date;
+  userEmail: string | null;
+  userName: string | null;
+  userLastName: string | null;
+  username: string | null;
 }
 
 /**
@@ -40,8 +44,35 @@ export async function getRiskAssessment(
 ): Promise<RiskAssessmentWithJustification | null> {
   try {
     const [assessment] = await db
-      .select()
+      .select({
+        id: zeroTrustAssessments.id,
+        userId: zeroTrustAssessments.userId,
+        orderId: zeroTrustAssessments.orderId,
+        paymentIntentId: zeroTrustAssessments.paymentIntentId,
+        riskScore: zeroTrustAssessments.riskScore,
+        decision: zeroTrustAssessments.decision,
+        confidence: zeroTrustAssessments.confidence,
+        transactionAmount: zeroTrustAssessments.transactionAmount,
+        currency: zeroTrustAssessments.currency,
+        itemCount: zeroTrustAssessments.itemCount,
+        storeCount: zeroTrustAssessments.storeCount,
+        riskFactors: zeroTrustAssessments.riskFactors,
+        aiJustification: zeroTrustAssessments.aiJustification,
+        justificationGeneratedAt: zeroTrustAssessments.justificationGeneratedAt,
+        userAgent: zeroTrustAssessments.userAgent,
+        ipAddress: zeroTrustAssessments.ipAddress,
+        shippingCountry: zeroTrustAssessments.shippingCountry,
+        shippingState: zeroTrustAssessments.shippingState,
+        shippingCity: zeroTrustAssessments.shippingCity,
+        createdAt: zeroTrustAssessments.createdAt,
+        userEmail: userProfiles.email,
+        userName: userProfiles.firstName,
+        userLastName: userProfiles.lastName,
+        username: users.username,
+      })
       .from(zeroTrustAssessments)
+      .leftJoin(users, eq(zeroTrustAssessments.userId, users.id))
+      .leftJoin(userProfiles, eq(zeroTrustAssessments.userId, userProfiles.userId))
       .where(eq(zeroTrustAssessments.id, assessmentId))
       .limit(1);
 

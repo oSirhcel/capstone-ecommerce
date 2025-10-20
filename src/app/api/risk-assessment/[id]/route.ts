@@ -58,6 +58,10 @@ export async function GET(
       shippingState: assessment.shippingState,
       shippingCity: assessment.shippingCity,
       createdAt: assessment.createdAt,
+      userEmail: assessment.userEmail,
+      userName: assessment.userName,
+      userLastName: assessment.userLastName,
+      username: assessment.username,
     });
   } catch (error) {
     console.error("Error fetching risk assessment:", error);

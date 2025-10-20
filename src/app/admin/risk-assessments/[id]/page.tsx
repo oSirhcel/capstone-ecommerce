@@ -41,6 +41,10 @@ export default function RiskAssessmentDetailPage() {
         justificationGeneratedAt: string | null;
         ipAddress: string | null;
         createdAt: string;
+        userEmail: string | null;
+        userName: string | null;
+        userLastName: string | null;
+        username: string | null;
       }>;
     },
   });
@@ -110,6 +114,27 @@ export default function RiskAssessmentDetailPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-2 text-sm">
+              <div>
+                <span className="text-muted-foreground">User:</span>{" "}
+                {data.userName || data.userEmail || data.username ? (
+                  <div className="flex flex-col">
+                    <span className="font-medium">
+                      {[data.userName, data.userLastName]
+                        .filter(Boolean)
+                        .join(" ") ||
+                        data.username ||
+                        "Unknown"}
+                    </span>
+                    {data.userEmail && (
+                      <span className="text-muted-foreground text-xs">
+                        {data.userEmail}
+                      </span>
+                    )}
+                  </div>
+                ) : (
+                  <span className="text-muted-foreground">Guest</span>
+                )}
+              </div>
               <div>
                 <span className="text-muted-foreground">Score:</span>{" "}
                 <span className="font-medium">{data.riskScore}</span>

@@ -2,7 +2,7 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { db } from "@/server/db";
 import { orderItems, products, cartItems, carts, zeroTrustAssessments, users, stores } from "@/server/db/schema";
-import { eq, and, sql, inArray } from "drizzle-orm";
+import { eq, and, sql, inArray, desc } from "drizzle-orm";
 import { generateJustificationBackground } from "@/lib/api/risk-justification-server";
 
 export type RiskDecision = "allow" | "deny" | "warn";
@@ -507,30 +507,68 @@ export async function zeroTrustCheck(
         // For multi-store transactions, create a single assessment that can be linked to multiple orders
         let assessmentId: number | null = null;
         try {
-            const [insertedAssessment] = await db.insert(zeroTrustAssessments).values({
-                userId: riskPayload.userId,
-                orderId: riskPayload.orderId, // This will be null for multi-store transactions initially
-                riskScore: riskScore.score,
-                decision: riskScore.decision,
-                confidence: Math.round(riskScore.confidence * 100),
-                transactionAmount: Math.round(riskPayload.totalAmount * 100), // Convert dollars to cents
-                currency: riskPayload.currency,
-                itemCount: riskPayload.itemCount,
-                storeCount: riskPayload.uniqueStoreCount,
-                riskFactors: JSON.stringify(riskScore.factors),
-                userAgent: riskPayload.userAgent,
-                ipAddress: riskPayload.ipAddress,
-                createdAt: new Date(), // Explicit timestamp for consistency
-            }).returning({ id: zeroTrustAssessments.id });
+            // Check for existing recent assessment (within last 60 seconds) with same userId and amount
+            // This prevents duplicate assessments during the checkout flow
+            const oneMinuteAgo = new Date(Date.now() - 60 * 1000);
+            const transactionAmountCents = Math.round(riskPayload.totalAmount * 100);
             
-            assessmentId = insertedAssessment?.id ?? null;
+            const existingAssessments = await db
+                .select()
+                .from(zeroTrustAssessments)
+                .where(
+                    and(
+                        eq(zeroTrustAssessments.userId, riskPayload.userId || ''),
+                        eq(zeroTrustAssessments.transactionAmount, transactionAmountCents),
+                        sql`${zeroTrustAssessments.createdAt} >= ${oneMinuteAgo}`
+                    )
+                )
+                .orderBy(desc(zeroTrustAssessments.createdAt))
+                .limit(1);
             
-            // Generate AI justification in the background (non-blocking)
-            // This won't slow down the transaction response
-            if (assessmentId) {
-                generateJustificationBackground(assessmentId, riskScore, riskPayload).catch(err => {
-                    console.error(`Background AI generation failed for assessment ${assessmentId}:`, err);
-                });
+            const existingAssessment = existingAssessments[0];
+            
+            // If we found a recent matching assessment
+            if (existingAssessment) {
+                assessmentId = existingAssessment.id;
+                console.log(`Reusing existing risk assessment ${assessmentId} for user ${riskPayload.userId}`);
+                
+                // If the new request has an orderId but the existing assessment doesn't, update it
+                if (riskPayload.orderId && !existingAssessment.orderId) {
+                    await db
+                        .update(zeroTrustAssessments)
+                        .set({ orderId: riskPayload.orderId })
+                        .where(eq(zeroTrustAssessments.id, assessmentId));
+                    
+                    console.log(`Updated assessment ${assessmentId} with orderId ${riskPayload.orderId}`);
+                }
+            } else {
+                // Create new assessment if no recent one exists
+                const [insertedAssessment] = await db.insert(zeroTrustAssessments).values({
+                    userId: riskPayload.userId,
+                    orderId: riskPayload.orderId, // This will be null for multi-store transactions initially
+                    riskScore: riskScore.score,
+                    decision: riskScore.decision,
+                    confidence: Math.round(riskScore.confidence * 100),
+                    transactionAmount: transactionAmountCents,
+                    currency: riskPayload.currency,
+                    itemCount: riskPayload.itemCount,
+                    storeCount: riskPayload.uniqueStoreCount,
+                    riskFactors: JSON.stringify(riskScore.factors),
+                    userAgent: riskPayload.userAgent,
+                    ipAddress: riskPayload.ipAddress,
+                    createdAt: new Date(), // Explicit timestamp for consistency
+                }).returning({ id: zeroTrustAssessments.id });
+                
+                assessmentId = insertedAssessment?.id ?? null;
+                console.log(`Created new risk assessment ${assessmentId} for user ${riskPayload.userId}`);
+                
+                // Generate AI justification in the background (non-blocking)
+                // This won't slow down the transaction response
+                if (assessmentId) {
+                    generateJustificationBackground(assessmentId, riskScore, riskPayload).catch(err => {
+                        console.error(`Background AI generation failed for assessment ${assessmentId}:`, err);
+                    });
+                }
             }
         } catch (dbError) {
             console.error('Failed to log zero trust assessment to database:', dbError);

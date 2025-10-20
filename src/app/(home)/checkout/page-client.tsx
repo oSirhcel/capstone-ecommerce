@@ -28,6 +28,25 @@ import { AddressForm } from "@/components/checkout/address-form";
 import { useAddressesByType } from "@/hooks/use-addresses";
 import { createOrders as createOrdersAPI } from "@/lib/api/orders";
 
+// Type definitions
+interface RiskAssessmentResponse {
+  riskAssessment?: {
+    id?: number;
+    decision?: string;
+    score?: number;
+    confidence?: number;
+    factors?: string[];
+  };
+}
+
+interface ZeroTrustError extends Error {
+  isZeroTrustBlock?: boolean;
+  isZeroTrustVerification?: boolean;
+  verificationToken?: string;
+  riskScore?: number;
+  riskFactors?: string[];
+}
+
 // Form schemas
 const contactFormSchema = z.object({
   email: z
@@ -87,7 +106,6 @@ export function CheckoutClient() {
   const [currentStep, setCurrentStep] = useState<"address" | "payment">(
     "address",
   );
-  const [isProcessingOrder, setIsProcessingOrder] = useState(false);
 
   const {
     addresses: shippingAddresses,
@@ -404,12 +422,8 @@ export function CheckoutClient() {
         }),
       });
 
-      if (!riskAssessmentResponse.ok) {
-        const errorData = await riskAssessmentResponse.json();
-        throw new Error(errorData.error || "Risk assessment failed");
-      }
-
-      const riskData = await riskAssessmentResponse.json();
+      const riskData =
+        (await riskAssessmentResponse.json()) as RiskAssessmentResponse;
       const riskAssessmentId = riskData.riskAssessment?.id;
 
       // Create orders with risk assessment ID
@@ -428,8 +442,6 @@ export function CheckoutClient() {
         description: "Please try again or contact support.",
       });
       throw error;
-    } finally {
-      setIsProcessingOrder(false);
     }
   };
 
@@ -513,27 +525,34 @@ export function CheckoutClient() {
 
     // Check if this is a zero trust error
     if (error instanceof Error) {
-      const isZeroTrustBlock = (error as any).isZeroTrustBlock;
-      const isZeroTrustVerification = (error as any).isZeroTrustVerification;
-      const verificationToken = (error as any).verificationToken;
-      const riskScore = (error as any).riskScore;
-      const riskFactors = (error as any).riskFactors;
+      const zeroTrustError = error as ZeroTrustError;
 
-      if (isZeroTrustBlock) {
+      if (zeroTrustError.isZeroTrustBlock) {
         // Redirect to blocked page
         const params = new URLSearchParams();
-        if (riskScore) params.set("score", riskScore.toString());
-        if (riskFactors) params.set("factors", riskFactors.join(","));
+        if (zeroTrustError.riskScore !== undefined) {
+          params.set("score", String(zeroTrustError.riskScore));
+        }
+        if (zeroTrustError.riskFactors) {
+          params.set("factors", zeroTrustError.riskFactors.join(","));
+        }
         router.push(`/checkout/blocked?${params.toString()}`);
         return;
       }
 
-      if (isZeroTrustVerification && verificationToken) {
+      if (
+        zeroTrustError.isZeroTrustVerification &&
+        zeroTrustError.verificationToken
+      ) {
         // Redirect to OTP verification page
         const params = new URLSearchParams();
-        params.set("token", verificationToken);
-        if (riskScore) params.set("score", riskScore.toString());
-        if (session?.user?.email) params.set("email", session.user.email);
+        params.set("token", zeroTrustError.verificationToken);
+        if (zeroTrustError.riskScore !== undefined) {
+          params.set("score", String(zeroTrustError.riskScore));
+        }
+        if (session?.user?.email) {
+          params.set("email", session.user.email);
+        }
         router.push(`/checkout/verify-otp?${params.toString()}`);
         return;
       }
@@ -547,39 +566,6 @@ export function CheckoutClient() {
       description: errorMessage,
       duration: 5000,
     });
-  };
-
-  // Step navigation helpers
-  const canProceedToShipping = () => {
-    const contactData = contactForm.getValues();
-    return contactData.email && contactData.phone;
-  };
-
-  const canProceedToBilling = () => {
-    if (selectedShippingId) return true;
-    const shippingData = shippingForm.getValues();
-    return (
-      shippingData.firstName &&
-      shippingData.lastName &&
-      shippingData.addressLine1 &&
-      shippingData.city &&
-      shippingData.state &&
-      shippingData.postcode
-    );
-  };
-
-  const canProceedToPayment = () => {
-    if (sameAsShipping) return canProceedToBilling();
-    if (selectedBillingId) return true;
-    const billingData = billingForm.getValues();
-    return (
-      billingData.firstName &&
-      billingData.lastName &&
-      billingData.addressLine1 &&
-      billingData.city &&
-      billingData.state &&
-      billingData.postcode
-    );
   };
 
   return (

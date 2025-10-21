@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { db } from "@/server/db";
-import { orderItems, products, cartItems, carts, zeroTrustAssessments, users, stores } from "@/server/db/schema";
+import { orderItems, products, cartItems, carts, zeroTrustAssessments, users, stores, riskAssessmentStoreLinks } from "@/server/db/schema";
 import { eq, and, sql, inArray, desc } from "drizzle-orm";
 import { generateJustificationBackground } from "@/lib/api/risk-justification-server";
 
@@ -541,6 +541,39 @@ export async function zeroTrustCheck(
                     
                     console.log(`Updated assessment ${assessmentId} with orderId ${riskPayload.orderId}`);
                 }
+                
+                // Ensure store links exist for the reused assessment
+                // This handles cases where the assessment was created before store links were implemented
+                if (riskPayload.storeDistribution.length > 0) {
+                    try {
+                        // Filter out 'unknown' stores (invalid foreign key)
+                        const validStores = riskPayload.storeDistribution.filter(
+                            store => store.storeId && store.storeId !== 'unknown'
+                        );
+                        
+                        if (validStores.length > 0) {
+                            const storeLinks = validStores.map(store => ({
+                                riskAssessmentId: assessmentId,
+                                storeId: store.storeId,
+                                storeOrderId: null,
+                                storeSubtotal: Math.round(store.subtotal * 100), // Convert to cents
+                                storeItemCount: store.itemCount,
+                            }));
+                            
+                            await db
+                                .insert(riskAssessmentStoreLinks)
+                                .values(storeLinks)
+                                .onConflictDoNothing(); // Skip if links already exist
+                            
+                            console.log(`Ensured store links exist for reused risk assessment ${assessmentId}`);
+                        } else {
+                            console.warn(`No valid stores to link for assessment ${assessmentId}`);
+                        }
+                    } catch (storeLinkError) {
+                        console.error(`Failed to ensure store links for assessment ${assessmentId}:`, storeLinkError);
+                        // Don't fail the assessment if store linking fails
+                    }
+                }
             } else {
                 // Create new assessment if no recent one exists
                 const [insertedAssessment] = await db.insert(zeroTrustAssessments).values({
@@ -561,6 +594,39 @@ export async function zeroTrustCheck(
                 
                 assessmentId = insertedAssessment?.id ?? null;
                 console.log(`Created new risk assessment ${assessmentId} for user ${riskPayload.userId}`);
+                
+                // Create store links immediately for all decisions (especially deny)
+                // This ensures store owners can view denied assessments
+                if (assessmentId && riskPayload.storeDistribution.length > 0) {
+                    try {
+                        // Filter out 'unknown' stores (invalid foreign key)
+                        const validStores = riskPayload.storeDistribution.filter(
+                            store => store.storeId && store.storeId !== 'unknown'
+                        );
+                        
+                        if (validStores.length > 0) {
+                            const storeLinks = validStores.map(store => ({
+                                riskAssessmentId: assessmentId,
+                                storeId: store.storeId,
+                                storeOrderId: null, // No order created yet (may never be for deny)
+                                storeSubtotal: Math.round(store.subtotal * 100), // Convert to cents
+                                storeItemCount: store.itemCount,
+                            }));
+                            
+                            await db
+                                .insert(riskAssessmentStoreLinks)
+                                .values(storeLinks)
+                                .onConflictDoNothing(); // Handle duplicates gracefully
+                            
+                            console.log(`Created ${storeLinks.length} store links for risk assessment ${assessmentId}`);
+                        } else {
+                            console.warn(`No valid stores to link for new assessment ${assessmentId}`);
+                        }
+                    } catch (storeLinkError) {
+                        console.error(`Failed to create store links for assessment ${assessmentId}:`, storeLinkError);
+                        // Don't fail the assessment if store linking fails
+                    }
+                }
                 
                 // Generate AI justification in the background (non-blocking)
                 // This won't slow down the transaction response

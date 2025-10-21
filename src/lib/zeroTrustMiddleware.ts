@@ -507,10 +507,15 @@ export async function zeroTrustCheck(
         // For multi-store transactions, create a single assessment that can be linked to multiple orders
         let assessmentId: number | null = null;
         try {
-            // Check for existing recent assessment (within last 60 seconds) with same userId and amount
-            // This prevents duplicate assessments during the checkout flow
-            const oneMinuteAgo = new Date(Date.now() - 60 * 1000);
+            // Check for existing recent assessment (within last 3 minutes) with same user and similar characteristics
+            // This prevents duplicate assessments during the checkout flow, especially for multi-store race conditions
+            const threeMinutesAgo = new Date(Date.now() - 3 * 60 * 1000);
             const transactionAmountCents = Math.round(riskPayload.totalAmount * 100);
+            
+            // For multi-store transactions, check for assessments with similar total amounts
+            // (within 10% to account for rounding or small differences in split calculations)
+            const amountLowerBound = Math.floor(transactionAmountCents * 0.9);
+            const amountUpperBound = Math.ceil(transactionAmountCents * 1.1);
             
             const existingAssessments = await db
                 .select()
@@ -518,8 +523,11 @@ export async function zeroTrustCheck(
                 .where(
                     and(
                         eq(zeroTrustAssessments.userId, riskPayload.userId || ''),
-                        eq(zeroTrustAssessments.transactionAmount, transactionAmountCents),
-                        sql`${zeroTrustAssessments.createdAt} >= ${oneMinuteAgo}`
+                        sql`${zeroTrustAssessments.transactionAmount} >= ${amountLowerBound}`,
+                        sql`${zeroTrustAssessments.transactionAmount} <= ${amountUpperBound}`,
+                        eq(zeroTrustAssessments.itemCount, riskPayload.itemCount),
+                        eq(zeroTrustAssessments.storeCount, riskPayload.uniqueStoreCount),
+                        sql`${zeroTrustAssessments.createdAt} >= ${threeMinutesAgo}`
                     )
                 )
                 .orderBy(desc(zeroTrustAssessments.createdAt))
@@ -544,7 +552,7 @@ export async function zeroTrustCheck(
                 
                 // Ensure store links exist for the reused assessment
                 // This handles cases where the assessment was created before store links were implemented
-                if (riskPayload.storeDistribution.length > 0) {
+                if (riskPayload.storeDistribution.length > 0 && assessmentId !== null) {
                     try {
                         // Filter out 'unknown' stores (invalid foreign key)
                         const validStores = riskPayload.storeDistribution.filter(
@@ -553,9 +561,9 @@ export async function zeroTrustCheck(
                         
                         if (validStores.length > 0) {
                             const storeLinks = validStores.map(store => ({
-                                riskAssessmentId: assessmentId,
+                                riskAssessmentId: assessmentId!, // Non-null assertion is safe here due to check above
                                 storeId: store.storeId,
-                                storeOrderId: null,
+                                storeOrderId: null as number | null,
                                 storeSubtotal: Math.round(store.subtotal * 100), // Convert to cents
                                 storeItemCount: store.itemCount,
                             }));
@@ -597,7 +605,7 @@ export async function zeroTrustCheck(
                 
                 // Create store links immediately for all decisions (especially deny)
                 // This ensures store owners can view denied assessments
-                if (assessmentId && riskPayload.storeDistribution.length > 0) {
+                if (assessmentId !== null && riskPayload.storeDistribution.length > 0) {
                     try {
                         // Filter out 'unknown' stores (invalid foreign key)
                         const validStores = riskPayload.storeDistribution.filter(
@@ -605,10 +613,11 @@ export async function zeroTrustCheck(
                         );
                         
                         if (validStores.length > 0) {
+                            const nonNullAssessmentId = assessmentId as number; // Type assertion is safe here
                             const storeLinks = validStores.map(store => ({
-                                riskAssessmentId: assessmentId,
+                                riskAssessmentId: nonNullAssessmentId,
                                 storeId: store.storeId,
-                                storeOrderId: null, // No order created yet (may never be for deny)
+                                storeOrderId: null as number | null, // No order created yet (may never be for deny)
                                 storeSubtotal: Math.round(store.subtotal * 100), // Convert to cents
                                 storeItemCount: store.itemCount,
                             }));

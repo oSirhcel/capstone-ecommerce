@@ -28,6 +28,27 @@ import { AddressForm } from "@/components/checkout/address-form";
 import { useAddressesByType } from "@/hooks/use-addresses";
 import { createOrders as createOrdersAPI } from "@/lib/api/orders";
 
+// Type definitions
+interface RiskAssessmentResponse {
+  riskAssessment?: {
+    id?: number;
+    decision?: string;
+    score?: number;
+    confidence?: number;
+    factors?: string[];
+  };
+  verificationToken?: string; // For WARN flows
+  riskAssessmentId?: number; // For WARN flows (at top level)
+}
+
+interface ZeroTrustError extends Error {
+  isZeroTrustBlock?: boolean;
+  isZeroTrustVerification?: boolean;
+  verificationToken?: string;
+  riskScore?: number;
+  riskFactors?: string[];
+}
+
 // Form schemas
 const contactFormSchema = z.object({
   email: z
@@ -315,7 +336,7 @@ export function CheckoutClient() {
     setCurrentStep("payment");
   };
 
-  const handleCreateOrders = async () => {
+  const handleCreateOrders = async (riskAssessmentId?: number) => {
     try {
       // Get form data
       const contactData = contactForm.getValues();
@@ -372,6 +393,7 @@ export function CheckoutClient() {
         billingAddressData,
         shipping,
         tax,
+        riskAssessmentId,
       );
 
       return result;
@@ -387,12 +409,65 @@ export function CheckoutClient() {
   // Create orders and handle payment
   const handlePaymentInit = async () => {
     try {
-      const orderResult = await handleCreateOrders();
+      // First, perform risk assessment to get assessment ID
+      const orderData = getOrderDataForVerification();
+
+      const riskAssessmentResponse = await fetch("/api/payments", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          amount: total,
+          currency: "aud",
+          orderData,
+        }),
+      });
+
+      const riskData =
+        (await riskAssessmentResponse.json()) as RiskAssessmentResponse & {
+          riskAssessmentId?: number;
+        };
+
+      // For WARN responses (202), riskAssessmentId is at top level
+      // For ALLOW responses (200), it's nested in riskAssessment
+      const riskAssessmentId =
+        riskData.riskAssessmentId ?? riskData.riskAssessment?.id;
+
+      // Create orders with risk assessment ID
+      const orderResult = await handleCreateOrders(riskAssessmentId);
 
       if (orderResult.storeCount > 1) {
         toast.info(`Creating ${orderResult.storeCount} orders`, {
           description: `Your items will be shipped separately by each store.`,
         });
+      }
+
+      // For WARN flows, store orderIds in the verification by updating it
+      // This allows the verified page to link all orders to the risk assessment
+      if (riskAssessmentResponse.status === 202 && riskData.verificationToken) {
+        try {
+          await fetch("/api/verification/update-payment-data", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              token: riskData.verificationToken,
+              orderIds: orderResult.orderIds,
+            }),
+          });
+          console.log(
+            "Updated verification with orderIds:",
+            orderResult.orderIds,
+          );
+        } catch (updateError) {
+          console.error(
+            "Failed to update verification with orderIds:",
+            updateError,
+          );
+          // Don't fail the flow if this update fails
+        }
       }
 
       return orderResult.primaryOrderId;
@@ -403,6 +478,50 @@ export function CheckoutClient() {
       });
       throw error;
     }
+  };
+
+  // Helper functions to get final address data
+  const getFinalShippingData = () => {
+    if (selectedShippingId) {
+      const address = shippingAddresses.find(
+        (a) => a.id === selectedShippingId,
+      );
+      if (address) return address;
+    }
+    return shippingForm.getValues();
+  };
+
+  const getFinalBillingData = () => {
+    if (sameAsShipping) {
+      return getFinalShippingData();
+    }
+    if (selectedBillingId) {
+      const address = billingAddresses.find((a) => a.id === selectedBillingId);
+      if (address) return address;
+    }
+    return billingForm.getValues();
+  };
+
+  // Prepare order data for verification flow
+  const getOrderDataForVerification = () => {
+    const finalShipping = getFinalShippingData();
+    const finalBilling = getFinalBillingData();
+    const contactData = contactForm.getValues();
+
+    return {
+      items: items.map((item) => ({
+        productId:
+          typeof item.id === "string"
+            ? parseInt((item.id as unknown as string) || "", 10)
+            : item.id,
+        quantity: item.quantity,
+        price: item.price,
+      })),
+      totalAmount: Math.round(total * 100), // Convert to cents
+      contactData,
+      shippingAddress: finalShipping,
+      billingAddress: finalBilling,
+    };
   };
 
   // Handle successful payment
@@ -436,9 +555,50 @@ export function CheckoutClient() {
   };
 
   // Handle payment error
-  const handlePaymentError = (error: string) => {
+  const handlePaymentError = (error: string | Error) => {
+    let errorMessage: string;
+
+    // Check if this is a zero trust error
+    if (error instanceof Error) {
+      const zeroTrustError = error as ZeroTrustError;
+
+      if (zeroTrustError.isZeroTrustBlock) {
+        // Redirect to blocked page
+        const params = new URLSearchParams();
+        if (zeroTrustError.riskScore !== undefined) {
+          params.set("score", String(zeroTrustError.riskScore));
+        }
+        if (zeroTrustError.riskFactors) {
+          params.set("factors", zeroTrustError.riskFactors.join(","));
+        }
+        router.push(`/checkout/blocked?${params.toString()}`);
+        return;
+      }
+
+      if (
+        zeroTrustError.isZeroTrustVerification &&
+        zeroTrustError.verificationToken
+      ) {
+        // Redirect to OTP verification page
+        const params = new URLSearchParams();
+        params.set("token", zeroTrustError.verificationToken);
+        if (zeroTrustError.riskScore !== undefined) {
+          params.set("score", String(zeroTrustError.riskScore));
+        }
+        if (session?.user?.email) {
+          params.set("email", session.user.email);
+        }
+        router.push(`/checkout/verify-otp?${params.toString()}`);
+        return;
+      }
+
+      errorMessage = error.message;
+    } else {
+      errorMessage = error;
+    }
+
     toast.error("Payment failed", {
-      description: error,
+      description: errorMessage,
       duration: 5000,
     });
   };
@@ -456,7 +616,7 @@ export function CheckoutClient() {
         />
 
         {/* Header */}
-        <div className="mt-6 mb-8">
+        <div className="mb-8 mt-6">
           <div className="mb-4 flex items-center gap-4">
             <Button variant="ghost" size="sm" asChild>
               <Link href="/cart" className="flex items-center gap-2">
@@ -839,6 +999,7 @@ export function CheckoutClient() {
                       onSuccess={handlePaymentSuccess}
                       onError={handlePaymentError}
                       onCreateOrder={handlePaymentInit}
+                      orderData={getOrderDataForVerification()}
                     />
                   </CardContent>
                 </Card>

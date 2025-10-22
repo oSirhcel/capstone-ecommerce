@@ -96,7 +96,7 @@ async function handlePaymentIntentSucceeded(
           status: paymentIntent.status,
           paymentMethod: paymentIntent.payment_method,
           charges: paymentIntent.charges,
-          receiptUrl: paymentIntent.charges.data[0]?.receipt_url,
+          receiptUrl: paymentIntent.charges?.data?.[0]?.receipt_url,
         }),
         updatedAt: new Date(),
       })
@@ -146,16 +146,23 @@ async function handlePaymentIntentFailed(paymentIntent: Stripe.PaymentIntent) {
     if (paymentIntent.metadata?.orderId) {
       const orderId = parseInt(paymentIntent.metadata.orderId);
 
+      // Check if this is a denial (card declined, insufficient funds, etc.)
+      const isDenied = paymentIntent.last_payment_error?.code === "card_declined" ||
+                      paymentIntent.last_payment_error?.code === "insufficient_funds" ||
+                      paymentIntent.last_payment_error?.code === "expired_card" ||
+                      paymentIntent.last_payment_error?.code === "incorrect_cvc" ||
+                      paymentIntent.last_payment_error?.code === "processing_error";
+
       await db
         .update(orders)
         .set({
-          status: "Failed",
+          status: isDenied ? "Denied" : "Failed",
           paymentStatus: "Failed",
           updatedAt: new Date(),
         })
         .where(eq(orders.id, orderId));
 
-      console.log(`Order ${orderId} status updated to Failed`);
+      console.log(`Order ${orderId} status updated to ${isDenied ? "Denied" : "Failed"}`);
     }
   } catch (error) {
     console.error("Error handling payment_intent.payment_failed:", error);

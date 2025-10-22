@@ -29,6 +29,7 @@ export const processPayment = async (params: {
   currency?: string;
   orderId?: number;
   savePaymentMethod?: boolean;
+  orderData?: any;
 }): Promise<ProcessPaymentResponse> => {
   const response = await fetch("/api/payments", {
     method: "POST",
@@ -38,9 +39,37 @@ export const processPayment = async (params: {
     body: JSON.stringify(params),
   });
 
-  if (!response.ok) {
-    const error = (await response.json()) as { error?: string };
-    throw new Error(error.error ?? "Payment processing failed");
+  // Handle 202 Accepted (verification required) as an error case
+  if (response.status === 202 || !response.ok) {
+    const error = await response.json();
+    
+    console.log('Payment API response:', { status: response.status, error });
+    
+    // Handle zero trust blocking specially
+    if (error.errorCode === 'ZERO_TRUST_DENIED') {
+      const zeroTrustError = new Error(error.message || 'Transaction blocked for security reasons');
+      (zeroTrustError as any).isZeroTrustBlock = true;
+      (zeroTrustError as any).riskScore = error.riskScore;
+      (zeroTrustError as any).riskFactors = error.riskFactors;
+      (zeroTrustError as any).supportContact = error.supportContact;
+      throw zeroTrustError;
+    }
+    
+    // Handle zero trust verification required (202 status)
+    if (error.errorCode === 'ZERO_TRUST_VERIFICATION_REQUIRED' || response.status === 202) {
+      console.log('Creating verification error with:', error);
+      const verificationError = new Error(error.message || 'Transaction requires verification');
+      (verificationError as any).isZeroTrustVerification = true;
+      (verificationError as any).riskScore = error.riskScore;
+      (verificationError as any).riskFactors = error.riskFactors;
+      (verificationError as any).verificationToken = error.verificationToken;
+      (verificationError as any).expiresAt = error.expiresAt;
+      (verificationError as any).userEmail = error.userEmail;
+      console.log('Throwing verification error:', verificationError);
+      throw verificationError;
+    }
+    
+    throw new Error(error.error || 'Payment processing failed');
   }
 
   return (await response.json()) as ProcessPaymentResponse;

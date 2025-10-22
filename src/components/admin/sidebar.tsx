@@ -11,6 +11,7 @@ import {
   SettingsIcon,
   HomeIcon,
   CreditCardIcon,
+  ShieldAlertIcon,
 } from "lucide-react";
 import {
   Sidebar,
@@ -35,6 +36,11 @@ const navigation = [
   { name: "Products", href: "/admin/products", icon: PackageIcon },
   { name: "Customers", href: "/admin/customers", icon: UsersIcon },
   { name: "Payments", href: "/admin/payments", icon: CreditCardIcon },
+  {
+    name: "Risk Assessments",
+    href: "/admin/risk-assessments",
+    icon: ShieldAlertIcon,
+  },
   { name: "Analytics", href: "/admin/analytics", icon: BarChart3Icon },
   { name: "Store Management", href: "/admin/stores", icon: StoreIcon },
   { name: "Settings", href: "/admin/settings", icon: SettingsIcon },

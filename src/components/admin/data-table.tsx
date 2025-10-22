@@ -7,11 +7,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 
 export interface DataTableColumn<T = unknown> {
   header: string;
   accessorKey?: string;
   cell?: (props: { row: { original: T } }) => React.ReactNode;
+  sortable?: boolean;
 }
 
 interface DataTableProps<T = unknown> {
@@ -21,6 +24,9 @@ interface DataTableProps<T = unknown> {
   emptyMessage?: string;
   emptyIcon?: React.ReactNode;
   onRowClick?: (row: T) => void;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
+  onSort?: (column: string) => void;
 }
 
 export function DataTable<T = unknown>({
@@ -30,6 +36,9 @@ export function DataTable<T = unknown>({
   emptyMessage = "No results found.",
   emptyIcon,
   onRowClick,
+  sortBy,
+  sortOrder,
+  onSort,
 }: DataTableProps<T>) {
   return (
     <div className="rounded-md border">
@@ -37,7 +46,30 @@ export function DataTable<T = unknown>({
         <TableHeader>
           <TableRow>
             {columns.map((column, index) => (
-              <TableHead key={index}>{column.header}</TableHead>
+              <TableHead key={index}>
+                {column.sortable && column.accessorKey && onSort ? (
+                  <Button
+                    variant="ghost"
+                    onClick={() => onSort(column.accessorKey!)}
+                    className="h-auto p-0 font-semibold hover:bg-transparent"
+                  >
+                    <span className="flex items-center gap-1">
+                      {column.header}
+                      {sortBy === column.accessorKey ? (
+                        sortOrder === "asc" ? (
+                          <ArrowUp className="h-4 w-4" />
+                        ) : (
+                          <ArrowDown className="h-4 w-4" />
+                        )
+                      ) : (
+                        <ArrowUpDown className="h-4 w-4" />
+                      )}
+                    </span>
+                  </Button>
+                ) : (
+                  column.header
+                )}
+              </TableHead>
             ))}
           </TableRow>
         </TableHeader>

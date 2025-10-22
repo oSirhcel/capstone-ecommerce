@@ -1,16 +1,27 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Mail, ShieldCheck, RotateCcw, Truck } from "lucide-react";
+import {
+  Mail,
+  ShieldCheck,
+  RotateCcw,
+  Truck,
+  ExternalLink,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import Link from "next/link";
 
 interface StoreInfoProps {
   store: {
     id: string;
+    slug: string;
+    name: string;
     settings?: {
       contactEmail?: string | null;
       shippingPolicy?: string | null;
       returnPolicy?: string | null;
+      privacyPolicy?: string | null;
+      termsOfService?: string | null;
     } | null;
   };
 }
@@ -18,7 +29,10 @@ interface StoreInfoProps {
 export function StoreInfo({ store }: StoreInfoProps) {
   const hasContactInfo = store.settings?.contactEmail;
   const hasPolicies =
-    store.settings?.shippingPolicy ?? store.settings?.returnPolicy;
+    store.settings?.shippingPolicy ??
+    store.settings?.returnPolicy ??
+    store.settings?.privacyPolicy ??
+    store.settings?.termsOfService;
 
   return (
     <Card className="sticky top-4">
@@ -72,14 +86,22 @@ export function StoreInfo({ store }: StoreInfoProps) {
                 {/* Shipping Policy */}
                 {store.settings?.shippingPolicy && (
                   <div className="space-y-2">
-                    <div className="flex items-start gap-3">
-                      <Truck className="text-muted-foreground mt-0.5 h-5 w-5" />
-                      <div className="flex-1 space-y-1">
-                        <p className="font-medium">Shipping</p>
-                        <p className="text-muted-foreground text-sm">
-                          {store.settings.shippingPolicy}
-                        </p>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-start gap-3">
+                        <Truck className="text-muted-foreground mt-0.5 h-5 w-5" />
+                        <div className="flex-1 space-y-1">
+                          <p className="font-medium">Shipping Policy</p>
+                          <p className="text-muted-foreground text-sm">
+                            View our shipping terms and delivery information
+                          </p>
+                        </div>
                       </div>
+                      <Link href={`/stores/${store.slug}/shipping`}>
+                        <Button variant="outline" size="sm" className="gap-2">
+                          View
+                          <ExternalLink className="h-3 w-3" />
+                        </Button>
+                      </Link>
                     </div>
                   </div>
                 )}
@@ -87,14 +109,68 @@ export function StoreInfo({ store }: StoreInfoProps) {
                 {/* Returns Policy */}
                 {store.settings?.returnPolicy && (
                   <div className="space-y-2">
-                    <div className="flex items-start gap-3">
-                      <RotateCcw className="text-muted-foreground mt-0.5 h-5 w-5" />
-                      <div className="flex-1 space-y-1">
-                        <p className="font-medium">Returns</p>
-                        <p className="text-muted-foreground text-sm">
-                          {store.settings.returnPolicy}
-                        </p>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-start gap-3">
+                        <RotateCcw className="text-muted-foreground mt-0.5 h-5 w-5" />
+                        <div className="flex-1 space-y-1">
+                          <p className="font-medium">Return Policy</p>
+                          <p className="text-muted-foreground text-sm">
+                            Learn about our return and refund process
+                          </p>
+                        </div>
                       </div>
+                      <Link href={`/stores/${store.slug}/return`}>
+                        <Button variant="outline" size="sm" className="gap-2">
+                          View
+                          <ExternalLink className="h-3 w-3" />
+                        </Button>
+                      </Link>
+                    </div>
+                  </div>
+                )}
+
+                {/* Privacy Policy */}
+                {store.settings?.privacyPolicy && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-start gap-3">
+                        <ShieldCheck className="text-muted-foreground mt-0.5 h-5 w-5" />
+                        <div className="flex-1 space-y-1">
+                          <p className="font-medium">Privacy Policy</p>
+                          <p className="text-muted-foreground text-sm">
+                            How we collect and protect your data
+                          </p>
+                        </div>
+                      </div>
+                      <Link href={`/stores/${store.slug}/privacy`}>
+                        <Button variant="outline" size="sm" className="gap-2">
+                          View
+                          <ExternalLink className="h-3 w-3" />
+                        </Button>
+                      </Link>
+                    </div>
+                  </div>
+                )}
+
+                {/* Terms of Service */}
+                {store.settings?.termsOfService && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-start gap-3">
+                        <ShieldCheck className="text-muted-foreground mt-0.5 h-5 w-5" />
+                        <div className="flex-1 space-y-1">
+                          <p className="font-medium">Terms of Service</p>
+                          <p className="text-muted-foreground text-sm">
+                            Terms and conditions for using our store
+                          </p>
+                        </div>
+                      </div>
+                      <Link href={`/stores/${store.slug}/terms`}>
+                        <Button variant="outline" size="sm" className="gap-2">
+                          View
+                          <ExternalLink className="h-3 w-3" />
+                        </Button>
+                      </Link>
                     </div>
                   </div>
                 )}

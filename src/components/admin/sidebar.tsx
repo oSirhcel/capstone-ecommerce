@@ -8,7 +8,6 @@ import {
   PackageIcon,
   ShoppingCartIcon,
   StoreIcon,
-  SettingsIcon,
   HomeIcon,
   CreditCardIcon,
 } from "lucide-react";
@@ -37,7 +36,6 @@ const navigation = [
   { name: "Payments", href: "/admin/payments", icon: CreditCardIcon },
   { name: "Analytics", href: "/admin/analytics", icon: BarChart3Icon },
   { name: "Store Management", href: "/admin/stores", icon: StoreIcon },
-  { name: "Settings", href: "/admin/settings", icon: SettingsIcon },
 ];
 
 export function AdminSidebar() {

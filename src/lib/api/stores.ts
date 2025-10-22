@@ -121,17 +121,6 @@ export interface StoresResponse {
   };
 }
 
-export interface CreateStoreData {
-  name: string;
-  description?: string;
-  ownerId: string;
-}
-
-export interface UpdateStoreData {
-  name?: string;
-  description?: string;
-}
-
 // GET /api/stores - Fetch all stores with optional filtering
 export async function fetchStores(params?: {
   page?: number;
@@ -155,11 +144,9 @@ export async function fetchStores(params?: {
   return response.json() as Promise<StoresResponse>;
 }
 
-// GET /api/stores/[id] - Fetch a single store by ID
-export async function fetchStore(id: string): Promise<Store> {
-  const response = await fetch(`${getBaseUrl()}/api/stores/${id}`);
-
-  console.log(response);
+// GET /api/stores/by-id/[id] - Fetch store by ID
+export async function fetchStoreById(id: string): Promise<Store> {
+  const response = await fetch(`${getBaseUrl()}/api/stores/by-id/${id}`);
 
   if (!response.ok) {
     if (response.status === 404) {
@@ -169,75 +156,6 @@ export async function fetchStore(id: string): Promise<Store> {
   }
 
   return response.json() as Promise<Store>;
-}
-
-// POST /api/stores - Create a new store
-export async function createStore(data: CreateStoreData): Promise<Store> {
-  const response = await fetch(`${getBaseUrl()}/api/stores`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(data),
-  });
-
-  if (!response.ok) {
-    const errorData = (await response.json().catch(() => ({}))) as {
-      error?: string;
-    };
-    throw new Error(
-      errorData.error ?? `Failed to create store: ${response.statusText}`,
-    );
-  }
-
-  return response.json() as Promise<Store>;
-}
-
-// PUT /api/stores/[id] - Update a store
-export async function updateStore(
-  id: string,
-  data: UpdateStoreData,
-): Promise<Store> {
-  const response = await fetch(`${getBaseUrl()}/api/stores/${id}`, {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(data),
-  });
-
-  if (!response.ok) {
-    const errorData = (await response.json().catch(() => ({}))) as {
-      error?: string;
-    };
-    if (response.status === 404) {
-      throw new Error("Store not found");
-    }
-    throw new Error(
-      errorData.error ?? `Failed to update store: ${response.statusText}`,
-    );
-  }
-
-  return response.json() as Promise<Store>;
-}
-
-// DELETE /api/stores/[id] - Delete a store
-export async function deleteStore(id: string): Promise<void> {
-  const response = await fetch(`${getBaseUrl()}/api/stores/${id}`, {
-    method: "DELETE",
-  });
-
-  if (!response.ok) {
-    const errorData = (await response.json().catch(() => ({}))) as {
-      error?: string;
-    };
-    if (response.status === 404) {
-      throw new Error("Store not found");
-    }
-    throw new Error(
-      errorData.error ?? `Failed to delete store: ${response.statusText}`,
-    );
-  }
 }
 
 // GET /api/stores/featured - Fetch featured stores for homepage
@@ -250,6 +168,22 @@ export async function fetchFeaturedStores(limit = 6): Promise<Store[]> {
 
   const data = (await response.json()) as StoresResponse;
   return data.stores;
+}
+
+// GET /api/stores/[slug] - Fetch complete store details with settings by slug
+export async function fetchStoreDetailsBySlug(
+  slug: string,
+): Promise<StoreWithStats> {
+  const response = await fetch(`${getBaseUrl()}/api/stores/${slug}`);
+
+  if (!response.ok) {
+    if (response.status === 404) {
+      throw new Error("Store not found");
+    }
+    throw new Error(`Failed to fetch store details: ${response.statusText}`);
+  }
+
+  return response.json() as Promise<StoreWithStats>;
 }
 
 // GET /api/stores/[id] - Fetch complete store details with settings
@@ -300,6 +234,43 @@ export async function fetchStoreProducts(
 }
 
 // GET /api/stores/[slug]/reviews - Fetch aggregated reviews from all store products
+
+// PATCH /api/stores/[slug] - Update store and settings in one call
+export async function updateStoreComplete(data: {
+  slug: string;
+  name?: string;
+  description?: string;
+  newSlug?: string;
+  contactEmail?: string;
+  shippingPolicy?: string;
+  returnPolicy?: string;
+  privacyPolicy?: string;
+  termsOfService?: string;
+}): Promise<{ store: Store; settings: StoreSettings }> {
+  const { slug, newSlug, ...updateData } = data;
+
+  const response = await fetch(`${getBaseUrl()}/api/stores/${slug}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      ...updateData,
+      ...(newSlug && { slug: newSlug }),
+    }),
+  });
+
+  if (!response.ok) {
+    const error = (await response
+      .json()
+      .catch(() => ({ error: "Unknown error" }))) as { error?: string };
+    throw new Error(
+      error.error ?? `Failed to update store: ${response.statusText}`,
+    );
+  }
+
+  return response.json() as Promise<{ store: Store; settings: StoreSettings }>;
+}
 export async function fetchStoreReviews(
   slug: string,
   params?: {

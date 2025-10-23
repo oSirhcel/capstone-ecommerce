@@ -7,34 +7,33 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface StoreCardProps {
-  id: string;
   name: string;
-  description?: string | null;
-  image?: string;
+  slug: string;
+  description: string | null;
+  image: string;
   productCount: number;
-  rating?: number;
+  rating: number;
   createdAt: string;
-  ownerId: string;
 }
 
 export function StoreCard({
-  id,
   name,
+  slug,
   description,
   image,
   productCount,
-  rating = 4.5,
+  rating,
   createdAt,
 }: StoreCardProps) {
   const joinedYear = new Date(createdAt).getFullYear();
 
   return (
-    <Link href={`/stores/${id}`} className="block">
+    <Link href={`/stores/${slug}`} className="block">
       <Card className="overflow-hidden transition-all hover:shadow-md">
         <CardContent className="p-0">
           <div className="relative">
             <Image
-              src={image || "/placeholder.svg"}
+              src={image ?? "/placeholder.svg"}
               alt={name}
               width={300}
               height={200}

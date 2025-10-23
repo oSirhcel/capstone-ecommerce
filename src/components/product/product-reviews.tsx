@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Star, ThumbsDown, ThumbsUp, Edit, Trash2 } from "lucide-react";
+import { Star, Edit, Trash2 } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -92,7 +92,7 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
       setRating(5);
       setComment("");
       setIsSubmittingReview(false);
-    } catch (error) {
+    } catch {
       toast.error("Failed to submit review");
     }
   };
@@ -123,7 +123,7 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
       setEditingReviewId(null);
       setRating(5);
       setComment("");
-    } catch (error) {
+    } catch {
       toast.error("Failed to update review");
     }
   };
@@ -134,7 +134,7 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
     try {
       await deleteReviewMutation.mutateAsync(reviewId);
       toast.success("Review deleted successfully!");
-    } catch (error) {
+    } catch {
       toast.error("Failed to delete review");
     }
   };
@@ -144,7 +144,7 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
     interactive = false,
     onRatingChange?: (rating: number) => void,
   ) => {
-    return [...Array(5).keys()].map((i) => (
+    return Array.from({ length: 5 }).map((_, i) => (
       <Star
         key={i}
         className={`h-5 w-5 ${

@@ -1,118 +1,48 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
+import { useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { SearchIcon, StoreIcon, FolderIcon, PackageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Form, FormControl, FormField, FormItem } from "@/components/ui/form";
 import Link from "next/link";
 import Image from "next/image";
 import { categoryNameToSlug } from "@/lib/utils/category-slug";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { useSearchQuery } from "@/hooks/search/use-search-query";
 
-interface Product {
-  id: number;
-  name: string;
-  description: string | null;
-  price: number;
-  stock: number;
-  storeId: string;
-  categoryId: number | null;
-  createdAt: string;
-  updatedAt: string;
-  store: {
-    id: string;
-    name: string;
-  } | null;
-  category: {
-    id: number;
-    name: string;
-  } | null;
-  images: Array<{
-    id: number;
-    imageUrl: string;
-    altText: string | null;
-    isPrimary: boolean;
-    displayOrder: number;
-  }>;
-}
+const searchSchema = z.object({
+  query: z.string().min(1, "Search query is required"),
+});
 
-interface Store {
-  id: string;
-  name: string;
-  description: string | null;
-  ownerId: string;
-  createdAt: string;
-}
-
-interface Category {
-  id: number;
-  name: string;
-  description: string | null;
-}
-
-interface SearchResults {
-  products: Product[];
-  stores: Store[];
-  categories: Category[];
-  query: string;
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-  };
-}
+type SearchFormValues = z.infer<typeof searchSchema>;
 
 export default function SearchPage() {
   const searchParams = useSearchParams();
-  const query = searchParams.get("q") || "";
-  const [searchQuery, setSearchQuery] = useState(query);
-  const [results, setResults] = useState<SearchResults | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const router = useRouter();
+  const initialQuery = searchParams.get("q") ?? "";
   const [activeTab, setActiveTab] = useState("all");
 
-  const fetchSearchResults = async (searchTerm: string) => {
-    if (!searchTerm.trim()) {
-      setResults(null);
-      return;
-    }
+  const form = useForm<SearchFormValues>({
+    resolver: zodResolver(searchSchema),
+    defaultValues: { query: initialQuery },
+  });
 
-    setIsLoading(true);
-    try {
-      const response = await fetch(
-        `/api/search?q=${encodeURIComponent(searchTerm)}`,
-      );
-      if (response.ok) {
-        const data = await response.json();
-        setResults(data);
-      }
-    } catch (error) {
-      console.error("Error fetching search results:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const currentQuery = form.watch("query");
+  const { data: results, isLoading } = useSearchQuery(currentQuery);
 
-  useEffect(() => {
-    if (query) {
-      setSearchQuery(query);
-      fetchSearchResults(query);
-    }
-  }, [query]);
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      fetchSearchResults(searchQuery);
-      // Update URL without navigation
-      const url = new URL(window.location.href);
-      url.searchParams.set("q", searchQuery);
-      window.history.pushState({}, "", url.toString());
-    }
+  const onSubmit = (values: SearchFormValues) => {
+    // Update URL with new search query
+    const url = new URL(window.location.href);
+    url.searchParams.set("q", values.query);
+    router.push(url.pathname + url.search);
   };
 
   const formatPrice = (priceInCents: number) => {
@@ -131,16 +61,44 @@ export default function SearchPage() {
       <div className="mb-8">
         <h1 className="mb-4 text-3xl font-bold">Search Results</h1>
 
+        {/* Search Form */}
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="mb-6">
+            <div className="flex gap-2">
+              <FormField
+                control={form.control}
+                name="query"
+                render={({ field }) => (
+                  <FormItem className="flex-1">
+                    <FormControl>
+                      <Input
+                        placeholder="Search products, stores, categories..."
+                        {...field}
+                        className="h-10"
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+              <Button type="submit" size="default">
+                <SearchIcon className="mr-2 h-4 w-4" />
+                Search
+              </Button>
+            </div>
+          </form>
+        </Form>
+
         {/* Results Summary */}
         {results && (
           <div className="text-muted-foreground mt-4">
             {totalResults > 0 ? (
               <p>
-                Found {totalResults} result{totalResults !== 1 ? "s" : ""} for "
-                {results.query}"
+                Found {totalResults} result{totalResults !== 1 ? "s" : ""} for
+                &quot;
+                {results.query}&quot;
               </p>
             ) : (
-              <p>No results found for "{results.query}"</p>
+              <p>No results found for &quot;{results.query}&quot;</p>
             )}
           </div>
         )}
@@ -149,7 +107,7 @@ export default function SearchPage() {
       {/* Loading State */}
       {isLoading && (
         <div className="space-y-4">
-          {[...Array(6)].map((_, i) => (
+          {Array.from({ length: 6 }).map((_, i) => (
             <Card key={i}>
               <CardContent className="p-6">
                 <div className="flex gap-4">
@@ -234,7 +192,7 @@ export default function SearchPage() {
                       className="transition-shadow hover:shadow-md"
                     >
                       <CardContent className="p-4">
-                        <Link href={`/stores/${store.id}`}>
+                        <Link href={`/stores/${store.slug}`}>
                           <h3 className="text-primary font-semibold hover:underline">
                             {store.name}
                           </h3>
@@ -276,7 +234,7 @@ export default function SearchPage() {
                                 product.images[0]?.imageUrl ||
                                 "/placeholder.svg"
                               }
-                              alt={product.images[0]?.altText || product.name}
+                              alt={product.images[0]?.altText ?? product.name}
                               fill
                               className="object-cover"
                             />
@@ -328,13 +286,13 @@ export default function SearchPage() {
                     className="transition-shadow hover:shadow-md"
                   >
                     <CardContent className="p-4">
-                      <Link href={`/product/${product.slug || product.id}`}>
+                      <Link href={`/product/${product.id}`}>
                         <div className="relative mb-3 aspect-square overflow-hidden rounded-md">
                           <Image
                             src={
                               product.images[0]?.imageUrl || "/placeholder.svg"
                             }
-                            alt={product.images[0]?.altText || product.name}
+                            alt={product.images[0]?.altText ?? product.name}
                             fill
                             className="object-cover"
                           />
@@ -385,7 +343,7 @@ export default function SearchPage() {
                     className="transition-shadow hover:shadow-md"
                   >
                     <CardContent className="p-6">
-                      <Link href={`/stores/${store.id}`}>
+                      <Link href={`/stores/${store.slug}`}>
                         <h3 className="text-primary mb-2 text-lg font-semibold hover:underline">
                           {store.name}
                         </h3>

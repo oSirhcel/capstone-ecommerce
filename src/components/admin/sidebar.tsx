@@ -8,7 +8,6 @@ import {
   PackageIcon,
   ShoppingCartIcon,
   StoreIcon,
-  SettingsIcon,
   HomeIcon,
   CreditCardIcon,
   ShieldAlertIcon,
@@ -43,7 +42,6 @@ const navigation = [
   },
   { name: "Analytics", href: "/admin/analytics", icon: BarChart3Icon },
   { name: "Store Management", href: "/admin/stores", icon: StoreIcon },
-  { name: "Settings", href: "/admin/settings", icon: SettingsIcon },
 ];
 
 export function AdminSidebar() {

@@ -111,12 +111,14 @@ async function main() {
     const storeA: NewStore = {
       id: "default-store-id",
       name: "Alpha Gadgets",
+      slug: "alpha-gadgets", // NEW
       description: "Quality electronics and accessories",
       ownerId: ownerA.id,
     };
     const storeB: NewStore = {
       id: uuidv4(),
       name: "Beta Crafts",
+      slug: "beta-crafts", // NEW
       description: "Handmade goods and home decor",
       ownerId: ownerB.id,
     };
@@ -162,7 +164,7 @@ async function main() {
           seoDescription:
             "Premium wireless earbuds with active noise cancellation, 30-hour battery life, and superior sound quality.",
           slug: "wireless-earbuds-pro",
-          status: "active",
+          status: "Active",
           featured: true,
           tags: JSON.stringify([
             "wireless",
@@ -210,7 +212,7 @@ async function main() {
           seoDescription:
             "Control lights, thermostats, and more from one centralized smart home hub.",
           slug: "smart-home-hub",
-          status: "active",
+          status: "Active",
           featured: false,
           tags: JSON.stringify(["smart-home", "hub", "automation", "iot"]),
           storeId: alphaStore.id,
@@ -252,7 +254,7 @@ async function main() {
           seoDescription:
             "High-speed 65W GaN charger with USB-C Power Delivery for fast charging of all devices.",
           slug: "usb-c-fast-charger-65w",
-          status: "active",
+          status: "Active",
           featured: false,
           tags: JSON.stringify([
             "charger",
@@ -300,7 +302,7 @@ async function main() {
           seoDescription:
             "Eco-friendly storage basket handwoven from natural fibers for home organization.",
           slug: "handwoven-storage-basket",
-          status: "active",
+          status: "Active",
           featured: true,
           tags: JSON.stringify([
             "handmade",
@@ -348,7 +350,7 @@ async function main() {
           seoDescription:
             "Hand-thrown ceramic vase with minimalist design for modern home decor.",
           slug: "minimalist-ceramic-vase",
-          status: "active",
+          status: "Active",
           featured: false,
           tags: JSON.stringify([
             "ceramic",
@@ -396,7 +398,7 @@ async function main() {
           seoDescription:
             "Handcrafted leather keychain with brass ring made from premium vegetable-tanned leather.",
           slug: "handcrafted-leather-keychain",
-          status: "active",
+          status: "Active",
           featured: false,
           tags: JSON.stringify([
             "leather",
@@ -444,7 +446,7 @@ async function main() {
           seoDescription:
             "Portable speaker with deep bass, 12-hour battery life, and waterproof design.",
           slug: "portable-bluetooth-speaker",
-          status: "active",
+          status: "Active",
           featured: true,
           tags: JSON.stringify([
             "speaker",
@@ -492,7 +494,7 @@ async function main() {
           seoDescription:
             "Soft organic cotton t-shirt made from sustainably sourced materials.",
           slug: "organic-cotton-t-shirt",
-          status: "active",
+          status: "Active",
           featured: false,
           tags: JSON.stringify([
             "cotton",
@@ -533,7 +535,7 @@ async function main() {
           seoDescription:
             "Non-slip premium yoga mat with extra cushioning and carrying strap.",
           slug: "yoga-mat-premium",
-          status: "draft",
+          status: "Draft",
           featured: false,
           tags: JSON.stringify([
             "yoga",
@@ -574,7 +576,7 @@ async function main() {
           seoDescription:
             "Comprehensive guide to programming fundamentals covering multiple languages.",
           slug: "programming-fundamentals-book",
-          status: "active",
+          status: "Active",
           featured: false,
           tags: JSON.stringify([
             "book",

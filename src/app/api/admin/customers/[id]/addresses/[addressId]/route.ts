@@ -15,8 +15,9 @@ import { auth } from "@/lib/auth";
  */
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string; addressId: string } },
+  { params }: { params: Promise<{ id: string; addressId: string }> },
 ) {
+  const { id, addressId } = await params;
   // Check admin authentication
   const session = await auth();
   if (!session?.user) {
@@ -56,7 +57,7 @@ export async function PATCH(
     const [hasOrderedFromStore] = await db
       .select({ orderId: orders.id })
       .from(orders)
-      .where(and(eq(orders.userId, params.id), eq(orders.storeId, storeId)))
+      .where(and(eq(orders.userId, id), eq(orders.storeId, storeId)))
       .limit(1);
 
     if (!hasOrderedFromStore) {
@@ -76,10 +77,7 @@ export async function PATCH(
       .select()
       .from(addresses)
       .where(
-        and(
-          eq(addresses.id, parseInt(params.addressId)),
-          eq(addresses.userId, params.id),
-        ),
+        and(eq(addresses.id, parseInt(addressId)), eq(addresses.userId, id)),
       );
 
     if (!existingAddress) {
@@ -92,16 +90,14 @@ export async function PATCH(
       await db
         .update(addresses)
         .set({ isDefault: false })
-        .where(
-          and(eq(addresses.userId, params.id), eq(addresses.type, addressType)),
-        );
+        .where(and(eq(addresses.userId, id), eq(addresses.type, addressType)));
     }
 
     // Update address
     const [updatedAddress] = await db
       .update(addresses)
       .set(updateData)
-      .where(eq(addresses.id, parseInt(params.addressId)))
+      .where(eq(addresses.id, parseInt(addressId)))
       .returning();
 
     return NextResponse.json({

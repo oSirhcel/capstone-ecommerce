@@ -10,6 +10,7 @@ export interface Store {
 export interface CreateStoreData {
   name: string;
   description: string;
+  slug: string;
 }
 
 export interface StoreAvailabilityResponse {
@@ -30,7 +31,9 @@ export async function createStore(
       body: JSON.stringify(storeData),
     });
 
-    const data = (await response.json()) as { id: string } | { error: string };
+    const data = (await response.json()) as
+      | { id: string; slug: string }
+      | { error: string };
 
     if (!response.ok) {
       return {
@@ -38,7 +41,7 @@ export async function createStore(
       };
     }
 
-    return { data: data as { id: string } };
+    return { data: data as { id: string; slug: string } };
   } catch {
     return { error: "Network error occurred" };
   }
@@ -58,4 +61,30 @@ export async function checkStoreNameAvailability(
 
   const json = (await response.json()) as { hasStore: boolean };
   return !json.hasStore; // true means available
+}
+
+export async function generateStoreSlugs(storeName: string): Promise<string[]> {
+  const response = await fetch(`${getBaseUrl()}/api/ai/generate-slug`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ storeName }),
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to generate slugs");
+  }
+
+  const json = (await response.json()) as { slugs: string[] };
+  return json.slugs;
+}
+
+export async function checkSlugAvailability(slug: string): Promise<boolean> {
+  const response = await fetch(`${getBaseUrl()}/api/onboarding/slug/${slug}`);
+
+  if (!response.ok) {
+    throw new Error("Failed to check slug availability");
+  }
+
+  const json = (await response.json()) as { available: boolean };
+  return json.available;
 }

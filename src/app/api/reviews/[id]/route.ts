@@ -14,8 +14,9 @@ type SessionUser = {
 // PUT /api/reviews/[id] - Edit review
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
+  const { id } = await params;
   try {
     const session = await auth();
 
@@ -24,7 +25,7 @@ export async function PUT(
     }
 
     const user = session.user as SessionUser;
-    const reviewId = parseInt(params.id, 10);
+    const reviewId = parseInt(id, 10);
 
     if (isNaN(reviewId)) {
       return NextResponse.json({ error: "Invalid review ID" }, { status: 400 });
@@ -40,7 +41,7 @@ export async function PUT(
 
     if (!parsed.success) {
       return NextResponse.json(
-        { error: "Invalid data", details: parsed.error.flatten() },
+        { error: "Invalid data", details: z.treeifyError(parsed.error) },
         { status: 400 },
       );
     }
@@ -99,8 +100,9 @@ export async function PUT(
 // DELETE /api/reviews/[id] - Delete review
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
+  const { id } = await params;
   try {
     const session = await auth();
 
@@ -109,7 +111,7 @@ export async function DELETE(
     }
 
     const user = session.user as SessionUser;
-    const reviewId = parseInt(params.id, 10);
+    const reviewId = parseInt(id, 10);
 
     if (isNaN(reviewId)) {
       return NextResponse.json({ error: "Invalid review ID" }, { status: 400 });

@@ -103,6 +103,7 @@ export const orderStatusEnum = pgEnum("order_status", [
   "Refunded",
   "On-hold",
   "Failed",
+  "Denied",
 ]);
 
 export const paymentStatusEnum = pgEnum("payment_status", [
@@ -118,8 +119,7 @@ export const orders = pgTable("orders", {
     .references(() => users.id)
     .notNull(),
   storeId: varchar("storeId", { length: 255 })
-    .references(() => stores.id)
-    .notNull(), // Orders belong to a specific store
+    .references(() => stores.id), // Orders belong to a specific store
   status: orderStatusEnum().notNull().default("Pending"),
   paymentStatus: paymentStatusEnum().notNull().default("Pending"),
   totalAmount: integer().notNull(), // Total in cents
@@ -336,6 +336,127 @@ export const orderDiscounts = pgTable("order_discounts", {
     .notNull(),
   discountAmount: integer().notNull(), // Amount saved in cents
   createdAt: timestamp().defaultNow().notNull(),
+});
+
+// Zero Trust Risk Assessments
+export const zeroTrustAssessments = pgTable("zero_trust_assessments", {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  userId: varchar("userId", { length: 255 })
+    .references(() => users.id),
+  orderId: integer()
+    .references(() => orders.id),
+  paymentIntentId: varchar({ length: 255 }), // Stripe payment intent ID
+  
+  // Risk assessment results
+  riskScore: integer().notNull(), // 0-100
+  decision: varchar({ length: 10 }).notNull(), // 'allow', 'warn', 'deny'
+  confidence: integer().notNull(), // 0-100 (confidence percentage)
+  
+  // Transaction details at time of assessment
+  transactionAmount: integer().notNull(), // Amount in cents
+  currency: varchar({ length: 3 }).notNull().default('aud'),
+  itemCount: integer().notNull().default(0),
+  storeCount: integer().notNull().default(0),
+  
+  // Risk factors (JSON array)
+  riskFactors: text(), // JSON string of risk factors
+  
+  // AI-generated justification (NEW)
+  aiJustification: text(), // AI-generated explanation of the risk assessment
+  justificationGeneratedAt: timestamp(), // When the AI justification was generated
+  
+  // Request metadata
+  userAgent: text(),
+  ipAddress: varchar({ length: 45 }), // IPv6 compatible
+  
+  // Geographic data
+  shippingCountry: varchar({ length: 2 }),
+  shippingState: varchar({ length: 100 }),
+  shippingCity: varchar({ length: 100 }),
+  
+  createdAt: timestamp({ withTimezone: true }).defaultNow().notNull(),
+});
+
+// Risk Assessment to Order Links (for multi-store transactions)
+export const riskAssessmentOrderLinks = pgTable(
+  "risk_assessment_order_links",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    riskAssessmentId: integer()
+      .references(() => zeroTrustAssessments.id)
+      .notNull(),
+    orderId: integer()
+      .references(() => orders.id)
+      .notNull(),
+    createdAt: timestamp({ withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    unique("raol_assessment_order_unique").on(
+      table.riskAssessmentId,
+      table.orderId,
+    ),
+    index("raol_assessment_idx").on(table.riskAssessmentId),
+    index("raol_order_idx").on(table.orderId),
+  ],
+);
+
+// Risk Assessment to Store Links (direct association for multi-store transactions)
+export const riskAssessmentStoreLinks = pgTable(
+  "risk_assessment_store_links",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    riskAssessmentId: integer("risk_assessment_id")
+      .references(() => zeroTrustAssessments.id, { onDelete: "cascade" })
+      .notNull(),
+    storeId: varchar("store_id", { length: 255 })
+      .references(() => stores.id, { onDelete: "cascade" })
+      .notNull(),
+    storeOrderId: integer("store_order_id").references(() => orders.id),
+    storeSubtotal: integer("store_subtotal").notNull(), // in cents
+    storeItemCount: integer("store_item_count").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    unique("ras_links_assessment_store_unique").on(
+      table.riskAssessmentId,
+      table.storeId,
+    ),
+    index("ras_links_assessment_idx").on(table.riskAssessmentId),
+    index("ras_links_store_idx").on(table.storeId),
+    index("ras_links_order_idx").on(table.storeOrderId),
+  ],
+);
+
+// Zero Trust Verification Tokens
+export const zeroTrustVerifications = pgTable("zero_trust_verifications", {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  token: varchar({ length: 255 }).notNull().unique(),
+  userId: varchar("userId", { length: 255 })
+    .references(() => users.id)
+    .notNull(),
+  
+  // OTP code for verification
+  otpHash: varchar({ length: 255 }), // Hashed OTP code
+  
+  // Transaction details to resume after verification
+  paymentData: text().notNull(), // JSON string of original payment request
+  riskScore: integer().notNull(),
+  riskFactors: text(), // JSON string of risk factors
+  
+  // Verification status
+  status: varchar({ length: 20 }).notNull().default('pending'), // 'pending', 'verified', 'expired'
+  verifiedAt: timestamp(),
+  expiresAt: timestamp().notNull(), // Tokens expire after 10 minutes
+  
+  // Email details
+  userEmail: varchar({ length: 255 }).notNull(),
+  emailSent: boolean().notNull().default(false),
+  emailSentAt: timestamp(),
+  
+  createdAt: timestamp().defaultNow().notNull(),
+  updatedAt: timestamp().defaultNow().notNull(),
 });
 
 // Inventory tracking

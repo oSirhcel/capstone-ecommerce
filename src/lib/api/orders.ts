@@ -90,6 +90,7 @@ export async function createOrders(
   billingAddress: AddressData,
   shipping: number,
   tax: number,
+  riskAssessmentId?: number,
 ): Promise<CreateOrdersResult> {
   const orderPromises = storeGroups.map(async (storeGroup) => {
     const storeTotal =
@@ -142,6 +143,25 @@ export async function createOrders(
 
   // Wait for all orders to be created
   const createdOrders = await Promise.all(orderPromises);
+
+  // Link risk assessment to all created orders if provided
+  if (riskAssessmentId && createdOrders.length > 0) {
+    try {
+      await fetch('/api/risk-assessments/link-orders', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          riskAssessmentId,
+          orderIds: createdOrders.map((o) => o.orderId),
+        }),
+      });
+    } catch (error) {
+      console.error('Failed to link risk assessment to orders:', error);
+      // Don't fail the order creation if linking fails
+    }
+  }
 
   // Return the first order ID for payment processing
   // (Stripe will handle the payment for the total amount)

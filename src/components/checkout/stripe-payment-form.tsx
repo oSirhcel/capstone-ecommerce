@@ -30,8 +30,9 @@ interface StripePaymentFormProps {
     paymentIntentId: string;
     orderId?: number;
   }) => void;
-  onError: (error: string) => void;
+  onError: (error: string | Error) => void;
   onCreateOrder?: () => Promise<number>;
+  orderData?: any; // Order data for verification flow
 }
 
 function PaymentForm({
@@ -41,6 +42,7 @@ function PaymentForm({
   onSuccess,
   onError,
   onCreateOrder,
+  orderData,
 }: StripePaymentFormProps) {
   const stripe = useStripe();
   const elements = useElements();
@@ -72,7 +74,7 @@ function PaymentForm({
         return;
       }
 
-      // Create order if not provided and callback exists
+      // Create order first if needed
       let currentOrderId = orderId;
       if (!currentOrderId && onCreateOrder) {
         try {
@@ -86,12 +88,13 @@ function PaymentForm({
         }
       }
 
-      // Create payment intent
+      // Create payment intent with order ID (includes zero trust assessment)
       const paymentResponse: ProcessPaymentResponse = await processPayment({
-        amount,
+        amount: amount, // Amount will be converted to cents in the API
         currency,
         orderId: currentOrderId,
         savePaymentMethod,
+        orderData, // Include order data for verification flow
       });
 
       const clientSecret: string = paymentResponse.clientSecret;
@@ -129,10 +132,17 @@ function PaymentForm({
       }
     } catch (error) {
       console.error("Payment processing error:", error);
+
       const errorMessage =
         error instanceof Error ? error.message : "Payment processing failed";
       setPaymentError(errorMessage);
-      onError(errorMessage);
+
+      // Pass the actual error object for zero trust handling
+      if (error instanceof Error) {
+        onError(error);
+      } else {
+        onError(errorMessage);
+      }
     } finally {
       setIsProcessing(false);
     }

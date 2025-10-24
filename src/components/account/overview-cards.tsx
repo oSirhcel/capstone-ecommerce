@@ -2,26 +2,37 @@
 
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { fetchOrders } from "@/lib/api/orders";
+import { fetchOrderStats } from "@/lib/api/orders";
 import { fetchAddresses } from "@/lib/api/addresses";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Package, MapPin, CheckCircle, Clock } from "lucide-react";
+import { Package, MapPin, CheckCircle } from "lucide-react";
 
 export default function OverviewCards() {
-  const { data: ordersData } = useQuery({
-    queryKey: ["orders", { page: 1, limit: 3 }],
-    queryFn: () => fetchOrders({ page: 1, limit: 3 }),
+  const {
+    data: orderStats,
+    isLoading: ordersLoading,
+    error: ordersError,
+  } = useQuery({
+    queryKey: ["order-stats"],
+    queryFn: fetchOrderStats,
   });
 
-  const { data: addressesData } = useQuery({
+  const {
+    data: addressesData,
+    isLoading: addressesLoading,
+    error: addressesError,
+  } = useQuery({
     queryKey: ["addresses"],
     queryFn: () => fetchAddresses(),
   });
 
-  const orders = ordersData?.orders ?? [];
-  const numDelivered = orders.filter((o) => o.status === "delivered").length;
+  // Use stats data directly
+  const totalOrders = orderStats?.totalOrders ?? 0;
+  const numDelivered = orderStats?.completedOrders ?? 0;
+  const numInTransit = orderStats?.inTransitOrders ?? 0;
+  const numPending = orderStats?.pendingOrders ?? 0;
+  const numCancelled = orderStats?.cancelledOrders ?? 0;
 
   return (
     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -31,9 +42,17 @@ export default function OverviewCards() {
           <Package className="text-muted-foreground h-4 w-4" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{orders.length}</div>
+          <div className="text-2xl font-bold">
+            {ordersLoading ? "..." : totalOrders}
+          </div>
           <p className="text-muted-foreground text-xs">
-            {numDelivered} delivered, {orders.length - numDelivered} in transit
+            {ordersLoading
+              ? "Loading..."
+              : ordersError
+                ? "Error loading orders"
+                : `${numDelivered} completed, ${numInTransit} in transit` +
+                  (numPending > 0 ? `, ${numPending} pending` : "") +
+                  (numCancelled > 0 ? `, ${numCancelled} cancelled` : "")}
           </p>
           <Link href="/account/orders">
             <Button variant="outline" size="sm" className="mt-3 bg-transparent">
@@ -50,12 +69,16 @@ export default function OverviewCards() {
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">
-            {addressesData?.addresses.length ?? 0}
+            {addressesLoading ? "..." : (addressesData?.addresses.length ?? 0)}
           </div>
           <p className="text-muted-foreground text-xs">
-            {(addressesData?.addresses ?? []).some((a) => a.isDefault)
-              ? "1 default address"
-              : ""}
+            {addressesLoading
+              ? "Loading..."
+              : addressesError
+                ? "Error loading addresses"
+                : (addressesData?.addresses ?? []).some((a) => a.isDefault)
+                  ? "1 default address"
+                  : ""}
           </p>
           <Link href="/account/addresses">
             <Button variant="outline" size="sm" className="mt-3 bg-transparent">

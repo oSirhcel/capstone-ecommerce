@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { Bell, Shield, Trash2, AlertTriangle } from "lucide-react";
@@ -18,7 +19,7 @@ import {
 } from "@/components/ui/dialog";
 
 interface AccountPreferencesProps {
-  onDeleteAccount: () => Promise<void>;
+  onDeleteAccount: (password: string) => Promise<void>;
 }
 
 export default function AccountPreferences({
@@ -26,6 +27,7 @@ export default function AccountPreferences({
 }: AccountPreferencesProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deletePassword, setDeletePassword] = useState("");
 
   // Mock preferences state - in a real app, these would come from the API
   const [preferences, setPreferences] = useState({
@@ -44,15 +46,21 @@ export default function AccountPreferences({
   };
 
   const handleDeleteAccount = async () => {
+    if (!deletePassword.trim()) {
+      toast.error("Please enter your password to confirm account deletion");
+      return;
+    }
+
     setIsLoading(true);
     try {
-      await onDeleteAccount();
+      await onDeleteAccount(deletePassword);
       toast.success("Account deleted");
     } catch (error) {
       toast.error("Failed to delete account. Please try again.");
     } finally {
       setIsLoading(false);
       setShowDeleteDialog(false);
+      setDeletePassword("");
     }
   };
 
@@ -193,16 +201,38 @@ export default function AccountPreferences({
                     your account and remove all your data from our servers.
                   </DialogDescription>
                 </DialogHeader>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="delete-password">
+                      Enter your password to confirm
+                    </Label>
+                    <Input
+                      id="delete-password"
+                      type="password"
+                      placeholder="Enter your password"
+                      value={deletePassword}
+                      onChange={(e) => setDeletePassword(e.target.value)}
+                      disabled={isLoading}
+                    />
+                    <p className="text-muted-foreground text-sm">
+                      This helps ensure that only you can delete your account.
+                    </p>
+                  </div>
+                </div>
                 <DialogFooter>
                   <Button
                     variant="outline"
-                    onClick={() => setShowDeleteDialog(false)}
+                    onClick={() => {
+                      setShowDeleteDialog(false);
+                      setDeletePassword("");
+                    }}
+                    disabled={isLoading}
                   >
                     Cancel
                   </Button>
                   <Button
                     onClick={handleDeleteAccount}
-                    disabled={isLoading}
+                    disabled={isLoading || !deletePassword.trim()}
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   >
                     {isLoading ? "Deleting..." : "Delete Account"}

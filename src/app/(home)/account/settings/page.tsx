@@ -93,12 +93,33 @@ export default function AccountSettingsPage() {
     }
   };
 
-  const handleDeleteAccount = async () => {
-    // This would typically call a delete account API
-    // For now, we'll just show a message
-    toast.error(
-      "Account deletion not implemented. Please contact support to delete your account.",
-    );
+  const handleDeleteAccount = async (password: string) => {
+    try {
+      const response = await fetch("/api/profile/delete", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          confirmDelete: true,
+          password: password,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to delete account");
+      }
+
+      // Sign out the user and redirect to home
+      const { signOut } = await import("next-auth/react");
+      await signOut({ callbackUrl: "/" });
+
+      toast.success("Your account has been permanently deleted");
+    } catch (error) {
+      console.error("Error deleting account:", error);
+      throw error;
+    }
   };
 
   if (status === "loading" || isLoading) {

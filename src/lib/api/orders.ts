@@ -83,6 +83,22 @@ export async function fetchOrderById(id: number): Promise<{ order: OrderDTO }> {
   return (await res.json()) as { order: OrderDTO };
 }
 
+export type OrderStats = {
+  totalOrders: number;
+  completedOrders: number;
+  inTransitOrders: number;
+  pendingOrders: number;
+  cancelledOrders: number;
+};
+
+export async function fetchOrderStats(): Promise<OrderStats> {
+  const base = getBaseUrl();
+  const url = new URL("/api/orders/stats", base);
+  const res = await fetch(url.toString(), { credentials: "include" });
+  if (!res.ok) throw new Error(`Failed to fetch order stats: ${res.status}`);
+  return (await res.json()) as OrderStats;
+}
+
 export async function createOrders(
   storeGroups: StoreGroup[],
   contactData: ContactData,

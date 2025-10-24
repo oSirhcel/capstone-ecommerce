@@ -39,6 +39,23 @@ export type OrderDTO = {
     status: string;
     transactionId?: string;
     createdAt: string;
+    paymentMethod?: {
+      type: string;
+      provider: string;
+      lastFourDigits?: string;
+      expiryMonth?: number;
+      expiryYear?: number;
+    } | null;
+    billingAddress?: {
+      firstName?: string;
+      lastName?: string;
+      addressLine1?: string;
+      addressLine2?: string;
+      city?: string;
+      state?: string;
+      postcode?: string;
+      country?: string;
+    } | null;
   } | null;
 };
 

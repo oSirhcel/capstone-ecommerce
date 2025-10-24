@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -54,7 +53,6 @@ const getStatusBadge = (status: string) => {
 
 export default function OrderPage() {
   const params = useParams();
-  const [showCancelDialog, setShowCancelDialog] = useState(false);
 
   const orderId = parseInt(params.id as string);
   const { data, isLoading, isError } = useOrderQuery(orderId);
@@ -143,8 +141,8 @@ export default function OrderPage() {
             </div>
             <h1 className="text-3xl font-bold">Order Not Found</h1>
             <p className="text-muted-foreground">
-              The order you're looking for doesn't exist or you don't have
-              permission to view it.
+              The order you&apos;re looking for doesn&apos;t exist or you
+              don&apos;t have permission to view it.
             </p>
           </div>
         </div>
@@ -159,13 +157,6 @@ export default function OrderPage() {
   );
   const tax = subtotal * 0.08;
   const shipping = 0; // TODO: Get from order data when available
-  const total = subtotal + tax + shipping;
-
-  const handleCancelOrder = () => {
-    //TODO: API call
-    console.log("Cancelling order:", order.id);
-    setShowCancelDialog(false);
-  };
 
   return (
     <div className="space-y-6">
@@ -202,7 +193,9 @@ export default function OrderPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setShowCancelDialog(true)}
+              onClick={() =>
+                console.log("Cancel order functionality to be implemented")
+              }
               className="text-red-600 hover:text-red-700"
             >
               <X className="mr-2 h-4 w-4" />
@@ -232,14 +225,14 @@ export default function OrderPage() {
                   >
                     <Image
                       src="/placeholder.svg"
-                      alt={item.productName || "Product"}
+                      alt={item.productName ?? "Product"}
                       width={80}
                       height={80}
                       className="rounded-md object-cover"
                     />
                     <div className="flex-1">
                       <h4 className="font-medium">
-                        {item.productName || "Product"}
+                        {item.productName ?? "Product"}
                       </h4>
                       <p className="text-muted-foreground text-sm">
                         ${(item.priceAtTime / 100).toFixed(2)} × {item.quantity}
@@ -368,7 +361,7 @@ export default function OrderPage() {
                 <>
                   <div>
                     <p className="font-medium">
-                      {order.shipping.method || "Standard Shipping"}
+                      {order.shipping.method ?? "Standard Shipping"}
                     </p>
                     {order.shipping.trackingNumber && (
                       <p className="text-muted-foreground text-sm">
@@ -451,7 +444,19 @@ export default function OrderPage() {
               {order.payment ? (
                 <>
                   <div>
-                    <p className="font-medium">Payment Method</p>
+                    <p className="font-medium">
+                      {order.payment.paymentMethod?.type === "credit_card"
+                        ? "Credit Card"
+                        : (order.payment.paymentMethod?.type ??
+                          "Payment Method")}
+                    </p>
+                    {order.payment.paymentMethod?.provider && (
+                      <p className="text-muted-foreground text-sm">
+                        {order.payment.paymentMethod.provider}
+                        {order.payment.paymentMethod.lastFourDigits &&
+                          ` ending in ${order.payment.paymentMethod.lastFourDigits}`}
+                      </p>
+                    )}
                     <p className="text-muted-foreground text-sm">
                       Status: {order.payment.status}
                     </p>
@@ -465,6 +470,28 @@ export default function OrderPage() {
                       {new Date(order.payment.createdAt).toLocaleDateString()}
                     </p>
                   </div>
+
+                  {order.payment.billingAddress && (
+                    <div className="border-t pt-4">
+                      <h4 className="mb-2 font-medium">Billing Address</h4>
+                      <div className="text-sm">
+                        <p className="font-medium">
+                          {order.payment.billingAddress.firstName}{" "}
+                          {order.payment.billingAddress.lastName}
+                        </p>
+                        <p>{order.payment.billingAddress.addressLine1}</p>
+                        {order.payment.billingAddress.addressLine2 && (
+                          <p>{order.payment.billingAddress.addressLine2}</p>
+                        )}
+                        <p>
+                          {order.payment.billingAddress.city},{" "}
+                          {order.payment.billingAddress.state}{" "}
+                          {order.payment.billingAddress.postcode}
+                        </p>
+                        <p>{order.payment.billingAddress.country}</p>
+                      </div>
+                    </div>
+                  )}
 
                   <div className="space-y-2 border-t pt-4">
                     <div className="flex justify-between text-sm">

@@ -16,6 +16,30 @@ export type OrderDTO = {
   createdAt: string;
   updatedAt: string;
   items: OrderItemDTO[];
+  shipping?: {
+    trackingNumber?: string;
+    shippedAt?: string;
+    deliveredAt?: string;
+    method?: string;
+    description?: string;
+    address?: {
+      firstName?: string;
+      lastName?: string;
+      addressLine1?: string;
+      addressLine2?: string;
+      city?: string;
+      state?: string;
+      postcode?: string;
+      country?: string;
+    };
+  } | null;
+  payment?: {
+    amount: number;
+    currency: string;
+    status: string;
+    transactionId?: string;
+    createdAt: string;
+  } | null;
 };
 
 export type AddressData = {

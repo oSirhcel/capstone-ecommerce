@@ -2,7 +2,7 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/server/db";
-import { orders, orderItems, addresses, products } from "@/server/db/schema";
+import { orders, orderItems, addresses, products, orderShipping, paymentTransactions, shippingMethods } from "@/server/db/schema";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
@@ -209,10 +209,6 @@ export async function POST(request: NextRequest) {
             eq(orders.userId, user.id),
             eq(orders.totalAmount, totalAmount),
             // created recently to avoid matching old historical orders
-            // @ts-expect-error drizzle timestamp compare helper used below
-            // drizzle-orm supports Date in comparisons
-            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-            // the gte helper is not imported here; keep simple by filtering after fetch if needed
             // We will perform item-level matching regardless
             // Note: We intentionally do not early-return here if none found
           )
@@ -221,7 +217,7 @@ export async function POST(request: NextRequest) {
         .limit(30);
 
       for (const candidate of recentOrders) {
-        if (candidate.status !== 'pending') continue;
+        if (candidate.status !== 'Pending') continue;
         if (candidate.createdAt < twoHoursAgo) continue;
 
         const existingItems = await db
@@ -348,6 +344,7 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: "Not found" }, { status: 404 });
       }
 
+      // Get order items
       const items = await db
         .select({
           id: orderItems.id,
@@ -360,6 +357,44 @@ export async function GET(request: NextRequest) {
         .from(orderItems)
         .leftJoin(products, eq(products.id, orderItems.productId))
         .where(eq(orderItems.orderId, id));
+
+      // Get shipping information
+      const [shippingInfo] = await db
+        .select({
+          id: orderShipping.id,
+          trackingNumber: orderShipping.trackingNumber,
+          shippedAt: orderShipping.shippedAt,
+          deliveredAt: orderShipping.deliveredAt,
+          methodName: shippingMethods.name,
+          methodDescription: shippingMethods.description,
+          address: {
+            firstName: addresses.firstName,
+            lastName: addresses.lastName,
+            addressLine1: addresses.addressLine1,
+            addressLine2: addresses.addressLine2,
+            city: addresses.city,
+            state: addresses.state,
+            postcode: addresses.postcode,
+            country: addresses.country,
+          },
+        })
+        .from(orderShipping)
+        .leftJoin(shippingMethods, eq(shippingMethods.id, orderShipping.shippingMethodId))
+        .leftJoin(addresses, eq(addresses.id, orderShipping.shippingAddressId))
+        .where(eq(orderShipping.orderId, id));
+
+      // Get payment information
+      const [paymentInfo] = await db
+        .select({
+          id: paymentTransactions.id,
+          amount: paymentTransactions.amount,
+          currency: paymentTransactions.currency,
+          status: paymentTransactions.status,
+          transactionId: paymentTransactions.transactionId,
+          createdAt: paymentTransactions.createdAt,
+        })
+        .from(paymentTransactions)
+        .where(eq(paymentTransactions.orderId, id));
 
       return NextResponse.json({
         order: {
@@ -375,6 +410,21 @@ export async function GET(request: NextRequest) {
             quantity: item.quantity,
             priceAtTime: item.priceAtTime,
           })),
+          shipping: shippingInfo ? {
+            trackingNumber: shippingInfo.trackingNumber,
+            shippedAt: shippingInfo.shippedAt,
+            deliveredAt: shippingInfo.deliveredAt,
+            method: shippingInfo.methodName,
+            description: shippingInfo.methodDescription,
+            address: shippingInfo.address,
+          } : null,
+          payment: paymentInfo ? {
+            amount: paymentInfo.amount,
+            currency: paymentInfo.currency,
+            status: paymentInfo.status,
+            transactionId: paymentInfo.transactionId,
+            createdAt: paymentInfo.createdAt,
+          } : null,
         },
       });
     }

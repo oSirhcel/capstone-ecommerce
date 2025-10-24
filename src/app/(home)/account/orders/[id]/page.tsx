@@ -17,6 +17,8 @@ import {
 import Image from "next/image";
 import { useOrderQuery } from "@/hooks/use-order-query";
 import { Skeleton } from "@/components/ui/skeleton";
+import ConfirmationDialog from "@/components/ui/confirmation-dialog";
+import { toast } from "sonner";
 
 const getStatusBadge = (status: string) => {
   switch (status) {
@@ -56,6 +58,37 @@ export default function OrderPage() {
 
   const orderId = parseInt(params.id as string);
   const { data, isLoading, isError } = useOrderQuery(orderId);
+
+  const handleCancelOrder = async () => {
+    try {
+      const response = await fetch(`/api/orders/${orderId}/cancel`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          reason: "Cancelled by customer",
+        }),
+      });
+
+      if (!response.ok) {
+        const error = (await response.json()) as {
+          error?: string;
+          details?: string;
+        };
+        const errorMessage = error.error ?? "Failed to cancel order";
+        const errorDetails = error.details ? ` (${error.details})` : "";
+        throw new Error(`${errorMessage}${errorDetails}`);
+      }
+
+      toast.success("Order cancelled successfully");
+      // Redirect back to orders page
+      window.location.href = "/account/orders";
+    } catch (error) {
+      console.error("Error cancelling order:", error);
+      toast.error("Failed to cancel order. Please try again.");
+    }
+  };
 
   if (isLoading) {
     return (
@@ -190,17 +223,24 @@ export default function OrderPage() {
             Download Invoice
           </Button>
           {order.status === "Pending" && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() =>
-                console.log("Cancel order functionality to be implemented")
+            <ConfirmationDialog
+              trigger={
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-red-600 hover:text-red-700"
+                >
+                  <X className="mr-2 h-4 w-4" />
+                  Cancel Order
+                </Button>
               }
-              className="text-red-600 hover:text-red-700"
-            >
-              <X className="mr-2 h-4 w-4" />
-              Cancel Order
-            </Button>
+              title="Cancel Order"
+              description="Are you sure you want to cancel this order? This action cannot be undone and the items will be returned to inventory."
+              confirmText="Cancel Order"
+              cancelText="Keep Order"
+              onConfirm={handleCancelOrder}
+              variant="destructive"
+            />
           )}
         </div>
       </div>

@@ -5,8 +5,9 @@ import {
   stores,
   categories,
   productImages,
+  reviews,
 } from "@/server/db/schema";
-import { eq, desc, asc, and, ilike } from "drizzle-orm";
+import { eq, desc, asc, and, ilike, sql, count } from "drizzle-orm";
 
 // GET /api/products - Get all products with optional filtering
 export async function GET(request: NextRequest) {
@@ -77,7 +78,7 @@ export async function GET(request: NextRequest) {
       .limit(limit)
       .offset(offset);
 
-    // Get product images for each product
+    // Get product images and review statistics for each product
     const productsWithImages = await Promise.all(
       productsData.map(async (product) => {
         const images = await db
@@ -92,8 +93,19 @@ export async function GET(request: NextRequest) {
           .where(eq(productImages.productId, product.id))
           .orderBy(asc(productImages.displayOrder));
 
+        // Get review statistics for this product
+        const [reviewStats] = await db
+          .select({
+            averageRating: sql<number>`ROUND(AVG(${reviews.rating})::numeric, 2)`.mapWith(Number),
+            reviewCount: count().mapWith(Number),
+          })
+          .from(reviews)
+          .where(eq(reviews.productId, product.id));
+
         return {
           ...product,
+          rating: reviewStats?.averageRating ?? 0,
+          reviewCount: reviewStats?.reviewCount ?? 0,
           images:
             images.length > 0
               ? images

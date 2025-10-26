@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/server/db";
 import { orders, orderItems } from "@/server/db/schema";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, or } from "drizzle-orm";
 
 type SessionUser = {
   id: string;
@@ -44,28 +44,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Check if user has purchased this product
-    // Allow reviews for orders that have been paid (Processing, Shipped, or Completed)
-    const hasPurchased = await db
-      .select({ id: orders.id })
-      .from(orders)
-      .innerJoin(orderItems, eq(orders.id, orderItems.orderId))
-      .where(
-        and(
-          eq(orders.userId, user.id),
-          eq(orderItems.productId, productIdNum),
-          inArray(orders.status, ["Processing", "Shipped", "Completed"]),
-        ),
-      )
-      .limit(1);
-
-    if (hasPurchased.length === 0) {
-      return NextResponse.json({
-        canReview: false,
-        reason: "You must purchase this product before you can review it",
-      });
-    }
-
+    // Allow all logged-in users to review products (no purchase requirement)
     return NextResponse.json({
       canReview: true,
     });

@@ -26,6 +26,8 @@ export interface Product {
   categoryId: number | null;
   createdAt: Date;
   updatedAt: Date;
+  rating: number; // Average rating from reviews
+  reviewCount: number; // Total number of reviews
   store?: {
     id: string;
     name: string;

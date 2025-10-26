@@ -1,8 +1,8 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { db } from "@/server/db";
-import { products, stores, categories, productImages } from "@/server/db/schema";
-import { eq, desc, asc, or, ilike } from "drizzle-orm";
+import { products, stores, categories, productImages, reviews } from "@/server/db/schema";
+import { eq, desc, asc, or, ilike, sql, count } from "drizzle-orm";
 
 // GET /api/search - Search across products, stores, and categories
 export async function GET(request: NextRequest) {
@@ -104,7 +104,7 @@ export async function GET(request: NextRequest) {
         .limit(type === "products" ? limit : 10)
         .offset(type === "products" ? offset : 0);
 
-      // Get product images for each product
+      // Get product images and review statistics for each product
       const productsWithImages = await Promise.all(
         productsData.map(async (product) => {
           const images = await db
@@ -119,8 +119,19 @@ export async function GET(request: NextRequest) {
             .where(eq(productImages.productId, product.id))
             .orderBy(asc(productImages.displayOrder));
 
+          // Get review statistics for this product
+          const [reviewStats] = await db
+            .select({
+              averageRating: sql<number>`ROUND(AVG(${reviews.rating})::numeric, 2)`.mapWith(Number),
+              reviewCount: count().mapWith(Number),
+            })
+            .from(reviews)
+            .where(eq(reviews.productId, product.id));
+
           return {
             ...product,
+            rating: reviewStats?.averageRating ?? 0,
+            reviewCount: reviewStats?.reviewCount ?? 0,
             images: images.length > 0 ? images : [{
               id: 0,
               imageUrl: "/placeholder.svg",

@@ -18,10 +18,12 @@ function transform(product: Product) {
   return {
     id: product.id.toString(),
     name: product.name,
-    price: product.price / 100,
-    discountPrice: product.price / 100,
-    rating: 4.0,
-    reviewCount: 0,
+    price: product.price ? product.price / 100 : 0,
+    discountPrice: product.compareAtPrice
+      ? product.compareAtPrice / 100
+      : undefined,
+    rating: product.rating,
+    reviewCount: product.reviewCount,
     stock: product.stock,
     sku: `${product.id.toString().padStart(6, "0")}`,
     description: product.description ?? "No description available",

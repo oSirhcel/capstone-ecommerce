@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -12,6 +11,7 @@ import {
   Calendar,
   Package,
   Star,
+  X,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -24,75 +24,33 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useStoresQuery } from "@/hooks/stores/use-stores-query";
+import { useDebounce } from "@/hooks/use-debounce";
 
 const STORES_PER_PAGE = 20;
-
-// Store interface matching our API response
-interface Store {
-  id: string;
-  name: string;
-  description: string | null;
-  ownerId: string;
-  createdAt: string;
-  productCount: number;
-}
-
-interface StoresResponse {
-  stores: Store[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-  };
-}
-
-// Function to fetch stores from API
-async function fetchStores(params?: {
-  page?: number;
-  limit?: number;
-  search?: string;
-}): Promise<StoresResponse> {
-  const searchParams = new URLSearchParams();
-
-  if (params?.page) searchParams.append("page", params.page.toString());
-  if (params?.limit) searchParams.append("limit", params.limit.toString());
-  if (params?.search) searchParams.append("search", params.search);
-
-  const response = await fetch(`/api/stores?${searchParams.toString()}`);
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch stores: ${response.statusText}`);
-  }
-
-  return response.json() as Promise<StoresResponse>;
-}
 
 export default function StoresPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
 
-  const [searchTerm, setSearchTerm] = useState(
-    searchParams.get("search") ?? "",
-  );
+  // Calculate values during render instead of using useEffect
+  const currentSearchTerm = searchParams.get("search") ?? "";
   const currentPage = parseInt(searchParams.get("page") ?? "1");
 
-  const { data, isLoading, error } = useQuery({
-    queryKey: [
-      "stores",
-      {
-        page: currentPage,
-        limit: STORES_PER_PAGE,
-        search: searchParams.get("search"),
-      },
-    ],
-    queryFn: () =>
-      fetchStores({
-        page: currentPage,
-        limit: STORES_PER_PAGE,
-        search: searchParams.get("search") ?? undefined,
-      }),
+  // Use local state for the input field only
+  const [searchTerm, setSearchTerm] = useState(currentSearchTerm);
+
+  // Debounce the search term for better UX (500ms delay)
+  const debouncedSearchTerm = useDebounce(searchTerm, 500);
+
+  // Check if search is being debounced
+  const isSearching = searchTerm !== debouncedSearchTerm;
+
+  const { data, isLoading, error } = useStoresQuery({
+    page: currentPage,
+    limit: STORES_PER_PAGE,
+    search: debouncedSearchTerm || undefined,
   });
 
   const stores = data?.stores ?? [];
@@ -109,18 +67,6 @@ export default function StoresPage() {
     router.push(`${pathname}?${params.toString()}`);
   };
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    const params = new URLSearchParams(searchParams);
-    if (searchTerm.trim()) {
-      params.set("search", searchTerm.trim());
-    } else {
-      params.delete("search");
-    }
-    params.set("page", "1"); // Reset to first page on new search
-    router.push(`${pathname}?${params.toString()}`);
-  };
-
   const clearSearch = () => {
     setSearchTerm("");
     const params = new URLSearchParams(searchParams);
@@ -129,9 +75,24 @@ export default function StoresPage() {
     router.push(`${pathname}?${params.toString()}`);
   };
 
+  // Sync input field with URL changes (legitimate useEffect use case)
   useEffect(() => {
-    setSearchTerm(searchParams.get("search") ?? "");
-  }, [searchParams]);
+    setSearchTerm(currentSearchTerm);
+  }, [currentSearchTerm]);
+
+  // Update URL when debounced search term changes
+  useEffect(() => {
+    if (debouncedSearchTerm !== currentSearchTerm) {
+      const params = new URLSearchParams(searchParams);
+      if (debouncedSearchTerm.trim()) {
+        params.set("search", debouncedSearchTerm.trim());
+      } else {
+        params.delete("search");
+      }
+      params.set("page", "1"); // Reset to first page on search change
+      router.push(`${pathname}?${params.toString()}`);
+    }
+  }, [debouncedSearchTerm, currentSearchTerm, searchParams, pathname, router]);
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -148,24 +109,25 @@ export default function StoresPage() {
 
         {/* Search and Filters */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <form onSubmit={handleSearch} className="flex max-w-md flex-1 gap-2">
-            <div className="relative flex-1">
-              <SearchIcon className="absolute top-2.5 left-2.5 h-4 w-4 text-gray-400" />
-              <Input
-                type="search"
-                placeholder="Search stores..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-8"
-              />
-            </div>
-            <Button type="submit">Search</Button>
-            {searchParams.get("search") && (
-              <Button variant="outline" onClick={clearSearch}>
-                Clear
-              </Button>
+          <div className="relative max-w-md flex-1">
+            <SearchIcon className="absolute top-2.5 left-2.5 h-4 w-4 text-gray-400" />
+            <Input
+              type="text"
+              placeholder="Search stores..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pr-8 pl-8"
+            />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={clearSearch}
+                className="absolute top-2.5 right-2.5 h-4 w-4 text-gray-400 transition-colors hover:text-gray-600"
+              >
+                <X className="h-4 w-4" />
+              </button>
             )}
-          </form>
+          </div>
 
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm">
@@ -180,7 +142,7 @@ export default function StoresPage() {
 
         {/* Stores Table */}
         <div className="space-y-6">
-          {isLoading && (
+          {(isLoading || isSearching) && (
             <Card>
               <CardContent className="p-0">
                 <Table>
@@ -228,7 +190,7 @@ export default function StoresPage() {
             </Card>
           )}
 
-          {error && !isLoading && (
+          {error && !isLoading && !isSearching && (
             <Card>
               <CardContent className="py-12 text-center">
                 <div className="font-medium text-red-600">
@@ -242,7 +204,7 @@ export default function StoresPage() {
             </Card>
           )}
 
-          {!isLoading && !error && stores.length === 0 && (
+          {!isLoading && !isSearching && !error && stores.length === 0 && (
             <Card>
               <CardContent className="py-12 text-center">
                 <Store className="mx-auto mb-4 h-12 w-12 text-gray-400" />
@@ -269,7 +231,7 @@ export default function StoresPage() {
             </Card>
           )}
 
-          {!isLoading && !error && stores.length > 0 && (
+          {!isLoading && !isSearching && !error && stores.length > 0 && (
             <>
               <Card>
                 <CardContent className="p-0">
@@ -296,7 +258,7 @@ export default function StoresPage() {
                           <TableRow
                             key={store.id}
                             className="hover:bg-muted/50 cursor-pointer transition-colors"
-                            onClick={() => router.push(`/stores/${store.id}`)}
+                            onClick={() => router.push(`/stores/${store.slug}`)}
                           >
                             <TableCell>
                               <div className="flex items-center gap-3">
@@ -329,7 +291,7 @@ export default function StoresPage() {
                             <TableCell className="text-center">
                               <Badge variant="secondary" className="gap-1">
                                 <Package className="h-3 w-3" />
-                                {store.productCount}
+                                {store.productCount ?? 0}
                               </Badge>
                             </TableCell>
                             <TableCell className="text-center">
@@ -413,7 +375,7 @@ export default function StoresPage() {
         </div>
 
         {/* Stats Summary */}
-        {!isLoading && !error && stores.length > 0 && (
+        {!isLoading && !isSearching && !error && stores.length > 0 && (
           <Card>
             <CardContent className="p-6">
               <div className="text-center">
@@ -428,7 +390,7 @@ export default function StoresPage() {
                   <div>
                     <div className="text-primary text-2xl font-bold">
                       {stores.reduce(
-                        (sum, store) => sum + store.productCount,
+                        (sum, store) => sum + (store.productCount ?? 0),
                         0,
                       )}
                     </div>

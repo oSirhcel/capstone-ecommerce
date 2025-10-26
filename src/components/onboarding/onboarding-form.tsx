@@ -11,7 +11,14 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
-import { ChevronLeftIcon, PencilIcon, StoreIcon } from "lucide-react";
+import {
+  ChevronLeftIcon,
+  PencilIcon,
+  StoreIcon,
+  LinkIcon,
+  SparklesIcon,
+  Loader2Icon,
+} from "lucide-react";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -29,8 +36,18 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { useCreateStore } from "@/hooks/onboarding/use-store-mutations";
 import { useStoreNameAvailability } from "@/hooks/onboarding/use-store-availability";
+import { useSlugGeneration } from "@/hooks/onboarding/use-slug-generation";
+import { useSlugAvailability } from "@/hooks/onboarding/use-slug-availability";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+  InputGroupText,
+} from "../ui/input-group";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 
 const formSchema = z.object({
   name: z
@@ -39,6 +56,14 @@ const formSchema = z.object({
       message: "Store name must be at least 4 characters.",
     })
     .trim(),
+  slug: z
+    .string()
+    .min(3, { message: "Slug must be at least 3 characters." })
+    .max(50, { message: "Slug must be less than 50 characters." })
+    .regex(/^[a-z0-9-]+$/, {
+      message: "Slug must be lowercase with hyphens only.",
+    })
+    .trim(), // NEW
   description: z
     .string()
     .max(1000, {
@@ -65,6 +90,11 @@ const steps = [
     name: "Description",
     fields: ["description"],
   },
+  {
+    id: "Step 3",
+    name: "Store Slug",
+    fields: ["slug"],
+  }, // NEW
 ];
 
 export const OnboardingForm = () => {
@@ -72,18 +102,25 @@ export const OnboardingForm = () => {
   const router = useRouter();
   const [activeIndex, setActiveIndex] = useState(0);
 
-  const [query, setQuery] = useState("");
+  const [nameQuery, setNameQuery] = useState("");
+  const [slugQuery, setSlugQuery] = useState("");
 
   const { data: isHandleAvailable, isLoading: isHandleLoading } =
-    useStoreNameAvailability(query);
+    useStoreNameAvailability(nameQuery);
 
   const mutation = useCreateStore();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     mode: "onChange",
-    defaultValues: { name: "", description: "" },
+    defaultValues: { name: "", slug: "", description: "" },
   });
+
+  const [generatedSlugs, setGeneratedSlugs] = useState<string[]>([]);
+  const [isGeneratingSlugs, setIsGeneratingSlugs] = useState(false);
+  const slugMutation = useSlugGeneration();
+  const { data: isSlugAvailable, isLoading: isSlugLoading } =
+    useSlugAvailability(slugQuery);
 
   type FormField = keyof FormValues;
 
@@ -106,11 +143,25 @@ export const OnboardingForm = () => {
     setActiveIndex((step) => step - 1);
   };
 
+  const generateSlugs = async () => {
+    const storeName = form.getValues("name");
+    setIsGeneratingSlugs(true);
+    try {
+      const slugs = await slugMutation.mutateAsync(storeName);
+      setGeneratedSlugs(slugs);
+    } catch (error) {
+      console.error("Failed to generate slugs:", error);
+    } finally {
+      setIsGeneratingSlugs(false);
+    }
+  };
+
   const onSubmit = async (values: FormValues) => {
     mutation.mutate(
       {
         name: values.name,
         description: values.description ?? "",
+        slug: values.slug, // NEW
       },
       {
         onSuccess: (result) => {
@@ -130,7 +181,8 @@ export const OnboardingForm = () => {
     );
   };
 
-  const debounced = useDebounceCallback(setQuery, 300);
+  const debouncedName = useDebounceCallback(setNameQuery, 300);
+  const debouncedSlug = useDebounceCallback(setSlugQuery, 300);
 
   return (
     <Form {...form}>
@@ -188,7 +240,7 @@ export const OnboardingForm = () => {
                           {...field}
                           onChange={(e) => {
                             field.onChange(e);
-                            debounced(e.target.value);
+                            debouncedName(e.target.value);
                           }}
                           className={cn(
                             form.formState.errors.name && field.value.length > 0
@@ -203,7 +255,7 @@ export const OnboardingForm = () => {
                           <span className="text-rose-500">
                             Store name must be at least 4 characters.
                           </span>
-                        ) : query.length >= 4 ? (
+                        ) : nameQuery.length >= 4 ? (
                           isHandleLoading ? (
                             <span>Checking availability…</span>
                           ) : isHandleAvailable ? (
@@ -260,26 +312,125 @@ export const OnboardingForm = () => {
             </div>
           )}
 
+          {activeIndex === 3 && (
+            <div>
+              <CardHeader className="pt-0 text-center">
+                <div className="bg-primary/20 mx-auto mt-1.5 flex size-12 items-center justify-center self-center rounded-full">
+                  <LinkIcon className="text-primary size-8" />
+                </div>
+                <CardTitle className="mt-4">Choose your store URL</CardTitle>
+                <CardDescription className="mt-1.5">
+                  Your store will be accessible at: buyio.com/stores/[your-slug]
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <FormField
+                  control={form.control}
+                  name="slug"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <div className="space-y-3">
+                          <InputGroup>
+                            <InputGroupInput
+                              placeholder="my-store"
+                              className="!pl-1"
+                              {...field}
+                              onChange={(e) => {
+                                field.onChange(e);
+                                debouncedSlug(e.target.value);
+                              }}
+                            />
+                            <InputGroupAddon>
+                              <InputGroupText className="text-muted-foreground">
+                                https://buyio.com/stores/
+                              </InputGroupText>
+                            </InputGroupAddon>
+                            <InputGroupAddon align="inline-end">
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <InputGroupButton
+                                    size="icon-sm"
+                                    className="text-primary"
+                                    onClick={generateSlugs}
+                                    disabled={isGeneratingSlugs}
+                                    title="Generate AI suggestions"
+                                  >
+                                    {isGeneratingSlugs ? (
+                                      <Loader2Icon className="size-4 animate-spin" />
+                                    ) : (
+                                      <SparklesIcon className="size-4" />
+                                    )}
+                                  </InputGroupButton>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  Generate AI suggestions for your store URL.
+                                </TooltipContent>
+                              </Tooltip>
+                            </InputGroupAddon>
+                          </InputGroup>
+                          {generatedSlugs.length > 0 && (
+                            <div className="space-y-2">
+                              <p className="text-muted-foreground text-xs">
+                                Available suggestions:
+                              </p>
+                              <div className="flex flex-wrap gap-2">
+                                {generatedSlugs.map((slug) => (
+                                  <Button
+                                    key={slug}
+                                    type="button"
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={() => field.onChange(slug)}
+                                  >
+                                    {slug}
+                                  </Button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </FormControl>
+                      <FormDescription className="text-xs">
+                        {form.formState.errors.slug &&
+                        field.value.length > 0 ? (
+                          <span className="text-rose-500">
+                            {form.formState.errors.slug.message}
+                          </span>
+                        ) : slugQuery.length >= 3 ? (
+                          isSlugLoading ? (
+                            <span>Checking availability…</span>
+                          ) : isSlugAvailable ? (
+                            <span className="text-green-500">
+                              This slug is available!
+                            </span>
+                          ) : (
+                            <span className="text-rose-500">
+                              This slug is taken.
+                            </span>
+                          )
+                        ) : (
+                          <span>Choose a unique URL for your store.</span>
+                        )}
+                      </FormDescription>
+                    </FormItem>
+                  )}
+                />
+              </CardContent>
+            </div>
+          )}
+
           <div className="p-6 pt-2">
             <div className="mb-2 flex items-center justify-center space-x-2">
-              <div
-                className={cn(
-                  "bg-muted-foreground size-2 rounded-full transition-all",
-                  activeIndex === 0 && "bg-primary size-2.5",
-                )}
-              />
-              <div
-                className={cn(
-                  "bg-muted-foreground size-2 rounded-full transition-all",
-                  activeIndex === 1 && "bg-primary size-2.5",
-                )}
-              />
-              <div
-                className={cn(
-                  "bg-muted-foreground size-2 rounded-full transition-all",
-                  activeIndex === 2 && "bg-primary size-2.5",
-                )}
-              />
+              {[0, 1, 2, 3].map((index) => (
+                <div
+                  key={index}
+                  className={cn(
+                    "bg-muted-foreground size-2 rounded-full transition-all",
+                    activeIndex === index && "bg-primary size-2.5",
+                  )}
+                />
+              ))}
             </div>
             {activeIndex == 0 && (
               <>
@@ -295,6 +446,11 @@ export const OnboardingForm = () => {
               </Button>
             )}
             {activeIndex === 2 && (
+              <Button type="button" onClick={onNext} className="mt-4 w-full">
+                Next
+              </Button>
+            )}
+            {activeIndex === 3 && (
               <Button type="submit" className="mt-4 w-full">
                 Complete
               </Button>

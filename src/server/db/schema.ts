@@ -30,12 +30,20 @@ export const categories = pgTable("categories", {
 export const stores = pgTable("stores", {
   id: varchar("id", { length: 255 }).primaryKey().notNull(),
   name: varchar({ length: 255 }).unique().notNull(),
+  slug: varchar({ length: 255 }).unique().notNull(),
   description: varchar({ length: 1000 }),
   ownerId: varchar("ownerId", { length: 255 })
     .references(() => users.id)
     .notNull(),
   createdAt: timestamp().defaultNow().notNull(),
 });
+
+export const productStatusEnum = pgEnum("product_status", [
+  "Active",
+  "Inactive",
+  "Draft",
+  "Archived",
+]);
 
 export const products = pgTable("products", {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),
@@ -55,7 +63,7 @@ export const products = pgTable("products", {
   seoTitle: varchar({ length: 60 }),
   seoDescription: varchar({ length: 160 }),
   slug: varchar({ length: 255 }).unique(),
-  status: varchar({ length: 20 }).notNull().default("draft"), // 'active', 'draft', 'archived'
+  status: productStatusEnum().notNull().default("Draft"),
   featured: boolean().notNull().default(false),
   tags: text(), // JSON string of tags array
   storeId: varchar("storeId", { length: 255 })

@@ -55,6 +55,7 @@ export async function GET(request: NextRequest) {
         store: {
           id: stores.id,
           name: stores.name,
+          slug: stores.slug,
         },
         category: {
           id: categories.id,
@@ -322,6 +323,7 @@ export async function POST(request: NextRequest) {
         store: {
           id: stores.id,
           name: stores.name,
+          slug: stores.slug,
         },
         category: {
           id: categories.id,

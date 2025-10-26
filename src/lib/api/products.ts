@@ -31,6 +31,8 @@ export interface Product {
   store?: {
     id: string;
     name: string;
+    slug: string;
+    description?: string;
   };
   category?: {
     id: number;

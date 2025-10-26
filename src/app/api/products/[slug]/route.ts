@@ -51,6 +51,7 @@ export async function GET(
         store: {
           id: stores.id,
           name: stores.name,
+          slug: stores.slug,
           description: stores.description,
         },
         category: {
@@ -361,6 +362,7 @@ export async function PUT(
         store: {
           id: stores.id,
           name: stores.name,
+          slug: stores.slug,
         },
         category: {
           id: categories.id,

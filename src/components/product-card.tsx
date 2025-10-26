@@ -14,6 +14,7 @@ interface ProductCardProps {
   price: number;
   image: string;
   rating: number;
+  reviewCount?: number;
   store: string;
   category: string;
 }
@@ -25,6 +26,7 @@ export function ProductCard({
   price,
   image,
   rating,
+  reviewCount,
   store,
   category,
 }: ProductCardProps) {
@@ -53,7 +55,14 @@ export function ProductCard({
             <p className="text-muted-foreground text-sm">{store}</p>
             <div className="flex items-center gap-1">
               <StarIcon className="fill-primary text-primary h-3.5 w-3.5" />
-              <span className="text-sm font-medium">{rating}</span>
+              <span className="text-sm font-medium">
+                {rating > 0 ? rating.toFixed(1) : "No rating"}
+              </span>
+              {reviewCount !== undefined && reviewCount > 0 && (
+                <span className="text-muted-foreground text-xs">
+                  ({reviewCount})
+                </span>
+              )}
             </div>
           </div>
           <h3 className="line-clamp-1 font-medium">{name}</h3>

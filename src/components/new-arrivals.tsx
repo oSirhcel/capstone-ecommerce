@@ -48,7 +48,8 @@ export function NewArrivals({ limit = 6 }: NewArrivalsProps) {
             name={product.name}
             price={product.price / 100}
             image={getPrimaryImageUrl(product)}
-            rating={4.0}
+            rating={product.rating}
+            reviewCount={product.reviewCount}
             store={product.store?.name ?? "Unknown Store"}
             category={product.category?.name ?? "Uncategorized"}
           />

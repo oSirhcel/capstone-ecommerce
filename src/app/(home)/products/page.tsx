@@ -48,7 +48,8 @@ function transformProductToCardProps(product: Product) {
     name: product.name,
     price: product.price / 100, // Convert from cents to dollars
     image: getPrimaryImageUrl(product),
-    rating: 4.5, // TODO: Add rating calculation when reviews are implemented
+    rating: product.rating, // Use actual rating from reviews
+    reviewCount: product.reviewCount, // Include review count
     store: product.store?.name ?? "Unknown Store",
     category: product.category?.name ?? "Uncategorized",
   };

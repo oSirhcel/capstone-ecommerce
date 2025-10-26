@@ -27,7 +27,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 import {
   useProductReviews,
-  useCanReviewProduct,
   useSubmitReview,
   useUpdateReview,
   useDeleteReview,
@@ -53,8 +52,6 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
     isLoading,
     error,
   } = useProductReviews(productId, sortBy);
-  const { data: canReviewData, isLoading: canReviewLoading } =
-    useCanReviewProduct(productId);
   const submitReviewMutation = useSubmitReview();
   const updateReviewMutation = useUpdateReview();
   const deleteReviewMutation = useDeleteReview();
@@ -66,6 +63,11 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
     distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
   };
 
+  // Check if current user has already reviewed this product
+  const userReview = reviews.find(
+    (review) => review.userId === session?.user?.id,
+  );
+
   const handleSubmitReview = async () => {
     if (!session?.user) {
       const callbackUrl =
@@ -73,11 +75,6 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
           ? encodeURIComponent(window.location.href)
           : "/";
       router.push(`/auth/signin?callbackUrl=${callbackUrl}`);
-      return;
-    }
-
-    if (!canReviewData?.canReview) {
-      toast.error(canReviewData?.reason ?? "You cannot review this product");
       return;
     }
 
@@ -92,8 +89,15 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
       setRating(5);
       setComment("");
       setIsSubmittingReview(false);
-    } catch (error) {
-      toast.error("Failed to submit review");
+    } catch (error: any) {
+      // Check if it's a "already reviewed" error
+      if (error?.message?.includes("already reviewed")) {
+        toast.error(
+          "You have already reviewed this product. You can edit your existing review below.",
+        );
+      } else {
+        toast.error(error?.message || "Failed to submit review");
+      }
     }
   };
 
@@ -236,21 +240,15 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
             onOpenChange={setIsSubmittingReview}
           >
             <DialogTrigger asChild>
-              <Button
-                className="w-full"
-                disabled={canReviewLoading || !canReviewData?.canReview}
-              >
-                {canReviewLoading
-                  ? "Checking..."
-                  : !canReviewData?.canReview
-                    ? "Purchase Required to Review"
-                    : "Write a Review"}
+              <Button className="w-full" disabled={!!userReview}>
+                {userReview
+                  ? "You've Already Reviewed This Product"
+                  : "Write a Review"}
               </Button>
             </DialogTrigger>
-            {!canReviewLoading && !canReviewData?.canReview && (
+            {userReview && (
               <p className="text-muted-foreground mt-2 text-center text-sm">
-                {canReviewData?.reason ??
-                  "You must purchase this product to review it"}
+                You can edit or delete your review below
               </p>
             )}
             <DialogContent>

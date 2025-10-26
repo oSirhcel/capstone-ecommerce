@@ -76,8 +76,6 @@ export async function PUT(
           })
           .where(eq(orders.id, orderId));
 
-        console.log("Order status updated to Cancelled");
-
         // Get order items to restore inventory
         const orderItemsList = await tx
           .select({
@@ -87,12 +85,8 @@ export async function PUT(
           .from(orderItems)
           .where(eq(orderItems.orderId, orderId));
 
-        console.log("Found order items:", orderItemsList);
-
         // Restore inventory for each item in the order
         for (const item of orderItemsList) {
-          console.log(`Restoring inventory for product ${item.productId}, quantity: ${item.quantity}`);
-          
           // Get current stock for the product
           const [currentProduct] = await tx
             .select({ stock: products.stock })
@@ -102,7 +96,6 @@ export async function PUT(
 
           if (currentProduct) {
             const newStock = currentProduct.stock + item.quantity;
-            console.log(`Updating product ${item.productId} stock from ${currentProduct.stock} to ${newStock}`);
             
             // Restore stock for the product
             await tx
@@ -112,8 +105,6 @@ export async function PUT(
                 updatedAt: new Date(),
               })
               .where(eq(products.id, item.productId));
-          } else {
-            console.warn(`Product ${item.productId} not found, skipping inventory restoration`);
           }
         }
       } catch (txError) {
@@ -129,7 +120,6 @@ export async function PUT(
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      console.error("Validation error in cancel order:", error.errors);
       return NextResponse.json(
         { error: "Validation error", details: error.errors },
         { status: 400 }
@@ -137,8 +127,6 @@ export async function PUT(
     }
 
     console.error("Error cancelling order:", error);
-    console.error("Order ID:", orderId);
-    console.error("User ID:", userId);
     
     return NextResponse.json(
       { 

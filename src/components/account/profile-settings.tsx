@@ -13,7 +13,6 @@ import { User, Mail, Calendar } from "lucide-react";
 
 const ProfileSchema = z.object({
   username: z.string().min(3, "Username must be at least 3 characters"),
-  email: z.string().email("Please enter a valid email address"),
 });
 
 type ProfileFormData = z.infer<typeof ProfileSchema>;
@@ -28,7 +27,7 @@ interface ProfileData {
 
 interface ProfileSettingsProps {
   profile: ProfileData;
-  onUpdate: (data: ProfileFormData) => Promise<void>;
+  onUpdate: (data: { username: string }) => Promise<void>;
 }
 
 export default function ProfileSettings({
@@ -45,16 +44,16 @@ export default function ProfileSettings({
     resolver: zodResolver(ProfileSchema),
     defaultValues: {
       username: profile.username,
-      email: profile.email || "",
     },
   });
 
   const onSubmit = async (data: ProfileFormData) => {
     setIsLoading(true);
     try {
-      await onUpdate(data);
+      // Only send username since email is disabled and shouldn't be updated
+      await onUpdate({ username: data.username });
       toast.success("Profile updated successfully");
-    } catch (error) {
+    } catch {
       toast.error("Failed to update profile. Please try again.");
     } finally {
       setIsLoading(false);
@@ -93,17 +92,12 @@ export default function ProfileSettings({
                 <Input
                   id="email"
                   type="email"
-                  {...register("email")}
+                  value={profile.email ?? ""}
                   placeholder="Enter your email"
                   className="pl-10"
                   disabled
                 />
               </div>
-              {errors.email && (
-                <p className="text-destructive text-sm">
-                  {errors.email.message}
-                </p>
-              )}
               <p className="text-muted-foreground text-xs">
                 Email cannot be changed. Contact support if you need to update
                 your email.

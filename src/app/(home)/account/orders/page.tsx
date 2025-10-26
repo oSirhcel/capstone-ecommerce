@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, Eye, Package, Filter } from "lucide-react";
+import { Search, Eye, Package } from "lucide-react";
 import Image from "next/image";
 import { useQuery } from "@tanstack/react-query";
 import { fetchOrders, type OrderDTO } from "@/lib/api/orders";
@@ -77,7 +77,6 @@ const getStatusBadge = (status: string) => {
 export default function OrdersPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [showFilters, setShowFilters] = useState(false);
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["orders", { page: 1, limit: 20 }],

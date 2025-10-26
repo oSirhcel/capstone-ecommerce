@@ -94,8 +94,6 @@ export function ProductInfo({ product }: ProductInfoProps) {
   const [selectedOptions, setSelectedOptions] =
     useQueryStates(optionsQueryConfig);
 
-  console.log(selectedOptions);
-
   const increaseQuantity = () => {
     if (quantity < product.stock) {
       setQuantity(quantity + 1);

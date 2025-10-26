@@ -3,13 +3,12 @@
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import ProfileSettings from "@/components/account/profile-settings";
 import PasswordSettings from "@/components/account/password-settings";
 import AccountPreferences from "@/components/account/account-preferences";
-import { Settings, User, Lock, Bell } from "lucide-react";
 
 interface ProfileData {
   id: string;
@@ -20,7 +19,7 @@ interface ProfileData {
 }
 
 export default function AccountSettingsPage() {
-  const { data: session, status } = useSession();
+  const { status } = useSession();
   const router = useRouter();
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -32,7 +31,7 @@ export default function AccountSettingsPage() {
     }
 
     if (status === "authenticated") {
-      fetchProfile();
+      void fetchProfile();
     }
   }, [status, router]);
 
@@ -40,7 +39,7 @@ export default function AccountSettingsPage() {
     try {
       const response = await fetch("/api/profile");
       if (response.ok) {
-        const data = await response.json();
+        const data = (await response.json()) as { user: ProfileData };
         setProfile(data.user);
       } else {
         throw new Error("Failed to fetch profile");
@@ -53,10 +52,7 @@ export default function AccountSettingsPage() {
     }
   };
 
-  const handleProfileUpdate = async (data: {
-    username: string;
-    email: string;
-  }) => {
+  const handleProfileUpdate = async (data: { username: string }) => {
     const response = await fetch("/api/profile", {
       method: "PUT",
       headers: {
@@ -66,8 +62,8 @@ export default function AccountSettingsPage() {
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || "Failed to update profile");
+      const error = (await response.json()) as { error?: string };
+      throw new Error(error.error ?? "Failed to update profile");
     }
 
     // Refresh profile data
@@ -88,8 +84,8 @@ export default function AccountSettingsPage() {
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || "Failed to update password");
+      const error = (await response.json()) as { error?: string };
+      throw new Error(error.error ?? "Failed to update password");
     }
   };
 
@@ -107,8 +103,8 @@ export default function AccountSettingsPage() {
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to delete account");
+        const error = (await response.json()) as { error?: string };
+        throw new Error(error.error ?? "Failed to delete account");
       }
 
       // Sign out the user and redirect to home

@@ -9,7 +9,7 @@ import { generateSlug } from "@/lib/utils/slug";
 
 interface ProductCardProps {
   id: number;
-  slug?: string;
+  slug: string | null;
   name: string;
   price: number;
   image: string;

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
 import { stores, products } from "@/server/db/schema";
 import { eq, desc, asc, count, ilike } from "drizzle-orm";
@@ -16,14 +16,14 @@ interface SessionUser {
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "20");
+    const page = parseInt(searchParams.get("page") ?? "1");
+    const limit = parseInt(searchParams.get("limit") ?? "20");
     const search = searchParams.get("search");
 
     const offset = (page - 1) * limit;
 
     // Build the base query with conditional WHERE
-    const whereCondition = search && search.trim() 
+    const whereCondition = search?.trim()
       ? ilike(stores.name, `%${search.trim()}%`)
       : undefined;
 
@@ -32,6 +32,7 @@ export async function GET(request: NextRequest) {
       .select({
         id: stores.id,
         name: stores.name,
+        slug: stores.slug, // NEW
         description: stores.description,
         ownerId: stores.ownerId,
         createdAt: stores.createdAt,
@@ -61,13 +62,11 @@ export async function GET(request: NextRequest) {
           ...store,
           productCount: productCountResult?.count || 0,
         };
-      })
+      }),
     );
 
     // Get total count for pagination (with search filter if applied)
-    const baseTotalQuery = db
-      .select({ count: count() })
-      .from(stores);
+    const baseTotalQuery = db.select({ count: count() }).from(stores);
 
     const [totalResult] = whereCondition
       ? await baseTotalQuery.where(whereCondition)
@@ -87,7 +86,7 @@ export async function GET(request: NextRequest) {
     console.error("Error fetching stores:", error);
     return NextResponse.json(
       { error: "Failed to fetch stores" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -102,14 +101,32 @@ export async function POST(request: NextRequest) {
     }
 
     const userId = (session?.user as SessionUser)?.id;
-    const body = await request.json();
-    
-    const { name, description } = body;
+    const body = (await request.json()) as {
+      name: string;
+      description: string;
+      slug: string;
+    };
 
-    if (!name || typeof name !== 'string' || name.trim().length === 0) {
+    const { name, description, slug } = body ?? {};
+
+    if (!name || typeof name !== "string" || name.trim().length === 0) {
       return NextResponse.json(
         { error: "Store name is required" },
-        { status: 400 }
+        { status: 400 },
+      );
+    }
+
+    if (!slug || typeof slug !== "string" || slug.trim().length === 0) {
+      return NextResponse.json(
+        { error: "Store slug is required" },
+        { status: 400 },
+      );
+    }
+
+    if (!/^[a-z0-9-]{3,50}$/.test(slug)) {
+      return NextResponse.json(
+        { error: "Invalid slug format" },
+        { status: 400 },
       );
     }
 
@@ -123,7 +140,7 @@ export async function POST(request: NextRequest) {
     if (existingStore.length > 0) {
       return NextResponse.json(
         { error: "You already have a store" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -133,6 +150,7 @@ export async function POST(request: NextRequest) {
       .values({
         id: crypto.randomUUID(),
         name: name.trim(),
+        slug: slug.trim(),
         description: description?.trim() || null,
         ownerId: userId!,
       })
@@ -143,7 +161,7 @@ export async function POST(request: NextRequest) {
     console.error("Error creating store:", error);
     return NextResponse.json(
       { error: "Failed to create store" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

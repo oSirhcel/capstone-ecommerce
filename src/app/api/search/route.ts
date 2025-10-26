@@ -35,13 +35,13 @@ export async function GET(request: NextRequest) {
         id: number;
         name: string;
         description: string | null;
-        price: number;
+        price: number | null;
         stock: number;
         storeId: string;
         categoryId: number | null;
         createdAt: Date;
         updatedAt: Date;
-        store: { id: string; name: string } | null;
+        store: { id: string; name: string; slug: string } | null;
         category: { id: number; name: string } | null;
         images: Array<{
           id: number;
@@ -85,6 +85,7 @@ export async function GET(request: NextRequest) {
           store: {
             id: stores.id,
             name: stores.name,
+            slug: stores.slug,
           },
           category: {
             id: categories.id,
@@ -97,8 +98,8 @@ export async function GET(request: NextRequest) {
         .where(
           or(
             ilike(products.name, searchTerm),
-            ilike(products.description, searchTerm)
-          )
+            ilike(products.description, searchTerm),
+          ),
         )
         .orderBy(desc(products.createdAt))
         .limit(type === "products" ? limit : 10)
@@ -132,15 +133,20 @@ export async function GET(request: NextRequest) {
             ...product,
             rating: reviewStats?.averageRating ?? 0,
             reviewCount: reviewStats?.reviewCount ?? 0,
-            images: images.length > 0 ? images : [{
-              id: 0,
-              imageUrl: "/placeholder.svg",
-              altText: "Product image",
-              isPrimary: true,
-              displayOrder: 0
-            }],
+            images:
+              images.length > 0
+                ? images
+                : [
+                    {
+                      id: 0,
+                      imageUrl: "/placeholder.svg",
+                      altText: "Product image",
+                      isPrimary: true,
+                      displayOrder: 0,
+                    },
+                  ],
           };
-        })
+        }),
       );
 
       results.products = productsWithImages;
@@ -152,6 +158,7 @@ export async function GET(request: NextRequest) {
         .select({
           id: stores.id,
           name: stores.name,
+          slug: stores.slug,
           description: stores.description,
           ownerId: stores.ownerId,
           createdAt: stores.createdAt,
@@ -160,8 +167,8 @@ export async function GET(request: NextRequest) {
         .where(
           or(
             ilike(stores.name, searchTerm),
-            ilike(stores.description, searchTerm)
-          )
+            ilike(stores.description, searchTerm),
+          ),
         )
         .orderBy(asc(stores.name))
         .limit(type === "stores" ? limit : 10)
@@ -182,8 +189,8 @@ export async function GET(request: NextRequest) {
         .where(
           or(
             ilike(categories.name, searchTerm),
-            ilike(categories.description, searchTerm)
-          )
+            ilike(categories.description, searchTerm),
+          ),
         )
         .orderBy(asc(categories.name))
         .limit(type === "categories" ? limit : 10)
@@ -192,7 +199,10 @@ export async function GET(request: NextRequest) {
       results.categories = categoriesData;
     }
 
-    const totalResults = results.products.length + results.stores.length + results.categories.length;
+    const totalResults =
+      results.products.length +
+      results.stores.length +
+      results.categories.length;
 
     return NextResponse.json({
       ...results,
@@ -208,7 +218,7 @@ export async function GET(request: NextRequest) {
     console.error("Error performing search:", error);
     return NextResponse.json(
       { error: "Failed to perform search" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

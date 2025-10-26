@@ -77,10 +77,7 @@ export async function PATCH(
       .select()
       .from(addresses)
       .where(
-        and(
-          eq(addresses.id, parseInt(addressId)),
-          eq(addresses.userId, id),
-        ),
+        and(eq(addresses.id, parseInt(addressId)), eq(addresses.userId, id)),
       );
 
     if (!existingAddress) {
@@ -93,9 +90,7 @@ export async function PATCH(
       await db
         .update(addresses)
         .set({ isDefault: false })
-        .where(
-          and(eq(addresses.userId, id), eq(addresses.type, addressType)),
-        );
+        .where(and(eq(addresses.userId, id), eq(addresses.type, addressType)));
     }
 
     // Update address

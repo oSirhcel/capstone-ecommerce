@@ -35,7 +35,7 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { reason } = CancelOrderSchema.parse(body);
+    //const { reason } = CancelOrderSchema.parse(body);
 
     // Check if order exists and belongs to the user
     const [order] = await db

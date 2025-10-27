@@ -45,8 +45,9 @@ export function NewArrivals({ limit = 6 }: NewArrivalsProps) {
           <ProductCard
             key={product.id}
             id={product.id}
+            slug={product.slug}
             name={product.name}
-            price={product.price / 100}
+            price={(product.price ?? 0) / 100}
             image={getPrimaryImageUrl(product)}
             rating={product.rating}
             reviewCount={product.reviewCount}

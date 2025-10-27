@@ -32,6 +32,7 @@ export async function POST(request: NextRequest) {
       city: z.string().min(1).optional(),
       state: z.string().min(1).optional(),
       postcode: z.string().optional(),
+      zip: z.string().optional(),
       country: z.string().min(1).optional(),
     });
 
@@ -86,6 +87,7 @@ export async function POST(request: NextRequest) {
       city?: string;
       state?: string;
       postcode?: string;
+      zip?: string;
       country?: string;
     }) => ({
       firstName: addr.firstName ?? "",
@@ -94,7 +96,7 @@ export async function POST(request: NextRequest) {
       addressLine2: addr.addressLine2 ?? null,
       city: addr.city ?? "",
       state: addr.state ?? "",
-      postcode: addr.postcode ?? "",
+      postcode: (addr.postcode ?? addr.zip ?? "").toString(),
       country: addr.country ?? "AU",
     });
 

@@ -22,31 +22,31 @@ import { toast } from "sonner";
 
 const getStatusBadge = (status: string) => {
   switch (status) {
-    case "delivered":
+    case "Completed":
       return (
         <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
           Delivered
         </Badge>
       );
-    case "processing":
+    case "Processing":
       return (
         <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
           Processing
         </Badge>
       );
-    case "shipped":
+    case "Shipped":
       return (
         <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-100">
           Shipped
         </Badge>
       );
-    case "pending":
+    case "Pending":
       return (
         <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">
           Pending
         </Badge>
       );
-    case "cancelled":
+    case "Cancelled":
       return <Badge variant="destructive">Cancelled</Badge>;
     default:
       return <Badge variant="secondary">{status}</Badge>;

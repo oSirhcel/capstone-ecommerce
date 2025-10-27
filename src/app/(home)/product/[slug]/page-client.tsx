@@ -9,6 +9,7 @@ import { ProductInfo } from "@/components/product/product-info";
 import { ProductTabs } from "@/components/product/product-tabs";
 import { RelatedProducts } from "@/components/product/related-products";
 import { StoreInfo } from "@/components/product/store-info";
+import { categoryNameToSlug } from "@/lib/utils/category-slug";
 
 interface ProductPageClientProps {
   productSlug: string;
@@ -109,13 +110,19 @@ export function ProductPageClient({ productSlug }: ProductPageClientProps) {
 
   const transformedProduct = transform(data);
 
+  const categorySlug = categoryNameToSlug(transformedProduct.category);
+  const categoryHref = `/categories/${categorySlug}`;
+
   return (
     <div className="bg-background min-h-screen">
       <div className="container mx-auto px-4 py-8 md:px-6">
         <Breadcrumb
           items={[
             { label: "Home", href: "/" },
-            { label: transformedProduct.category, href: `#` },
+            {
+              label: transformedProduct.category,
+              href: categoryHref,
+            },
             { label: transformedProduct.name, href: `#`, current: true },
           ]}
         />

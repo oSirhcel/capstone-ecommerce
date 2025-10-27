@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
       addressLine2: addr.addressLine2 ?? null,
       city: addr.city ?? "",
       state: addr.state ?? "",
-      postcode: addr.postcode ?? addr.postcode ?? "",
+      postcode: addr.postcode ?? "",
       country: addr.country ?? "AU",
     });
 

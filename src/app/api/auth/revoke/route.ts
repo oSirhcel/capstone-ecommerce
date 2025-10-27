@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { revokeToken } from "@/lib/auth";
+import { getToken } from "next-auth/jwt";
 
 /**
  * POST /api/auth/revoke
  * Revoke the current user's session token
  */
-export async function POST() {
+export async function POST(req: Request) {
   try {
     const session = await auth();
     
@@ -17,10 +18,18 @@ export async function POST() {
       );
     }
 
-    // In a real implementation, you would get the JTI from the session token
-    // For demo purposes, we'll revoke a test token
-    const testJti = "test-revocation";
-    revokeToken(testJti);
+    // Get the JWT token to extract the jti
+    const token = await getToken({ req });
+    
+    if (!token?.jti || typeof token.jti !== "string") {
+      return NextResponse.json(
+        { error: "Session token missing or invalid" },
+        { status: 400 }
+      );
+    }
+
+    // Revoke the actual session token
+    revokeToken(token.jti);
 
     return NextResponse.json({
       success: true,

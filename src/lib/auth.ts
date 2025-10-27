@@ -6,6 +6,28 @@ import { users, stores } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 
+// In-memory revoked session tokens (resets on server restart)
+// For production, consider using Redis or database table
+const revokedTokens = new Set<string>();
+
+// Helper function to revoke a token (call this on logout)
+export function revokeToken(jti: string) {
+  revokedTokens.add(jti);
+}
+
+// Helper function to check if a token is revoked
+export function isTokenRevoked(jti: string): boolean {
+  return revokedTokens.has(jti);
+}
+
+// Custom error class for revoked tokens
+export class SessionRevokedError extends Error {
+  constructor(message = "Your session has been terminated for security reasons") {
+    super(message);
+    this.name = "SessionRevokedError";
+  }
+}
+
 export const { auth, handlers, signIn, signOut } = NextAuth({
   providers: [
     Credentials({
@@ -55,8 +77,17 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
   ],
   callbacks: {
     async jwt({ token, trigger, user, session }) {
+      // Check if token is revoked on every request
+      if (token.jti && typeof token.jti === "string") {
+        if (revokedTokens.has(token.jti)) {
+          // Token is revoked, throw a more descriptive error
+          throw new SessionRevokedError("Session token has been revoked");
+        }
+      }
       if (user) {
         token.sub = user.id;
+        // Generate unique JWT ID (jti) to prevent session token reuse
+        token.jti = `${user.id}-${Date.now()}-${crypto.randomUUID()}`;
 
         // Check if user has an existing store on first login
         if (!token.storeId) {
@@ -113,6 +144,7 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
   },
   pages: {
     signIn: "/auth/signin",
+    error: "/auth/error",
   },
   session: {
     strategy: "jwt",

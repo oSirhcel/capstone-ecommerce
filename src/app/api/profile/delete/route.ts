@@ -19,7 +19,7 @@ import {
   riskAssessmentOrderLinks,
   riskAssessmentStoreLinks
 } from "@/server/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
 interface SessionUser {
@@ -77,11 +77,11 @@ export async function DELETE(request: NextRequest) {
     // Start a transaction to delete all related data
     await db.transaction(async (tx) => {
       // Delete risk assessment related data first (due to foreign key constraints)
-      await tx.delete(riskAssessmentStoreLinks).where(eq(riskAssessmentStoreLinks.riskAssessmentId, 
+      await tx.delete(riskAssessmentStoreLinks).where(inArray(riskAssessmentStoreLinks.riskAssessmentId, 
         db.select({ id: zeroTrustAssessments.id }).from(zeroTrustAssessments).where(eq(zeroTrustAssessments.userId, userId))
       ));
       
-      await tx.delete(riskAssessmentOrderLinks).where(eq(riskAssessmentOrderLinks.riskAssessmentId,
+      await tx.delete(riskAssessmentOrderLinks).where(inArray(riskAssessmentOrderLinks.riskAssessmentId,
         db.select({ id: zeroTrustAssessments.id }).from(zeroTrustAssessments).where(eq(zeroTrustAssessments.userId, userId))
       ));
 
@@ -98,13 +98,13 @@ export async function DELETE(request: NextRequest) {
       await tx.delete(addresses).where(eq(addresses.userId, userId));
 
       // Delete cart items first, then cart
-      await tx.delete(cartItems).where(eq(cartItems.cartId, 
+      await tx.delete(cartItems).where(inArray(cartItems.cartId, 
         db.select({ id: carts.id }).from(carts).where(eq(carts.userId, userId))
       ));
       await tx.delete(carts).where(eq(carts.userId, userId));
 
       // Delete order items first, then orders
-      await tx.delete(orderItems).where(eq(orderItems.orderId,
+      await tx.delete(orderItems).where(inArray(orderItems.orderId,
         db.select({ id: orders.id }).from(orders).where(eq(orders.userId, userId))
       ));
       await tx.delete(orders).where(eq(orders.userId, userId));

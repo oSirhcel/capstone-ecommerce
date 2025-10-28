@@ -1,8 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/server/db";
-import { reviews, userProfiles, orders, orderItems } from "@/server/db/schema";
-import { eq, and, sql, desc, asc, count } from "drizzle-orm";
+import { reviews, userProfiles, users, orders, orderItems } from "@/server/db/schema";
+import { eq, and, sql, desc, asc, count, inArray, or } from "drizzle-orm";
 import { z } from "zod";
 
 type SessionUser = {
@@ -61,10 +61,13 @@ export async function GET(request: NextRequest) {
         comment: reviews.comment,
         verifiedPurchase: reviews.verifiedPurchase,
         createdAt: reviews.createdAt,
-        userName: userProfiles.firstName,
+        username: users.username,
+        firstName: userProfiles.firstName,
+        lastName: userProfiles.lastName,
         userEmail: userProfiles.email,
       })
       .from(reviews)
+      .leftJoin(users, eq(reviews.userId, users.id))
       .leftJoin(userProfiles, eq(reviews.userId, userProfiles.userId))
       .where(eq(reviews.productId, productIdNum))
       .orderBy(orderBy);
@@ -108,19 +111,31 @@ export async function GET(request: NextRequest) {
     };
 
     // Format reviews data
-    const formattedReviews = reviewsData.map((review) => ({
-      id: review.id,
-      userId: review.userId,
-      productId: review.productId,
-      rating: review.rating,
-      comment: review.comment,
-      verifiedPurchase: review.verifiedPurchase,
-      createdAt: review.createdAt,
-      user: {
-        name: review.userName ?? "Anonymous",
-        email: review.userEmail ?? "",
-      },
-    }));
+    const formattedReviews = reviewsData.map((review) => {
+      // Create display name: prefer full name from profile, fallback to username
+      let displayName = "Anonymous";
+      if (review.firstName && review.lastName) {
+        displayName = `${review.firstName} ${review.lastName}`;
+      } else if (review.firstName) {
+        displayName = review.firstName;
+      } else if (review.username) {
+        displayName = review.username;
+      }
+
+      return {
+        id: review.id,
+        userId: review.userId,
+        productId: review.productId,
+        rating: review.rating,
+        comment: review.comment,
+        verifiedPurchase: review.verifiedPurchase,
+        createdAt: review.createdAt,
+        user: {
+          name: displayName,
+          email: review.userEmail ?? "",
+        },
+      };
+    });
 
     return NextResponse.json({
       reviews: formattedReviews,
@@ -182,28 +197,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if user has purchased this product (REQUIRED for review)
-    const hasPurchased = await db
-      .select({ id: orders.id })
-      .from(orders)
-      .innerJoin(orderItems, eq(orders.id, orderItems.orderId))
-      .where(
-        and(
-          eq(orders.userId, user.id),
-          eq(orderItems.productId, productId),
-          eq(orders.status, "Completed"),
-        ),
-      )
-      .limit(1);
-
-    if (hasPurchased.length === 0) {
-      return NextResponse.json(
-        { error: "You must purchase this product before you can review it" },
-        { status: 403 },
-      );
-    }
-
-    // Create review (verifiedPurchase is always true since we checked above)
+    // Allow all logged-in users to submit reviews (no purchase requirement)
+    // Create review
     const [newReview] = await db
       .insert(reviews)
       .values({
@@ -211,7 +206,7 @@ export async function POST(request: NextRequest) {
         productId,
         rating,
         comment: comment ?? null,
-        verifiedPurchase: true, // Always true since only purchasers can review
+        verifiedPurchase: false, // Set to false since no purchase verification
       })
       .returning();
 

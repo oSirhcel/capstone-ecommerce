@@ -22,5 +22,6 @@ declare module "next-auth" {
 declare module "next-auth/jwt" {
   interface JWT {
     storeId?: string;
+    jti?: string; // JWT ID - unique identifier for this token to prevent reuse
   }
 }

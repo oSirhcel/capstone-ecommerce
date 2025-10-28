@@ -9,6 +9,7 @@ import { ProductInfo } from "@/components/product/product-info";
 import { ProductTabs } from "@/components/product/product-tabs";
 import { RelatedProducts } from "@/components/product/related-products";
 import { StoreInfo } from "@/components/product/store-info";
+import { categoryNameToSlug } from "@/lib/utils/category-slug";
 
 interface ProductPageClientProps {
   productSlug: string;
@@ -18,10 +19,12 @@ function transform(product: Product) {
   return {
     id: product.id.toString(),
     name: product.name,
-    price: product.price / 100,
-    discountPrice: product.price / 100,
-    rating: 4.0,
-    reviewCount: 0,
+    price: product.price ? product.price / 100 : 0,
+    discountPrice: product.compareAtPrice
+      ? product.compareAtPrice / 100
+      : undefined,
+    rating: product.rating,
+    reviewCount: product.reviewCount,
     stock: product.stock,
     sku: `${product.id.toString().padStart(6, "0")}`,
     description: product.description ?? "No description available",
@@ -53,6 +56,7 @@ function transform(product: Product) {
     store: {
       id: product.store?.id ?? "unknown",
       name: product.store?.name ?? "Unknown Store",
+      slug: product.store?.slug ?? "unknown-store",
       logo: "/placeholder.svg",
       rating: 4.0,
       productCount: 0,
@@ -106,13 +110,19 @@ export function ProductPageClient({ productSlug }: ProductPageClientProps) {
 
   const transformedProduct = transform(data);
 
+  const categorySlug = categoryNameToSlug(transformedProduct.category);
+  const categoryHref = `/categories/${categorySlug}`;
+
   return (
     <div className="bg-background min-h-screen">
       <div className="container mx-auto px-4 py-8 md:px-6">
         <Breadcrumb
           items={[
             { label: "Home", href: "/" },
-            { label: transformedProduct.category, href: `#` },
+            {
+              label: transformedProduct.category,
+              href: categoryHref,
+            },
             { label: transformedProduct.name, href: `#`, current: true },
           ]}
         />

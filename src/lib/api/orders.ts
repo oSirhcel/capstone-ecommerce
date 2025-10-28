@@ -16,6 +16,47 @@ export type OrderDTO = {
   createdAt: string;
   updatedAt: string;
   items: OrderItemDTO[];
+  shipping?: {
+    trackingNumber?: string;
+    shippedAt?: string;
+    deliveredAt?: string;
+    method?: string;
+    description?: string;
+    address?: {
+      firstName?: string;
+      lastName?: string;
+      addressLine1?: string;
+      addressLine2?: string;
+      city?: string;
+      state?: string;
+      postcode?: string;
+      country?: string;
+    };
+  } | null;
+  payment?: {
+    amount: number;
+    currency: string;
+    status: string;
+    transactionId?: string;
+    createdAt: string;
+    paymentMethod?: {
+      type: string;
+      provider: string;
+      lastFourDigits?: string;
+      expiryMonth?: number;
+      expiryYear?: number;
+    } | null;
+    billingAddress?: {
+      firstName?: string;
+      lastName?: string;
+      addressLine1?: string;
+      addressLine2?: string;
+      city?: string;
+      state?: string;
+      postcode?: string;
+      country?: string;
+    } | null;
+  } | null;
 };
 
 export type AddressData = {
@@ -81,6 +122,22 @@ export async function fetchOrderById(id: number): Promise<{ order: OrderDTO }> {
   const res = await fetch(url.toString(), { credentials: "include" });
   if (!res.ok) throw new Error(`Failed to fetch order ${id}: ${res.status}`);
   return (await res.json()) as { order: OrderDTO };
+}
+
+export type OrderStats = {
+  totalOrders: number;
+  completedOrders: number;
+  inTransitOrders: number;
+  pendingOrders: number;
+  cancelledOrders: number;
+};
+
+export async function fetchOrderStats(): Promise<OrderStats> {
+  const base = getBaseUrl();
+  const url = new URL("/api/orders/stats", base);
+  const res = await fetch(url.toString(), { credentials: "include" });
+  if (!res.ok) throw new Error(`Failed to fetch order stats: ${res.status}`);
+  return (await res.json()) as OrderStats;
 }
 
 export async function createOrders(

@@ -2,7 +2,7 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/server/db";
-import { orders, orderItems, addresses, products } from "@/server/db/schema";
+import { orders, orderItems, addresses, products, orderShipping, paymentTransactions, shippingMethods, paymentMethods, orderAddresses } from "@/server/db/schema";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
@@ -32,6 +32,7 @@ export async function POST(request: NextRequest) {
       city: z.string().min(1).optional(),
       state: z.string().min(1).optional(),
       postcode: z.string().optional(),
+      zip: z.string().optional(),
       country: z.string().min(1).optional(),
     });
 
@@ -57,8 +58,6 @@ export async function POST(request: NextRequest) {
 
     const parsed = CreateOrderSchema.safeParse(await request.json());
 
-    console.log("parsed", parsed);
-
     if (!parsed.success) {
       return NextResponse.json(
         { error: "Validation error", details: z.treeifyError(parsed.error) },
@@ -66,8 +65,6 @@ export async function POST(request: NextRequest) {
       );
     }
     const body = parsed.data;
-
-    console.log(body);
 
     const {
       items,
@@ -90,6 +87,7 @@ export async function POST(request: NextRequest) {
       city?: string;
       state?: string;
       postcode?: string;
+      zip?: string;
       country?: string;
     }) => ({
       firstName: addr.firstName ?? "",
@@ -98,7 +96,7 @@ export async function POST(request: NextRequest) {
       addressLine2: addr.addressLine2 ?? null,
       city: addr.city ?? "",
       state: addr.state ?? "",
-      postcode: addr.postcode ?? addr.postcode ?? "",
+      postcode: (addr.postcode ?? addr.zip ?? "").toString(),
       country: addr.country ?? "AU",
     });
 
@@ -209,10 +207,6 @@ export async function POST(request: NextRequest) {
             eq(orders.userId, user.id),
             eq(orders.totalAmount, totalAmount),
             // created recently to avoid matching old historical orders
-            // @ts-expect-error drizzle timestamp compare helper used below
-            // drizzle-orm supports Date in comparisons
-            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-            // the gte helper is not imported here; keep simple by filtering after fetch if needed
             // We will perform item-level matching regardless
             // Note: We intentionally do not early-return here if none found
           )
@@ -221,7 +215,7 @@ export async function POST(request: NextRequest) {
         .limit(30);
 
       for (const candidate of recentOrders) {
-        if (candidate.status !== 'pending') continue;
+        if (candidate.status !== 'Pending') continue;
         if (candidate.createdAt < twoHoursAgo) continue;
 
         const existingItems = await db
@@ -289,6 +283,53 @@ export async function POST(request: NextRequest) {
 
     await db.insert(orderItems).values(orderItemsData);
 
+    // Create address snapshots for the order
+    // Get the full address details for shipping address
+    const [shippingAddressDetails] = await db
+      .select()
+      .from(addresses)
+      .where(eq(addresses.id, shippingAddressId))
+      .limit(1);
+
+    if (shippingAddressDetails) {
+      await db.insert(orderAddresses).values({
+        orderId: order.id,
+        type: "shipping",
+        firstName: shippingAddressDetails.firstName,
+        lastName: shippingAddressDetails.lastName,
+        addressLine1: shippingAddressDetails.addressLine1,
+        addressLine2: shippingAddressDetails.addressLine2,
+        city: shippingAddressDetails.city,
+        state: shippingAddressDetails.state,
+        postcode: shippingAddressDetails.postcode,
+        country: shippingAddressDetails.country,
+      });
+    }
+
+    // Create billing address snapshot if billing address exists
+    if (billingAddressId) {
+      const [billingAddressDetails] = await db
+        .select()
+        .from(addresses)
+        .where(eq(addresses.id, billingAddressId))
+        .limit(1);
+
+      if (billingAddressDetails) {
+        await db.insert(orderAddresses).values({
+          orderId: order.id,
+          type: "billing",
+          firstName: billingAddressDetails.firstName,
+          lastName: billingAddressDetails.lastName,
+          addressLine1: billingAddressDetails.addressLine1,
+          addressLine2: billingAddressDetails.addressLine2,
+          city: billingAddressDetails.city,
+          state: billingAddressDetails.state,
+          postcode: billingAddressDetails.postcode,
+          country: billingAddressDetails.country,
+        });
+      }
+    }
+
     return NextResponse.json({
       success: true,
       orderId: order.id,
@@ -348,6 +389,7 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: "Not found" }, { status: 404 });
       }
 
+      // Get order items
       const items = await db
         .select({
           id: orderItems.id,
@@ -360,6 +402,74 @@ export async function GET(request: NextRequest) {
         .from(orderItems)
         .leftJoin(products, eq(products.id, orderItems.productId))
         .where(eq(orderItems.orderId, id));
+
+      // Get shipping information
+      const [shippingInfo] = await db
+        .select({
+          id: orderShipping.id,
+          trackingNumber: orderShipping.trackingNumber,
+          shippedAt: orderShipping.shippedAt,
+          deliveredAt: orderShipping.deliveredAt,
+          methodName: shippingMethods.name,
+          methodDescription: shippingMethods.description,
+        })
+        .from(orderShipping)
+        .leftJoin(shippingMethods, eq(shippingMethods.id, orderShipping.shippingMethodId))
+        .where(eq(orderShipping.orderId, id));
+
+      // Get shipping address from orderAddresses table
+      const [shippingAddress] = await db
+        .select({
+          firstName: orderAddresses.firstName,
+          lastName: orderAddresses.lastName,
+          addressLine1: orderAddresses.addressLine1,
+          addressLine2: orderAddresses.addressLine2,
+          city: orderAddresses.city,
+          state: orderAddresses.state,
+          postcode: orderAddresses.postcode,
+          country: orderAddresses.country,
+        })
+        .from(orderAddresses)
+        .where(and(eq(orderAddresses.orderId, id), eq(orderAddresses.type, "shipping")))
+        .limit(1);
+
+      // Get payment information with payment method details
+      const [paymentInfo] = await db
+        .select({
+          id: paymentTransactions.id,
+          amount: paymentTransactions.amount,
+          currency: paymentTransactions.currency,
+          status: paymentTransactions.status,
+          transactionId: paymentTransactions.transactionId,
+          createdAt: paymentTransactions.createdAt,
+          paymentMethodId: paymentTransactions.paymentMethodId,
+          paymentMethod: {
+            type: paymentMethods.type,
+            provider: paymentMethods.provider,
+            lastFourDigits: paymentMethods.lastFourDigits,
+            expiryMonth: paymentMethods.expiryMonth,
+            expiryYear: paymentMethods.expiryYear,
+          },
+        })
+        .from(paymentTransactions)
+        .leftJoin(paymentMethods, eq(paymentMethods.id, paymentTransactions.paymentMethodId))
+        .where(eq(paymentTransactions.orderId, id));
+
+      // Get billing address from orderAddresses table
+      const [billingAddress] = await db
+        .select({
+          firstName: orderAddresses.firstName,
+          lastName: orderAddresses.lastName,
+          addressLine1: orderAddresses.addressLine1,
+          addressLine2: orderAddresses.addressLine2,
+          city: orderAddresses.city,
+          state: orderAddresses.state,
+          postcode: orderAddresses.postcode,
+          country: orderAddresses.country,
+        })
+        .from(orderAddresses)
+        .where(and(eq(orderAddresses.orderId, id), eq(orderAddresses.type, "billing")))
+        .limit(1);
 
       return NextResponse.json({
         order: {
@@ -375,6 +485,29 @@ export async function GET(request: NextRequest) {
             quantity: item.quantity,
             priceAtTime: item.priceAtTime,
           })),
+          shipping: shippingAddress ? {
+            trackingNumber: shippingInfo?.trackingNumber,
+            shippedAt: shippingInfo?.shippedAt,
+            deliveredAt: shippingInfo?.deliveredAt,
+            method: shippingInfo?.methodName ?? "Standard Shipping",
+            description: shippingInfo?.methodDescription,
+            address: shippingAddress,
+          } : null,
+          payment: paymentInfo ? {
+            amount: paymentInfo.amount,
+            currency: paymentInfo.currency,
+            status: paymentInfo.status,
+            transactionId: paymentInfo.transactionId,
+            createdAt: paymentInfo.createdAt,
+            paymentMethod: paymentInfo.paymentMethod ? {
+              type: paymentInfo.paymentMethod.type,
+              provider: paymentInfo.paymentMethod.provider,
+              lastFourDigits: paymentInfo.paymentMethod.lastFourDigits,
+              expiryMonth: paymentInfo.paymentMethod.expiryMonth,
+              expiryYear: paymentInfo.paymentMethod.expiryYear,
+            } : null,
+            billingAddress: billingAddress,
+          } : null,
         },
       });
     }

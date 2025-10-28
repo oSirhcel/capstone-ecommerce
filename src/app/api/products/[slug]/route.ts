@@ -5,8 +5,9 @@ import {
   stores,
   categories,
   productImages,
+  reviews,
 } from "@/server/db/schema";
-import { eq, asc } from "drizzle-orm";
+import { eq, asc, sql, count } from "drizzle-orm";
 
 // GET /api/products/[slug] - Get a specific product by slug or ID
 export async function GET(
@@ -50,6 +51,7 @@ export async function GET(
         store: {
           id: stores.id,
           name: stores.name,
+          slug: stores.slug,
           description: stores.description,
         },
         category: {
@@ -86,8 +88,19 @@ export async function GET(
 
     const product = productData[0];
 
+    // Get review statistics for this product
+    const [reviewStats] = await db
+      .select({
+        averageRating: sql<number>`ROUND(AVG(${reviews.rating})::numeric, 2)`.mapWith(Number),
+        reviewCount: count().mapWith(Number),
+      })
+      .from(reviews)
+      .where(eq(reviews.productId, product.id));
+
     return NextResponse.json({
       ...product,
+      rating: reviewStats?.averageRating ?? 0,
+      reviewCount: reviewStats?.reviewCount ?? 0,
       images:
         images.length > 0
           ? images
@@ -349,6 +362,7 @@ export async function PUT(
         store: {
           id: stores.id,
           name: stores.name,
+          slug: stores.slug,
         },
         category: {
           id: categories.id,
@@ -374,8 +388,19 @@ export async function PUT(
       .where(eq(productImages.productId, productId))
       .orderBy(asc(productImages.displayOrder));
 
+    // Get review statistics for this product
+    const [reviewStats] = await db
+      .select({
+        averageRating: sql<number>`ROUND(AVG(${reviews.rating})::numeric, 2)`.mapWith(Number),
+        reviewCount: count().mapWith(Number),
+      })
+      .from(reviews)
+      .where(eq(reviews.productId, productId));
+
     const completeProduct = {
       ...productWithImages[0],
+      rating: reviewStats?.averageRating ?? 0,
+      reviewCount: reviewStats?.reviewCount ?? 0,
       images:
         images.length > 0
           ? images

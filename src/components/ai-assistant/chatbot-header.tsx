@@ -18,21 +18,8 @@ interface ChatbotHeaderProps {
 }
 
 export function ChatbotHeader({ onReset }: ChatbotHeaderProps) {
-  const { status, minimize, mode } = useWidgetState();
+  const { status, minimize } = useWidgetState();
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
-
-  const getModeLabel = () => {
-    switch (mode) {
-      case "onboarding":
-        return "Onboarding Helper";
-      case "product-creation":
-        return "Product Creator";
-      case "form-filling":
-        return "Form Assistant";
-      default:
-        return "AI Assistant";
-    }
-  };
 
   const handleClose = () => {
     setShowConfirmDialog(true);
@@ -49,7 +36,7 @@ export function ChatbotHeader({ onReset }: ChatbotHeaderProps) {
       <div className="flex h-14 items-center justify-between border-b px-4">
         <div className="flex items-center gap-2">
           <Bot className="text-primary h-5 w-5" />
-          <h2 className="font-semibold">{getModeLabel()}</h2>
+          <h2 className="font-semibold">AI Chatbot</h2>
         </div>
         <div className="flex items-center gap-2">
           {status === "expanded" && (

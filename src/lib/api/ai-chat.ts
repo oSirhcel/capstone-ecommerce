@@ -1,8 +1,7 @@
-import type { ChatMessage, ChatMode } from "@/types/ai-assistant";
+import type { ChatMessage } from "@/types/ai-assistant";
 
 export interface ChatRequest {
   messages: ChatMessage[];
-  mode: ChatMode;
   stream?: boolean;
 }
 

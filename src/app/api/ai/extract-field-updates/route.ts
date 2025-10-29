@@ -1,9 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { extractProductData } from "@/lib/ai/extractors/product-extractor";
+import { extractFieldUpdates } from "@/lib/ai/extractors/field-update-extractor";
 import {
-  productExtractionRequestSchema,
-  productExtractionResponseSchema,
+  productFieldUpdateRequestSchema,
+  productFieldUpdateResponseSchema,
   chatErrorResponseSchema,
 } from "@/lib/ai/schemas";
 
@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = (await request.json()) as unknown;
-    const validationResult = productExtractionRequestSchema.safeParse(body);
+    const validationResult = productFieldUpdateRequestSchema.safeParse(body);
 
     if (!validationResult.success) {
       return NextResponse.json(
@@ -34,24 +34,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { description } = validationResult.data;
-    const result = await extractProductData(description);
+    const { instruction, currentFormData } = validationResult.data;
+    const result = await extractFieldUpdates(instruction, currentFormData);
 
     const responseData = {
-      success: true,
-      data: result.data,
+      updates: result.updates,
+      reasoning: result.reasoning,
     };
 
     // Validate response against schema
     const validatedResponse =
-      productExtractionResponseSchema.parse(responseData);
+      productFieldUpdateResponseSchema.parse(responseData);
 
     return NextResponse.json(validatedResponse);
   } catch (error) {
-    console.error("Error in extract-product API:", error);
+    console.error("Error in extract-field-updates API:", error);
 
     const errorResponse = chatErrorResponseSchema.parse({
-      error: "Failed to extract product data",
+      error: "Failed to extract field updates",
     });
 
     return NextResponse.json(errorResponse, { status: 500 });

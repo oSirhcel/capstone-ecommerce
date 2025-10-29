@@ -8,23 +8,17 @@ import {
   useCallback,
   ReactNode,
 } from "react";
-import type {
-  WidgetState,
-  NotificationBadge,
-  ChatMode,
-} from "@/types/ai-assistant";
+import type { WidgetState } from "@/types/ai-assistant";
 
 interface WidgetContextValue {
   status: WidgetState;
   notificationCount: number;
   lastMessage?: string;
-  mode: ChatMode;
   expand: () => void;
   minimize: () => void;
   toggle: () => void;
   setNotificationCount: (count: number) => void;
   clearNotifications: () => void;
-  setMode: (mode: ChatMode) => void;
 }
 
 const WidgetContext = createContext<WidgetContextValue | undefined>(undefined);
@@ -33,14 +27,12 @@ const STORAGE_KEY = "ai-widget-state";
 
 interface SavedState {
   status: WidgetState;
-  mode: ChatMode;
 }
 
 export function WidgetProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<WidgetState>("minimized");
   const [notificationCount, setNotificationCount] = useState(0);
   const [lastMessage, setLastMessage] = useState<string>();
-  const [mode, setMode] = useState<ChatMode>("general");
 
   // Load saved state from localStorage on mount
   useEffect(() => {
@@ -49,7 +41,6 @@ export function WidgetProvider({ children }: { children: ReactNode }) {
       try {
         const parsed = JSON.parse(saved) as SavedState;
         setStatus(parsed.status);
-        setMode(parsed.mode);
       } catch (error) {
         console.error("Failed to parse saved widget state:", error);
       }
@@ -58,9 +49,9 @@ export function WidgetProvider({ children }: { children: ReactNode }) {
 
   // Save state to localStorage whenever it changes
   useEffect(() => {
-    const stateToSave: SavedState = { status, mode };
+    const stateToSave: SavedState = { status };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
-  }, [status, mode]);
+  }, [status]);
 
   const expand = useCallback(() => {
     setStatus("expanded");
@@ -78,10 +69,6 @@ export function WidgetProvider({ children }: { children: ReactNode }) {
     setNotificationCount(0);
   }, []);
 
-  const handleSetMode = useCallback((newMode: ChatMode) => {
-    setMode(newMode);
-  }, []);
-
   const handleSetNotificationCount = useCallback((count: number) => {
     setNotificationCount(count);
   }, []);
@@ -92,13 +79,11 @@ export function WidgetProvider({ children }: { children: ReactNode }) {
         status,
         notificationCount,
         lastMessage,
-        mode,
         expand,
         minimize,
         toggle,
         setNotificationCount: handleSetNotificationCount,
         clearNotifications,
-        setMode: handleSetMode,
       }}
     >
       {children}

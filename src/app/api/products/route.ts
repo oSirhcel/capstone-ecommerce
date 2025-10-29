@@ -6,6 +6,7 @@ import {
   categories,
   productImages,
   reviews,
+  productTags,
 } from "@/server/db/schema";
 import { eq, desc, asc, and, ilike, sql, count } from "drizzle-orm";
 
@@ -100,7 +101,7 @@ export async function GET(request: NextRequest) {
     }
 
     const productsData = await query
-      .orderBy(orderByClause as any)
+      .orderBy(orderByClause as Parameters<typeof query.orderBy>[0])
       .limit(limit)
       .offset(offset);
 
@@ -122,7 +123,10 @@ export async function GET(request: NextRequest) {
         // Get review statistics for this product
         const [reviewStats] = await db
           .select({
-            averageRating: sql<number>`ROUND(AVG(${reviews.rating})::numeric, 2)`.mapWith(Number),
+            averageRating:
+              sql<number>`ROUND(AVG(${reviews.rating})::numeric, 2)`.mapWith(
+                Number,
+              ),
             reviewCount: count().mapWith(Number),
           })
           .from(reviews)
@@ -178,26 +182,22 @@ export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as {
       name: string;
-      sku: string;
-      description: string;
-      price: number;
+      sku?: string;
+      description?: string;
+      price?: number;
       compareAtPrice?: number;
       costPerItem?: number;
       stock?: number;
       trackQuantity?: boolean;
       allowBackorders?: boolean;
       weight?: number;
-      dimensions?: {
-        length?: number;
-        width?: number;
-        height?: number;
-      };
+      dimensions?: { length?: number; width?: number; height?: number };
       seoTitle?: string;
       seoDescription?: string;
       slug?: string;
-      status?: "active" | "draft" | "archived";
+      status?: "Active" | "Inactive" | "Draft" | "Archived";
       featured?: boolean;
-      tags?: string;
+      tagIds?: number[];
       storeId: string;
       categoryId?: number;
       images?: string[];
@@ -218,9 +218,9 @@ export async function POST(request: NextRequest) {
       seoTitle,
       seoDescription,
       slug,
-      status = "draft",
+      status = "Draft",
       featured = false,
-      tags,
+      tagIds = [],
       storeId,
       categoryId,
       images = [],
@@ -237,7 +237,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate required fields for active products
-    if (status === "active") {
+    if (status === "Active") {
       if (!sku || sku.trim() === "") {
         return NextResponse.json(
           { error: "SKU is required for active products" },
@@ -282,6 +282,16 @@ export async function POST(request: NextRequest) {
       ? dimensions.height.toString()
       : null;
 
+    // Normalize status to DB enum values
+    const statusValue: "Active" | "Inactive" | "Draft" | "Archived" =
+      status === "Active"
+        ? "Active"
+        : status === "Archived"
+          ? "Archived"
+          : status === "Inactive"
+            ? "Inactive"
+            : "Draft";
+
     // Create the product
     const [newProduct] = await db
       .insert(products)
@@ -302,15 +312,22 @@ export async function POST(request: NextRequest) {
         seoTitle,
         seoDescription,
         slug: slug && slug.trim() !== "" ? slug : null, // Convert empty strings to null
-        status,
+        status: statusValue,
         featured,
-        tags: tags
-          ? JSON.stringify(tags.split(",").map((tag: string) => tag.trim()))
-          : null,
         storeId,
         categoryId: categoryId ?? null,
       })
       .returning();
+
+    // Insert product-tag relationships
+    if (tagIds && tagIds.length > 0) {
+      await db.insert(productTags).values(
+        tagIds.map((tagId) => ({
+          productId: newProduct.id,
+          tagId,
+        })),
+      );
+    }
 
     // Insert product images if provided
     if (images && images.length > 0) {
@@ -347,7 +364,6 @@ export async function POST(request: NextRequest) {
         slug: products.slug,
         status: products.status,
         featured: products.featured,
-        tags: products.tags,
         storeId: products.storeId,
         categoryId: products.categoryId,
         createdAt: products.createdAt,
@@ -383,6 +399,7 @@ export async function POST(request: NextRequest) {
 
     const completeProduct = {
       ...productWithImages[0],
+      tags: [],
       images:
         productImagesData.length > 0
           ? productImagesData

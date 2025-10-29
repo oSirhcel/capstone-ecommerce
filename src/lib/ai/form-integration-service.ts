@@ -13,7 +13,7 @@ export interface ProductFormValues {
   compareAtPrice?: number;
   costPerItem?: number;
   category?: string;
-  tags?: string;
+  tags?: string[];
   trackQuantity: boolean;
   quantity: number;
   allowBackorders: boolean;
@@ -55,9 +55,9 @@ export function mapDraftToFormValues(
   // Category mapping
   if (draft.categoryId) formValues.category = draft.categoryId.toString();
 
-  // Tags mapping (array to comma-separated string)
+  // Tags mapping (keep as array)
   if (draft.tags && draft.tags.length > 0) {
-    formValues.tags = draft.tags.join(", ");
+    formValues.tags = draft.tags;
   }
 
   // SEO fields

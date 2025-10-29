@@ -141,6 +141,41 @@
       "when": 1760959309745,
       "tag": "0019_wooden_scarecrow",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1761731593573,
+      "tag": "0020_legal_colleen_wing",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1761742786829,
+      "tag": "0021_sloppy_wither",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1761743157487,
+      "tag": "0022_clumsy_psylocke",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1761745353244,
+      "tag": "0023_clean_zarek",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1761751479182,
+      "tag": "0024_demonic_eternals",
+      "breakpoints": true
     }
   ]
 }

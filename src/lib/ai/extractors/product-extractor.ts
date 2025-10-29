@@ -133,11 +133,6 @@ CRITICAL CONSTRAINTS:
         throw firstError;
       }
 
-      console.warn(
-        "First extraction failed due to validation, retrying with fallback...",
-        errorMessage,
-      );
-
       // If validation fails, generate with strict fallbacks
       try {
         result = await generateObject({
@@ -178,9 +173,14 @@ STRICT: Keep seoDescription under 200 characters!`,
         100,
       ),
       categoryId: result.object.categoryId,
-      tags: (result.object.tags ?? ["product"]).map((tag) =>
-        truncateString(tag, 100),
-      ),
+      tags: Array.from(
+        new Set(
+          (result.object.tags ?? ["product"])
+            .map((tag) => (typeof tag === "string" ? tag.trim() : ""))
+            .filter((t) => t.length > 0)
+            .map((t) => truncateString(t, 100)),
+        ),
+      ).slice(0, 10),
       // Enforce character limits on SEO fields
       seoTitle: truncateString(
         result.object.seoTitle ??

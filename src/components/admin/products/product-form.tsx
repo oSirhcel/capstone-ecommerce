@@ -46,6 +46,9 @@ import { useAIProductDraft } from "@/contexts/ai-product-draft-context";
 import { useAIFormFields } from "@/contexts/ai-form-fields-context";
 import { FormIntegrationService } from "@/lib/ai/form-integration-service";
 import { cn } from "@/lib/utils";
+import { TagInput } from "@/components/ui/tag-input";
+import { useTagsQuery } from "@/hooks/tags/use-tags-query";
+import { useCreateTag } from "@/hooks/tags/use-tag-mutations";
 
 const productFormSchema = z
   .object({
@@ -73,7 +76,7 @@ const productFormSchema = z
       .min(0, "Cost per item must be 0 or greater")
       .optional(),
     category: z.string().optional(),
-    tags: z.string().optional(),
+    tags: z.array(z.string()).optional().default([]),
     trackQuantity: z.boolean().default(true),
     quantity: z.number().min(0, "Quantity must be 0 or greater").default(0),
     allowBackorders: z.boolean().default(false),
@@ -94,14 +97,14 @@ const productFormSchema = z
       .max(200, "SEO description must be less than 200 characters")
       .optional(),
     slug: z.string().optional(),
-    status: z.enum(["active", "draft", "archived"]).default("draft"),
+    status: z.enum(["Active", "Draft", "Archived"]).default("Draft"),
     featured: z.boolean().default(false),
     images: z.array(z.string()).optional(),
   })
   .refine(
     (data) => {
       // SKU is required when status is "active"
-      if (data.status === "active" && (!data.sku || data.sku === "")) {
+      if (data.status === "Active" && (!data.sku || data.sku === "")) {
         return false;
       }
       return true;
@@ -115,7 +118,7 @@ const productFormSchema = z
     (data) => {
       // Description is required when status is "active"
       if (
-        data.status === "active" &&
+        data.status === "Active" &&
         (!data.description || data.description.trim() === "")
       ) {
         return false;
@@ -131,7 +134,7 @@ const productFormSchema = z
     (data) => {
       // Price is required when status is "active"
       if (
-        data.status === "active" &&
+        data.status === "Active" &&
         (data.price === undefined || data.price === null || data.price <= 0)
       ) {
         return false;
@@ -176,6 +179,10 @@ export function ProductForm({
     updateFormData,
   } = useAIFormFields();
 
+  // Fetch all tags for conversion
+  const { data: allTags = [] } = useTagsQuery();
+  const createTagMutation = useCreateTag();
+
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productFormSchema),
     defaultValues: {
@@ -186,7 +193,14 @@ export function ProductForm({
       compareAtPrice: 0,
       costPerItem: 0,
       category: "",
-      tags: "",
+      tags: Array.isArray(initialData?.tags)
+        ? initialData?.tags
+        : typeof initialData?.tags === "string"
+          ? (initialData?.tags as string)
+              .split(",")
+              .map((t) => t.trim())
+              .filter((t) => t.length > 0)
+          : [],
       trackQuantity: true,
       quantity: 0,
       allowBackorders: false,
@@ -199,10 +213,21 @@ export function ProductForm({
       seoTitle: "",
       seoDescription: "",
       slug: "",
-      status: "draft",
+      status: "Draft",
       featured: false,
       images: [],
-      ...initialData,
+      ...(initialData && {
+        ...initialData,
+        // Ensure tags is always an array after spread
+        tags: Array.isArray(initialData.tags)
+          ? initialData.tags
+          : typeof initialData.tags === "string"
+            ? (initialData.tags as string)
+                .split(",")
+                .map((t) => t.trim())
+                .filter((t) => t.length > 0)
+            : [],
+      }),
     },
   });
 
@@ -247,6 +272,33 @@ export function ProductForm({
   ]);
 
   const onSubmit = async (data: ProductFormValues) => {
+    // Create tags that don't exist and convert tag names to tag IDs
+    const tagIds = await Promise.all(
+      (data.tags ?? []).map(async (tagName: string) => {
+        // Check if tag already exists
+        const existingTag = allTags.find((t) => t?.name === tagName);
+        if (existingTag) {
+          return existingTag.id;
+        }
+
+        // Create new tag
+        try {
+          const result = await createTagMutation.mutateAsync(tagName);
+          if (result?.data) {
+            console.log("Created tag:", result.data);
+            return result.data.id;
+          }
+          return 0;
+        } catch (error) {
+          console.error(`Failed to create tag "${tagName}":`, error);
+          return 0;
+        }
+      }),
+    );
+
+    // Filter out any failed tag creations (0 values)
+    const validTagIds = tagIds.filter((id: number) => id > 0);
+
     const productData = {
       name: data.name,
       sku: data.sku,
@@ -264,7 +316,7 @@ export function ProductForm({
       slug: data.slug,
       status: data.status,
       featured: data.featured,
-      tags: data.tags,
+      tagIds: validTagIds,
       storeId,
       categoryId: data.category ? parseInt(data.category) : undefined,
       // Always use the images state as the source of truth
@@ -392,7 +444,7 @@ export function ProductForm({
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>
-                            SKU {form.watch("status") === "active" && "*"}
+                            SKU {form.watch("status") === "Active" && "*"}
                           </FormLabel>
                           <FormControl>
                             <Input
@@ -420,7 +472,7 @@ export function ProductForm({
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>
-                          Description {form.watch("status") === "active" && "*"}
+                          Description {form.watch("status") === "Active" && "*"}
                         </FormLabel>
                         <FormControl>
                           <Textarea
@@ -576,7 +628,7 @@ export function ProductForm({
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>
-                            Price {form.watch("status") === "active" && "*"}
+                            Price {form.watch("status") === "Active" && "*"}
                           </FormLabel>
                           <FormControl>
                             <Input
@@ -726,13 +778,12 @@ export function ProductForm({
                         <FormItem>
                           <FormLabel>Tags</FormLabel>
                           <FormControl>
-                            <Input
-                              placeholder="Enter tags separated by commas"
-                              {...field}
-                              className={cn(
-                                aiFilledFields.has("tags") &&
-                                  "bg-purple-50 ring-2 ring-purple-500",
-                              )}
+                            <TagInput
+                              tags={
+                                Array.isArray(field.value) ? field.value : []
+                              }
+                              onTagsChange={(tags) => field.onChange(tags)}
+                              placeholder="Add a tag and press Enter"
                             />
                           </FormControl>
                           <FormDescription>
@@ -761,9 +812,9 @@ export function ProductForm({
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="active">Active</SelectItem>
-                              <SelectItem value="draft">Draft</SelectItem>
-                              <SelectItem value="archived">Archived</SelectItem>
+                              <SelectItem value="Active">Active</SelectItem>
+                              <SelectItem value="Draft">Draft</SelectItem>
+                              <SelectItem value="Archived">Archived</SelectItem>
                             </SelectContent>
                           </Select>
                           <FormMessage />

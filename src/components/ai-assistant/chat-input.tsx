@@ -30,7 +30,7 @@ export function ChatInput({ onSend, disabled, placeholder }: ChatInputProps) {
   };
 
   return (
-    <div className="flex items-end gap-2 border-t p-4">
+    <div className="flex items-center gap-2 border-t p-4">
       <Textarea
         value={message}
         onChange={(e) => setMessage(e.target.value)}

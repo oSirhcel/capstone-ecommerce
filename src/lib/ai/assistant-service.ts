@@ -1,16 +1,15 @@
 import { generateText, streamText } from "ai";
 import { google } from "@ai-sdk/google";
-import type { ChatMessage, ChatMode, ChatContext } from "@/types/ai-assistant";
+import type { ChatMessage } from "@/types/ai-assistant";
 
 export interface AssistantConfig {
-  mode: ChatMode;
-  context?: ChatContext;
+  context?: unknown;
   stream?: boolean;
 }
 
 export interface ChatRequest {
   messages: ChatMessage[];
-  config: AssistantConfig;
+  config?: AssistantConfig;
 }
 
 /**
@@ -19,7 +18,7 @@ export interface ChatRequest {
 export async function generateChatResponse(
   request: ChatRequest,
 ): Promise<string> {
-  const { messages, config } = request;
+  const { messages } = request;
 
   if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
     throw new Error("Google AI API key not configured");
@@ -27,8 +26,8 @@ export async function generateChatResponse(
 
   const model = google("gemini-2.5-flash");
 
-  // Build system prompt based on mode
-  const systemPrompt = buildSystemPrompt(config.mode, config.context);
+  // Build system prompt
+  const systemPrompt = buildSystemPrompt();
 
   // Convert messages to the format expected by the AI SDK
   const conversationHistory = messages.map((msg) => ({
@@ -52,7 +51,7 @@ export async function generateChatResponse(
 export async function streamChatResponse(
   request: ChatRequest,
 ): Promise<Response> {
-  const { messages, config } = request;
+  const { messages } = request;
 
   if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
     throw new Error("Google AI API key not configured");
@@ -60,8 +59,8 @@ export async function streamChatResponse(
 
   const model = google("gemini-2.5-flash");
 
-  // Build system prompt based on mode
-  const systemPrompt = buildSystemPrompt(config.mode, config.context);
+  // Build system prompt
+  const systemPrompt = buildSystemPrompt();
 
   // Convert messages to the format expected by the AI SDK
   const conversationHistory = messages.map((msg) => ({
@@ -80,61 +79,19 @@ export async function streamChatResponse(
 }
 
 /**
- * Build system prompt based on chat mode and context
+ * Build system prompt for the AI assistant
  */
-function buildSystemPrompt(mode: ChatMode, context?: ChatContext): string {
-  // TODO: Add context to the system prompt
-  const basePrompt = `You are a helpful AI assistant for an Australian e-commerce platform. You help store owners manage their stores, products, and settings.`;
+function buildSystemPrompt(): string {
+  return `You are a helpful AI assistant for an Australian e-commerce platform. You help store owners manage their stores, products, and settings.
 
-  switch (mode) {
-    case "onboarding":
-      return `${basePrompt}
+You are versatile and can help with:
+- Creating products from natural language descriptions. Extract key details: name, description, price, stock quantity, suggest categories, generate SEO-friendly content
+- Answering questions about platform features and usage
+- Providing guidance on form fields and best practices
+- Explaining Australian e-commerce regulations and requirements
+- General troubleshooting and platform support
 
-You are currently helping a store owner with onboarding tasks. Focus on:
-- Setting up store details (name, description, ABN)
-- Configuring tax settings (GST registration, tax rates)
-- Setting up shipping methods
-- Connecting payment methods (Stripe)
-- Creating store policies (shipping, returns, privacy, terms)
-- Creating their first product
-
-Be patient, clear, and guide them step-by-step.`;
-
-    case "product-creation":
-      return `${basePrompt}
-
-You are helping create a product from natural language descriptions. When the user describes a product:
-- Extract key details: name, description, price, stock quantity
-- Suggest appropriate categories
-- Generate SEO-friendly slugs
-- Identify missing required fields
-- Ask clarifying questions when information is ambiguous
-
-Present your response in a helpful, conversational way.`;
-
-    case "form-filling":
-      return `${basePrompt}
-
-You are helping the user fill out forms. Provide guidance on:
-- What each field means
-- What values are expected
-- Best practices for each field
-- Australian regulations and requirements when relevant
-
-Do not actually fill the form unless explicitly asked.`;
-
-    case "general":
-    default:
-      return `${basePrompt}
-
-You provide general help with the platform. You can:
-- Answer questions about features
-- Explain how to use different parts of the admin panel
-- Provide troubleshooting guidance
-- Suggest best practices for Australian e-commerce
-
-Keep responses concise and actionable.`;
-  }
+When users describe products, be ready to extract and structure the data. When they ask questions, provide clear, concise, actionable answers. Keep responses helpful and focused on solving their problems.`;
 }
 
 /**
@@ -150,7 +107,7 @@ export interface StoreContext {
 }
 
 export async function getStoreContext(
-  storeId: string,
+  _storeId: string,
 ): Promise<StoreContext | null> {
   // TODO: Implement actual store context fetching
   return null;

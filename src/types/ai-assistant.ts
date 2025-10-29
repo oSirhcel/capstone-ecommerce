@@ -32,14 +32,7 @@ export interface ChatMessage {
 }
 
 // Context types
-export type ChatMode =
-  | "general"
-  | "onboarding"
-  | "product-creation"
-  | "form-filling";
-
 export interface ChatContext {
-  mode: ChatMode;
   pageContext?: string;
   storeData?: unknown;
   userIntent?: string;

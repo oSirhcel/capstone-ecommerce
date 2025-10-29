@@ -4,22 +4,11 @@ import {
   generateChatResponse,
   streamChatResponse,
 } from "@/lib/ai/assistant-service";
-import { z } from "zod";
-
-const chatRequestSchema = z.object({
-  messages: z.array(
-    z.object({
-      id: z.string(),
-      role: z.enum(["user", "assistant", "system"]),
-      content: z.string(),
-      timestamp: z.union([z.string(), z.date()]),
-      type: z.enum(["text", "action", "form-fill", "suggestion"]).optional(),
-      metadata: z.record(z.string(), z.unknown()).optional(),
-    }),
-  ),
-  mode: z.enum(["general", "onboarding", "product-creation", "form-filling"]),
-  stream: z.boolean().optional(),
-});
+import {
+  chatRequestSchema,
+  chatResponseSchema,
+  chatErrorResponseSchema,
+} from "@/lib/ai/schemas";
 
 export async function POST(request: NextRequest) {
   try {
@@ -49,7 +38,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { messages, mode, stream } = validationResult.data;
+    const { messages, stream } = validationResult.data;
 
     // Convert Zod-validated messages to ChatMessage format
     const chatMessages = messages.map((msg) => ({
@@ -64,7 +53,7 @@ export async function POST(request: NextRequest) {
     if (stream) {
       const streamResponse = await streamChatResponse({
         messages: chatMessages,
-        config: { mode, stream: true },
+        config: { stream: true },
       });
 
       return streamResponse;
@@ -73,18 +62,24 @@ export async function POST(request: NextRequest) {
     // Otherwise, return a regular JSON response
     const response = await generateChatResponse({
       messages: chatMessages,
-      config: { mode },
     });
 
-    return NextResponse.json({
+    const responseData = {
       message: response,
       timestamp: new Date().toISOString(),
-    });
+    };
+
+    // Validate response against schema
+    const validatedResponse = chatResponseSchema.parse(responseData);
+
+    return NextResponse.json(validatedResponse);
   } catch (error) {
     console.error("Error in chat API:", error);
-    return NextResponse.json(
-      { error: "Failed to generate response" },
-      { status: 500 },
-    );
+
+    const errorResponse = chatErrorResponseSchema.parse({
+      error: "Failed to generate response",
+    });
+
+    return NextResponse.json(errorResponse, { status: 500 });
   }
 }

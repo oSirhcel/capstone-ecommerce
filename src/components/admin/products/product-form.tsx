@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -42,6 +42,10 @@ import { useRouter } from "next/navigation";
 import { UploadButton } from "@/lib/uploadthing";
 import { useSession } from "next-auth/react";
 import { ProductShotModal } from "./product-shot-modal";
+import { useAIProductDraft } from "@/contexts/ai-product-draft-context";
+import { useAIFormFields } from "@/contexts/ai-form-fields-context";
+import { FormIntegrationService } from "@/lib/ai/form-integration-service";
+import { cn } from "@/lib/utils";
 
 const productFormSchema = z
   .object({
@@ -87,7 +91,7 @@ const productFormSchema = z
       .optional(),
     seoDescription: z
       .string()
-      .max(160, "SEO description must be less than 160 characters")
+      .max(200, "SEO description must be less than 200 characters")
       .optional(),
     slug: z.string().optional(),
     status: z.enum(["active", "draft", "archived"]).default("draft"),
@@ -161,6 +165,17 @@ export function ProductForm({
   const createProductMutation = useCreateProduct();
   const updateProductMutation = useUpdateProduct();
 
+  // Use new separated contexts
+  const { pendingDraft, clearPendingDraft } = useAIProductDraft();
+  const {
+    aiFilledFields,
+    markFieldsAsFilled,
+    clearFilledFields,
+    pendingFieldUpdates,
+    setPendingFieldUpdates,
+    updateFormData,
+  } = useAIFormFields();
+
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productFormSchema),
     defaultValues: {
@@ -192,6 +207,44 @@ export function ProductForm({
   });
 
   const { isDirty } = form.formState;
+
+  // Sync form data to context so AI can access current form state
+  useEffect(() => {
+    if (!isEditing) {
+      const formValues = form.getValues();
+      updateFormData(formValues as Record<string, unknown>);
+    }
+  }, [form, isEditing, updateFormData]);
+
+  // Apply pending draft using batch update - Much cleaner!
+  useEffect(() => {
+    if (pendingDraft && !isEditing) {
+      const affectedFields = FormIntegrationService.applyDraftToForm(
+        form,
+        pendingDraft,
+      );
+      markFieldsAsFilled(affectedFields);
+      clearPendingDraft();
+    }
+  }, [pendingDraft, clearPendingDraft, form, isEditing, markFieldsAsFilled]);
+
+  // Apply pending field updates using batch update
+  useEffect(() => {
+    if (pendingFieldUpdates && !isEditing) {
+      const affectedFields = FormIntegrationService.applyFieldUpdates(
+        form,
+        pendingFieldUpdates,
+      );
+      markFieldsAsFilled(affectedFields);
+      setPendingFieldUpdates(null);
+    }
+  }, [
+    pendingFieldUpdates,
+    form,
+    isEditing,
+    markFieldsAsFilled,
+    setPendingFieldUpdates,
+  ]);
 
   const onSubmit = async (data: ProductFormValues) => {
     const productData = {
@@ -226,6 +279,7 @@ export function ProductForm({
           onSuccess: () => {
             // Reset form dirty state with the current images
             form.reset({ ...data, images });
+            clearFilledFields();
           },
         },
       );
@@ -234,6 +288,7 @@ export function ProductForm({
       createProductMutation.mutate(productData, {
         onSuccess: (res) => {
           if (res.data) {
+            clearFilledFields();
             router.replace(`/admin/products/${res.data.product.id}/edit`);
           }
         },
@@ -319,6 +374,10 @@ export function ProductForm({
                             <Input
                               placeholder="Enter product name"
                               {...field}
+                              className={cn(
+                                aiFilledFields.has("name") &&
+                                  "bg-purple-50 ring-2 ring-purple-500",
+                              )}
                             />
                           </FormControl>
                           <div className="h-5" />
@@ -339,6 +398,10 @@ export function ProductForm({
                             <Input
                               placeholder="Enter SKU (optional for drafts)"
                               {...field}
+                              className={cn(
+                                aiFilledFields.has("sku") &&
+                                  "bg-purple-50 ring-2 ring-purple-500",
+                              )}
                             />
                           </FormControl>
                           <FormDescription>
@@ -362,7 +425,11 @@ export function ProductForm({
                         <FormControl>
                           <Textarea
                             placeholder="Enter detailed product description (optional for drafts)"
-                            className="min-h-[120px]"
+                            className={cn(
+                              "min-h-[120px]",
+                              aiFilledFields.has("description") &&
+                                "bg-purple-50 ring-2 ring-purple-500",
+                            )}
                             {...field}
                           />
                         </FormControl>
@@ -517,6 +584,10 @@ export function ProductForm({
                               step="0.01"
                               placeholder="0.00 (optional for drafts)"
                               {...field}
+                              className={cn(
+                                aiFilledFields.has("price") &&
+                                  "bg-purple-50 ring-2 ring-purple-500",
+                              )}
                               onChange={(e) =>
                                 field.onChange(
                                   Number.parseFloat(e.target.value) || 0,
@@ -544,6 +615,10 @@ export function ProductForm({
                               step="0.01"
                               placeholder="0.00"
                               {...field}
+                              className={cn(
+                                aiFilledFields.has("compareAtPrice") &&
+                                  "bg-purple-50 ring-2 ring-purple-500",
+                              )}
                               onChange={(e) =>
                                 field.onChange(
                                   Number.parseFloat(e.target.value) || 0,
@@ -571,6 +646,10 @@ export function ProductForm({
                               step="0.01"
                               placeholder="0.00"
                               {...field}
+                              className={cn(
+                                aiFilledFields.has("costPerItem") &&
+                                  "bg-purple-50 ring-2 ring-purple-500",
+                              )}
                               onChange={(e) =>
                                 field.onChange(
                                   Number.parseFloat(e.target.value) || 0,
@@ -609,7 +688,12 @@ export function ProductForm({
                             defaultValue={field.value}
                           >
                             <FormControl>
-                              <SelectTrigger>
+                              <SelectTrigger
+                                className={cn(
+                                  aiFilledFields.has("category") &&
+                                    "bg-purple-50 ring-2 ring-purple-500",
+                                )}
+                              >
                                 <SelectValue placeholder="Select a category" />
                               </SelectTrigger>
                             </FormControl>
@@ -645,6 +729,10 @@ export function ProductForm({
                             <Input
                               placeholder="Enter tags separated by commas"
                               {...field}
+                              className={cn(
+                                aiFilledFields.has("tags") &&
+                                  "bg-purple-50 ring-2 ring-purple-500",
+                              )}
                             />
                           </FormControl>
                           <FormDescription>
@@ -755,6 +843,10 @@ export function ProductForm({
                                 type="number"
                                 placeholder="0"
                                 {...field}
+                                className={cn(
+                                  aiFilledFields.has("quantity") &&
+                                    "bg-purple-50 ring-2 ring-purple-500",
+                                )}
                                 onChange={(e) =>
                                   field.onChange(
                                     Number.parseInt(e.target.value) || 0,
@@ -814,6 +906,10 @@ export function ProductForm({
                             step="0.01"
                             placeholder="0.00"
                             {...field}
+                            className={cn(
+                              aiFilledFields.has("weight") &&
+                                "bg-purple-50 ring-2 ring-purple-500",
+                            )}
                             onChange={(e) =>
                               field.onChange(
                                 Number.parseFloat(e.target.value) || 0,
@@ -839,6 +935,10 @@ export function ProductForm({
                               step="0.01"
                               placeholder="0.00"
                               {...field}
+                              className={cn(
+                                aiFilledFields.has("dimensions.length") &&
+                                  "bg-purple-50 ring-2 ring-purple-500",
+                              )}
                               onChange={(e) =>
                                 field.onChange(
                                   Number.parseFloat(e.target.value) || 0,
@@ -863,6 +963,10 @@ export function ProductForm({
                               step="0.01"
                               placeholder="0.00"
                               {...field}
+                              className={cn(
+                                aiFilledFields.has("dimensions.width") &&
+                                  "bg-purple-50 ring-2 ring-purple-500",
+                              )}
                               onChange={(e) =>
                                 field.onChange(
                                   Number.parseFloat(e.target.value) || 0,
@@ -887,6 +991,10 @@ export function ProductForm({
                               step="0.01"
                               placeholder="0.00"
                               {...field}
+                              className={cn(
+                                aiFilledFields.has("dimensions.height") &&
+                                  "bg-purple-50 ring-2 ring-purple-500",
+                              )}
                               onChange={(e) =>
                                 field.onChange(
                                   Number.parseFloat(e.target.value) || 0,
@@ -919,7 +1027,14 @@ export function ProductForm({
                       <FormItem>
                         <FormLabel>SEO Title</FormLabel>
                         <FormControl>
-                          <Input placeholder="Enter SEO title" {...field} />
+                          <Input
+                            placeholder="Enter SEO title"
+                            {...field}
+                            className={cn(
+                              aiFilledFields.has("seoTitle") &&
+                                "bg-purple-50 ring-2 ring-purple-500",
+                            )}
+                          />
                         </FormControl>
                         <FormDescription>
                           {field.value?.length ?? 0}/60 characters - This will
@@ -939,12 +1054,16 @@ export function ProductForm({
                         <FormControl>
                           <Textarea
                             placeholder="Enter SEO description"
-                            className="min-h-[100px]"
+                            className={cn(
+                              "min-h-[100px]",
+                              aiFilledFields.has("seoDescription") &&
+                                "bg-purple-50 ring-2 ring-purple-500",
+                            )}
                             {...field}
                           />
                         </FormControl>
                         <FormDescription>
-                          {field.value?.length ?? 0}/160 characters - This will
+                          {field.value?.length ?? 0}/200 characters - This will
                           appear in search results
                         </FormDescription>
                         <FormMessage />

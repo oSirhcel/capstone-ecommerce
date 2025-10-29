@@ -43,7 +43,7 @@ export function ProductSeo({ seo }: ProductSeoProps) {
           <p className="text-sm">{seo.description ?? "Not set"}</p>
           {seo.description && (
             <p className="text-muted-foreground mt-1 text-xs">
-              {seo.description.length}/160 characters
+              {seo.description.length}/200 characters
             </p>
           )}
         </div>

@@ -654,8 +654,252 @@ async function main() {
       await db.insert(productImages).values(imageRecords);
     }
 
-    // Seed up to 4 sensible reviews per product
-    const candidateReviewers = [ownerA.id, ownerB.id, customer1.id, customer2.id];
+    // --- Add third owner and store (Gamma Lifestyle) and seed 6 products (2 per specific categories) ---
+    const ownerGamma: NewUser = {
+      id: uuidv4(),
+      username: "owner_gamma",
+      password: passwordHash,
+    };
+    await db.insert(users).values(ownerGamma);
+
+    const gammaStore: NewStore = {
+      id: uuidv4(),
+      name: "Gamma Lifestyle",
+      slug: "gamma-lifestyle",
+      description:
+        "Lifestyle store featuring clothing, books, and beauty essentials",
+      ownerId: ownerGamma.id,
+    };
+    const [insertedGammaStore] = await db.insert(stores).values(gammaStore).returning();
+
+    const gammaSeeds: ProductSeed[] = [
+      // Beauty & Personal Care (2)
+      {
+        product: {
+          name: "Hydrating Face Serum",
+          sku: "GL-BEA-001",
+          description:
+            "Lightweight serum with hyaluronic acid for daily hydration.",
+          price: cents(24.99),
+          compareAtPrice: cents(29.99),
+          costPerItem: cents(10.0),
+          stock: 120,
+          trackQuantity: true,
+          allowBackorders: false,
+          weight: "0.1",
+          length: "10.0",
+          width: "3.0",
+          height: "3.0",
+          seoTitle: "Hydrating Face Serum",
+          seoDescription: "Daily hydrating serum with hyaluronic acid.",
+          slug: "hydrating-face-serum",
+          status: "Active",
+          featured: true,
+          tags: JSON.stringify(["beauty", "serum", "hydration"]),
+          storeId: insertedGammaStore.id,
+          categoryId: categoryIds.beauty,
+        },
+        images: [
+          {
+            imageUrl: "/placeholder.svg",
+            altText: "Hydrating Face Serum",
+            isPrimary: true,
+            displayOrder: 0,
+          },
+        ],
+      },
+      {
+        product: {
+          name: "Nourishing Body Lotion",
+          sku: "GL-BEA-002",
+          description: "Rich body lotion with shea butter for smooth skin.",
+          price: cents(14.99),
+          compareAtPrice: cents(19.99),
+          costPerItem: cents(7.0),
+          stock: 150,
+          trackQuantity: true,
+          allowBackorders: false,
+          weight: "0.3",
+          length: "18.0",
+          width: "7.0",
+          height: "4.0",
+          seoTitle: "Nourishing Body Lotion",
+          seoDescription: "Body lotion with shea butter.",
+          slug: "nourishing-body-lotion",
+          status: "Active",
+          featured: false,
+          tags: JSON.stringify(["beauty", "lotion", "shea-butter"]),
+          storeId: insertedGammaStore.id,
+          categoryId: categoryIds.beauty,
+        },
+        images: [
+          {
+            imageUrl: "/placeholder.svg",
+            altText: "Nourishing Body Lotion",
+            isPrimary: true,
+            displayOrder: 0,
+          },
+        ],
+      },
+      // Books (2)
+      {
+        product: {
+          name: "Mindful Productivity",
+          sku: "GL-BOO-001",
+          description: "A practical guide to focus and getting things done.",
+          price: cents(21.99),
+          compareAtPrice: cents(27.99),
+          costPerItem: cents(9.0),
+          stock: 60,
+          trackQuantity: true,
+          allowBackorders: false,
+          weight: "0.5",
+          length: "23.0",
+          width: "15.0",
+          height: "2.0",
+          seoTitle: "Mindful Productivity",
+          seoDescription: "Guide to focus and productivity.",
+          slug: "mindful-productivity",
+          status: "Active",
+          featured: false,
+          tags: JSON.stringify(["books", "productivity"]),
+          storeId: insertedGammaStore.id,
+          categoryId: categoryIds.books,
+        },
+        images: [
+          {
+            imageUrl: "/placeholder.svg",
+            altText: "Mindful Productivity Book",
+            isPrimary: true,
+            displayOrder: 0,
+          },
+        ],
+      },
+      {
+        product: {
+          name: "Cooking for Students",
+          sku: "GL-BOO-002",
+          description: "Simple and affordable recipes for busy students.",
+          price: cents(17.99),
+          compareAtPrice: cents(22.99),
+          costPerItem: cents(8.0),
+          stock: 80,
+          trackQuantity: true,
+          allowBackorders: false,
+          weight: "0.6",
+          length: "24.0",
+          width: "16.0",
+          height: "2.5",
+          seoTitle: "Cooking for Students",
+          seoDescription: "Affordable recipes for students.",
+          slug: "cooking-for-students",
+          status: "Active",
+          featured: false,
+          tags: JSON.stringify(["books", "cooking"]),
+          storeId: insertedGammaStore.id,
+          categoryId: categoryIds.books,
+        },
+        images: [
+          {
+            imageUrl: "/placeholder.svg",
+            altText: "Cooking for Students Book",
+            isPrimary: true,
+            displayOrder: 0,
+          },
+        ],
+      },
+      // Clothing (2)
+      {
+        product: {
+          name: "Classic Cotton Tee",
+          sku: "GL-CLO-001",
+          description: "Soft cotton t-shirt available in multiple colors.",
+          price: cents(19.99),
+          compareAtPrice: cents(24.99),
+          costPerItem: cents(9.0),
+          stock: 100,
+          trackQuantity: true,
+          allowBackorders: true,
+          weight: "0.2",
+          length: "70.0",
+          width: "50.0",
+          height: "1.0",
+          seoTitle: "Classic Cotton Tee",
+          seoDescription: "Soft cotton tee.",
+          slug: "classic-cotton-tee",
+          status: "Active",
+          featured: false,
+          tags: JSON.stringify(["clothing", "t-shirt", "cotton"]),
+          storeId: insertedGammaStore.id,
+          categoryId: categoryIds.clothing,
+        },
+        images: [
+          {
+            imageUrl: "/placeholder.svg",
+            altText: "Classic Cotton Tee",
+            isPrimary: true,
+            displayOrder: 0,
+          },
+        ],
+      },
+      {
+        product: {
+          name: "Comfy Hoodie",
+          sku: "GL-CLO-002",
+          description: "Cozy hoodie with front pocket and drawstring.",
+          price: cents(39.99),
+          compareAtPrice: cents(49.99),
+          costPerItem: cents(20.0),
+          stock: 70,
+          trackQuantity: true,
+          allowBackorders: false,
+          weight: "0.7",
+          length: "75.0",
+          width: "55.0",
+          height: "3.0",
+          seoTitle: "Comfy Hoodie",
+          seoDescription: "Cozy hoodie with pocket.",
+          slug: "comfy-hoodie",
+          status: "Active",
+          featured: false,
+          tags: JSON.stringify(["clothing", "hoodie"]),
+          storeId: insertedGammaStore.id,
+          categoryId: categoryIds.clothing,
+        },
+        images: [
+          {
+            imageUrl: "/placeholder.svg",
+            altText: "Comfy Hoodie",
+            isPrimary: true,
+            displayOrder: 0,
+          },
+        ],
+      },
+    ];
+
+    const gammaInsertedProducts = await db
+      .insert(products)
+      .values(gammaSeeds.map((ps) => ps.product))
+      .returning();
+
+    const gammaImageRecords: NewProductImage[] = gammaInsertedProducts.flatMap((p) => {
+      const seed = gammaSeeds.find((ps) => ps.product.name === p.name);
+      const images = seed?.images ?? [];
+      return images.map((img, idx) => ({
+        productId: p.id,
+        imageUrl: img.imageUrl,
+        altText: img.altText ?? `${p.name} image ${idx + 1}`,
+        isPrimary: img.isPrimary ?? idx === 0,
+        displayOrder: img.displayOrder ?? idx,
+      }));
+    });
+
+    if (gammaImageRecords.length > 0) {
+      await db.insert(productImages).values(gammaImageRecords);
+    }
+
+    // Seed up to 4 sensible reviews per product (ensure Gamma products have at least 2)
+    const candidateReviewers = [ownerA.id, ownerB.id, customer1.id, customer2.id, ownerGamma.id];
     const positiveComments = [
       "Excellent quality and fast delivery!",
       "Very satisfied with the purchase.",
@@ -680,8 +924,12 @@ async function main() {
     }
 
     const allReviews: NewReview[] = [];
-    for (const p of insertedProducts) {
-      const count = randomInt(0, 4);
+    const productsForReviews = [...insertedProducts, ...gammaInsertedProducts];
+    for (const p of productsForReviews) {
+      const isGamma = gammaInsertedProducts.some((gp) => gp.id === p.id);
+      const minCount = isGamma ? 2 : 0;
+      const maxCount = 4;
+      const count = randomInt(minCount, maxCount);
       const seenReviewer = new Set<string>();
       for (let i = 0; i < count; i++) {
         const reviewer = candidateReviewers[randomInt(0, candidateReviewers.length - 1)];
@@ -1063,11 +1311,11 @@ async function main() {
     });
 
     console.log("✅ Seed complete:", {
-      users: 6, // 2 owners + 2 customers + 2 special accounts
-      stores: insertedStores.length,
+      users: 7, // +1 owner_gamma
+      stores: insertedStores.length + 1, // + Gamma Lifestyle
       categories: insertedCategories.length,
-      products: insertedProducts.length,
-      images: imageRecords.length,
+      products: insertedProducts.length + gammaInsertedProducts.length,
+      images: imageRecords.length + gammaImageRecords.length,
       customers: 4,
       orders: insertedOrders.length + riskOrdersCreated,
       orderItems: items.length + riskOrderItemsCreated,

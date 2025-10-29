@@ -70,7 +70,7 @@ export const ProductPageClient = ({ id }: { id: number }) => {
       : undefined,
     costPerItem: product.costPerItem ? product.costPerItem / 100 : undefined,
     category: product.category?.name ?? "Uncategorized",
-    tags: product.tags ? (JSON.parse(product.tags) as string[]) : [],
+    tags: product.tags ?? [],
     status: product.status,
     featured: product.featured,
     images: product.images,

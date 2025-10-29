@@ -5,8 +5,16 @@ import {
   stores,
   categories,
   productImages,
+  productTags,
+  tags,
+  cartItems,
+  orderItems,
+  reviews,
+  wishlists,
+  inventoryLogs,
+  productVariants,
 } from "@/server/db/schema";
-import { eq, asc } from "drizzle-orm";
+import { eq, asc, notInArray } from "drizzle-orm";
 
 // GET /api/products/[slug] - Get a specific product by slug or ID
 export async function GET(
@@ -42,7 +50,6 @@ export async function GET(
         slug: products.slug,
         status: products.status,
         featured: products.featured,
-        tags: products.tags,
         storeId: products.storeId,
         categoryId: products.categoryId,
         createdAt: products.createdAt,
@@ -61,15 +68,26 @@ export async function GET(
       .leftJoin(stores, eq(products.storeId, stores.id))
       .leftJoin(categories, eq(products.categoryId, categories.id))
       .where(
-        isNumericId 
-          ? eq(products.id, productId!)
-          : eq(products.slug, slug)
+        isNumericId ? eq(products.id, productId!) : eq(products.slug, slug),
       )
       .limit(1);
 
     if (productData.length === 0) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
+
+    const product = productData[0];
+
+    // Get product tags
+    const productTagsData = await db
+      .select({
+        id: tags.id,
+        name: tags.name,
+        slug: tags.slug,
+      })
+      .from(productTags)
+      .innerJoin(tags, eq(productTags.tagId, tags.id))
+      .where(eq(productTags.productId, product.id));
 
     // Get product images
     const images = await db
@@ -84,10 +102,9 @@ export async function GET(
       .where(eq(productImages.productId, productData[0].id))
       .orderBy(asc(productImages.displayOrder));
 
-    const product = productData[0];
-
     return NextResponse.json({
       ...product,
+      tags: productTagsData,
       images:
         images.length > 0
           ? images
@@ -117,11 +134,11 @@ export async function PUT(
 ) {
   try {
     const { slug } = await params;
-    
+
     // Check if the slug is a numeric ID
     const isNumericId = /^\d+$/.test(slug);
     let productId: number;
-    
+
     if (isNumericId) {
       productId = parseInt(slug);
     } else {
@@ -131,11 +148,14 @@ export async function PUT(
         .from(products)
         .where(eq(products.slug, slug))
         .limit(1);
-      
+
       if (productLookup.length === 0) {
-        return NextResponse.json({ error: "Product not found" }, { status: 404 });
+        return NextResponse.json(
+          { error: "Product not found" },
+          { status: 404 },
+        );
       }
-      
+
       productId = productLookup[0].id;
     }
 
@@ -158,15 +178,15 @@ export async function PUT(
       seoTitle?: string;
       seoDescription?: string;
       slug?: string;
-      status?: "active" | "draft" | "archived";
+      status?: "Active" | "Draft" | "Archived";
       featured?: boolean;
-      tags?: string;
+      tagIds?: number[];
       categoryId?: number;
       images?: string[];
     };
 
     // Validate required fields for active products
-    if (body.status === "active") {
+    if (body.status === "Active") {
       const currentProduct = await db
         .select({
           sku: products.sku,
@@ -269,14 +289,17 @@ export async function PUT(
       // Convert empty strings to null for drafts
       updateData.slug = body.slug && body.slug.trim() !== "" ? body.slug : null;
     }
-    if (body.status !== undefined) updateData.status = body.status;
-    if (body.featured !== undefined) updateData.featured = body.featured;
-
-    if (body.tags !== undefined) {
-      updateData.tags = body.tags
-        ? JSON.stringify(body.tags.split(",").map((tag: string) => tag.trim()))
-        : null;
+    if (body.status !== undefined) {
+      // Normalize status to DB enum values
+      const statusValue: "Active" | "Draft" | "Archived" =
+        body.status === "Active"
+          ? "Active"
+          : body.status === "Archived"
+            ? "Archived"
+            : "Draft";
+      updateData.status = statusValue;
     }
+    if (body.featured !== undefined) updateData.featured = body.featured;
 
     if (body.categoryId !== undefined) {
       updateData.categoryId = body.categoryId ?? null;
@@ -294,6 +317,22 @@ export async function PUT(
 
     if (!updatedProduct) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
+    }
+
+    // Handle tag updates
+    if (body.tagIds !== undefined) {
+      // Delete existing product-tag relationships
+      await db.delete(productTags).where(eq(productTags.productId, productId));
+
+      // Insert new product-tag relationships
+      if (body.tagIds.length > 0) {
+        await db.insert(productTags).values(
+          body.tagIds.map((tagId) => ({
+            productId,
+            tagId,
+          })),
+        );
+      }
     }
 
     // Update images if provided
@@ -341,7 +380,6 @@ export async function PUT(
         slug: products.slug,
         status: products.status,
         featured: products.featured,
-        tags: products.tags,
         storeId: products.storeId,
         categoryId: products.categoryId,
         createdAt: products.createdAt,
@@ -360,6 +398,17 @@ export async function PUT(
       .leftJoin(categories, eq(products.categoryId, categories.id))
       .where(eq(products.id, productId))
       .limit(1);
+
+    // Get product tags
+    const updatedTags = await db
+      .select({
+        id: tags.id,
+        name: tags.name,
+        slug: tags.slug,
+      })
+      .from(productTags)
+      .innerJoin(tags, eq(productTags.tagId, tags.id))
+      .where(eq(productTags.productId, productId));
 
     // Get product images
     const images = await db
@@ -388,6 +437,7 @@ export async function PUT(
                 displayOrder: 0,
               },
             ],
+      tags: updatedTags,
     };
 
     return NextResponse.json({ product: completeProduct });
@@ -400,14 +450,112 @@ export async function PUT(
   }
 }
 
-// DELETE /api/products/[slug] - Delete a product (placeholder for future implementation)
+// DELETE /api/products/[slug] - Delete a product by slug or ID
 export async function DELETE(
   _request: NextRequest,
-  { params: _params }: { params: Promise<{ slug: string }> },
+  { params }: { params: Promise<{ slug: string }> },
 ) {
-  // TODO: Implement product deletion with proper authentication
-  return NextResponse.json(
-    { error: "Product deletion not yet implemented" },
-    { status: 501 },
-  );
+  try {
+    const { slug } = await params;
+
+    // Check if the slug is a numeric ID
+    const isNumericId = /^\d+$/.test(slug);
+    let productId: number;
+
+    if (isNumericId) {
+      productId = parseInt(slug);
+    } else {
+      // First, get the product ID from the slug
+      const productLookup = await db
+        .select({ id: products.id })
+        .from(products)
+        .where(eq(products.slug, slug))
+        .limit(1);
+
+      if (productLookup.length === 0) {
+        return NextResponse.json(
+          { error: "Product not found" },
+          { status: 404 },
+        );
+      }
+
+      productId = productLookup[0].id;
+    }
+
+    // Verify product exists before attempting deletion
+    const productExists = await db
+      .select({ id: products.id })
+      .from(products)
+      .where(eq(products.id, productId))
+      .limit(1);
+
+    if (productExists.length === 0) {
+      return NextResponse.json({ error: "Product not found" }, { status: 404 });
+    }
+
+    // Delete related records first (since foreign keys don't cascade)
+    // Note: Some of these (orderItems, inventoryLogs) are historical records
+    // but must be deleted due to FK constraints. Consider archiving instead in production.
+
+    // Delete cart items
+    await db.delete(cartItems).where(eq(cartItems.productId, productId));
+
+    // Delete wishlist items
+    await db.delete(wishlists).where(eq(wishlists.productId, productId));
+
+    // Delete reviews
+    await db.delete(reviews).where(eq(reviews.productId, productId));
+
+    // Delete product variants
+    await db
+      .delete(productVariants)
+      .where(eq(productVariants.productId, productId));
+
+    // Delete inventory logs (historical data - consider archiving in production)
+    await db
+      .delete(inventoryLogs)
+      .where(eq(inventoryLogs.productId, productId));
+
+    // Delete order items (historical data - consider archiving in production)
+    await db.delete(orderItems).where(eq(orderItems.productId, productId));
+
+    // Delete product images
+    await db
+      .delete(productImages)
+      .where(eq(productImages.productId, productId));
+
+    // Delete product-tag relationships (productTags has cascade, but let's be explicit)
+    await db.delete(productTags).where(eq(productTags.productId, productId));
+
+    // Delete the product
+    await db.delete(products).where(eq(products.id, productId));
+
+    // Clean up orphaned tags (tags with no products)
+    // Get all tag IDs that are still in use
+    const usedTagIds = await db
+      .select({ tagId: productTags.tagId })
+      .from(productTags);
+
+    const usedTagIdArray = Array.from(new Set(usedTagIds.map((t) => t.tagId)));
+
+    // Delete tags that are not in use
+    // If usedTagIdArray is empty, notInArray will match all tags (deleting all orphaned tags)
+    if (usedTagIdArray.length > 0) {
+      await db.delete(tags).where(notInArray(tags.id, usedTagIdArray));
+    } else {
+      // If no tags are in use, delete all tags (intentional - cleaning up orphaned tags)
+      // eslint-disable-next-line drizzle/enforce-delete-with-where
+      await db.delete(tags);
+    }
+
+    return NextResponse.json({
+      message: "Product deleted successfully",
+    });
+  } catch (error) {
+    console.error("Error deleting product:", error);
+    return NextResponse.json(
+      { error: "Failed to delete product" },
+      { status: 500 },
+    );
+  }
 }

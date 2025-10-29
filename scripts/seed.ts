@@ -14,6 +14,8 @@ import {
   orders,
   orderItems,
   addresses,
+  tags,
+  productTags,
 } from "../src/server/db/schema";
 import { sql, type InferInsertModel } from "drizzle-orm";
 
@@ -26,6 +28,8 @@ type NewUserProfile = InferInsertModel<typeof userProfiles>;
 type NewOrder = InferInsertModel<typeof orders>;
 type NewOrderItem = InferInsertModel<typeof orderItems>;
 type NewAddress = InferInsertModel<typeof addresses>;
+type NewTag = InferInsertModel<typeof tags>;
+type NewProductTag = InferInsertModel<typeof productTags>;
 
 async function main() {
   const databaseUrl = process.env.DATABASE_URL;
@@ -42,12 +46,14 @@ async function main() {
     // Truncate all tables in correct order (respecting foreign keys)
     await db.execute(
       sql`TRUNCATE TABLE 
+        "product_tags",
         "product_images", 
         "order_items", 
         "orders", 
         "addresses", 
         "user_profiles", 
-        "products", 
+        "products",
+        "tags",
         "stores", 
         "categories", 
         "users" 
@@ -141,6 +147,7 @@ async function main() {
         isPrimary?: boolean;
         displayOrder?: number;
       }>;
+      tags: string[];
     };
 
     const productsSeed: ProductSeed[] = [
@@ -166,16 +173,16 @@ async function main() {
           slug: "wireless-earbuds-pro",
           status: "Active",
           featured: true,
-          tags: JSON.stringify([
-            "wireless",
-            "bluetooth",
-            "earbuds",
-            "noise-cancelling",
-            "premium",
-          ]),
           storeId: alphaStore.id,
           categoryId: categoryIds.electronics,
         },
+        tags: [
+          "wireless",
+          "bluetooth",
+          "earbuds",
+          "noise-cancelling",
+          "premium",
+        ],
         images: [
           {
             imageUrl:
@@ -214,10 +221,10 @@ async function main() {
           slug: "smart-home-hub",
           status: "Active",
           featured: false,
-          tags: JSON.stringify(["smart-home", "hub", "automation", "iot"]),
           storeId: alphaStore.id,
           categoryId: categoryIds.homeLiving,
         },
+        tags: ["smart-home", "hub", "automation", "iot"],
         images: [
           {
             imageUrl:
@@ -256,16 +263,10 @@ async function main() {
           slug: "usb-c-fast-charger-65w",
           status: "Active",
           featured: false,
-          tags: JSON.stringify([
-            "charger",
-            "usb-c",
-            "fast-charging",
-            "gan",
-            "65w",
-          ]),
           storeId: alphaStore.id,
           categoryId: categoryIds.accessories,
         },
+        tags: ["charger", "usb-c", "fast-charging", "gan", "65w"],
         images: [
           {
             imageUrl:
@@ -304,16 +305,10 @@ async function main() {
           slug: "handwoven-storage-basket",
           status: "Active",
           featured: true,
-          tags: JSON.stringify([
-            "handmade",
-            "basket",
-            "storage",
-            "eco-friendly",
-            "seagrass",
-          ]),
           storeId: betaStore.id,
           categoryId: categoryIds.handmade,
         },
+        tags: ["handmade", "basket", "storage", "eco-friendly", "seagrass"],
         images: [
           {
             imageUrl:
@@ -352,16 +347,10 @@ async function main() {
           slug: "minimalist-ceramic-vase",
           status: "Active",
           featured: false,
-          tags: JSON.stringify([
-            "ceramic",
-            "vase",
-            "minimalist",
-            "handmade",
-            "decor",
-          ]),
           storeId: betaStore.id,
           categoryId: categoryIds.homeLiving,
         },
+        tags: ["ceramic", "vase", "minimalist", "handmade", "decor"],
         images: [
           {
             imageUrl:
@@ -400,16 +389,10 @@ async function main() {
           slug: "handcrafted-leather-keychain",
           status: "Active",
           featured: false,
-          tags: JSON.stringify([
-            "leather",
-            "keychain",
-            "handmade",
-            "brass",
-            "accessories",
-          ]),
           storeId: betaStore.id,
           categoryId: categoryIds.accessories,
         },
+        tags: ["leather", "keychain", "handmade", "brass", "accessories"],
         images: [
           {
             imageUrl:
@@ -448,16 +431,10 @@ async function main() {
           slug: "portable-bluetooth-speaker",
           status: "Active",
           featured: true,
-          tags: JSON.stringify([
-            "speaker",
-            "bluetooth",
-            "portable",
-            "waterproof",
-            "bass",
-          ]),
           storeId: alphaStore.id,
           categoryId: categoryIds.electronics,
         },
+        tags: ["speaker", "bluetooth", "portable", "waterproof", "bass"],
         images: [
           {
             imageUrl:
@@ -496,16 +473,10 @@ async function main() {
           slug: "organic-cotton-t-shirt",
           status: "Active",
           featured: false,
-          tags: JSON.stringify([
-            "cotton",
-            "organic",
-            "t-shirt",
-            "sustainable",
-            "clothing",
-          ]),
           storeId: betaStore.id,
           categoryId: categoryIds.clothing,
         },
+        tags: ["cotton", "organic", "t-shirt", "sustainable", "clothing"],
         images: [
           {
             imageUrl: "/placeholder.svg",
@@ -537,16 +508,10 @@ async function main() {
           slug: "yoga-mat-premium",
           status: "Draft",
           featured: false,
-          tags: JSON.stringify([
-            "yoga",
-            "mat",
-            "fitness",
-            "non-slip",
-            "premium",
-          ]),
           storeId: alphaStore.id,
           categoryId: categoryIds.sports,
         },
+        tags: ["yoga", "mat", "fitness", "non-slip", "premium"],
         images: [
           {
             imageUrl: "/placeholder.svg",
@@ -578,16 +543,10 @@ async function main() {
           slug: "programming-fundamentals-book",
           status: "Active",
           featured: false,
-          tags: JSON.stringify([
-            "book",
-            "programming",
-            "education",
-            "coding",
-            "fundamentals",
-          ]),
           storeId: alphaStore.id,
           categoryId: categoryIds.books,
         },
+        tags: ["book", "programming", "education", "coding", "fundamentals"],
         images: [
           {
             imageUrl: "/placeholder.svg",
@@ -603,6 +562,53 @@ async function main() {
       .insert(products)
       .values(productsSeed.map((ps) => ps.product))
       .returning();
+
+    // Extract all unique tag names from all products
+    const allTagNames = Array.from(
+      new Set(productsSeed.flatMap((ps) => ps.tags)),
+    );
+
+    // Helper to generate slug from tag name
+    function generateTagSlug(name: string): string {
+      return name
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9\s-]/g, "")
+        .replace(/\s+/g, "-")
+        .replace(/-+/g, "-")
+        .replace(/^-+|-+$/g, "");
+    }
+
+    // Create tags
+    const tagData: NewTag[] = allTagNames.map((name) => ({
+      name,
+      slug: generateTagSlug(name),
+    }));
+
+    const insertedTags = await db.insert(tags).values(tagData).returning();
+    const tagMap = new Map(insertedTags.map((t) => [t.name, t]));
+
+    // Create product-tag relationships
+    const productTagRelationships: NewProductTag[] = [];
+
+    for (let i = 0; i < insertedProducts.length; i++) {
+      const product = insertedProducts[i];
+      const seed = productsSeed[i];
+
+      for (const tagName of seed.tags) {
+        const tag = tagMap.get(tagName);
+        if (tag) {
+          productTagRelationships.push({
+            productId: product.id,
+            tagId: tag.id,
+          });
+        }
+      }
+    }
+
+    if (productTagRelationships.length > 0) {
+      await db.insert(productTags).values(productTagRelationships);
+    }
 
     const imageRecords: NewProductImage[] = insertedProducts.flatMap((p) => {
       const seed = productsSeed.find((ps) => ps.product.name === p.name);
@@ -749,7 +755,9 @@ async function main() {
       users: 4, // 2 owners + 2 customers
       stores: insertedStores.length,
       categories: insertedCategories.length,
+      tags: insertedTags.length,
       products: insertedProducts.length,
+      productTags: productTagRelationships.length,
       images: imageRecords.length,
       customers: 2,
       orders: insertedOrders.length,

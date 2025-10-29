@@ -65,7 +65,7 @@ export function ProductEditPageClient({ id }: ProductEditPageClientProps) {
     compareAtPrice: product.compareAtPrice ? product.compareAtPrice / 100 : 0,
     costPerItem: product.costPerItem ? product.costPerItem / 100 : 0,
     category: product.categoryId?.toString() ?? "",
-    tags: product.tags ?? "",
+    tags: product.tags?.map((t) => t.name) ?? [],
     trackQuantity: product.trackQuantity,
     quantity: product.stock,
     allowBackorders: product.allowBackorders,

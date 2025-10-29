@@ -21,7 +21,7 @@ export interface Product {
   slug: string | null; // Nullable for drafts
   status: string;
   featured: boolean;
-  tags: string | null;
+  tags: Array<{ id: number; name: string; slug: string }> | null;
   storeId: string;
   categoryId: number | null;
   createdAt: Date;
@@ -72,9 +72,9 @@ export interface CreateProductData {
   seoTitle?: string;
   seoDescription?: string;
   slug?: string;
-  status?: "active" | "draft" | "archived";
+  status?: "Active" | "Draft" | "Archived";
   featured?: boolean;
-  tags?: string;
+  tagIds?: number[];
   storeId: string;
   categoryId?: number;
   images?: string[];
@@ -99,9 +99,9 @@ export interface UpdateProductData {
   seoTitle?: string;
   seoDescription?: string;
   slug?: string;
-  status?: "active" | "draft" | "archived";
+  status?: "Active" | "Draft" | "Archived";
   featured?: boolean;
-  tags?: string;
+  tagIds?: number[];
   categoryId?: number;
   images?: string[];
 }
@@ -257,13 +257,8 @@ export function formatPrice(priceInCents: number): string {
 }
 
 // Utility function to parse tags from JSON string
-export function parseTags(tagsJson: string | null): string[] {
-  if (!tagsJson) return [];
-  try {
-    return JSON.parse(tagsJson) as string[];
-  } catch {
-    return [];
-  }
+export function parseTags(tags: string[] | null): string[] {
+  return tags ?? [];
 }
 
 // Utility function to format dimensions

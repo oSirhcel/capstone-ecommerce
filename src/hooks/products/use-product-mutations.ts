@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   createProduct,
   updateProduct,
+  deleteProduct,
   type CreateProductData,
   type UpdateProductData,
 } from "@/lib/api/products";
@@ -99,6 +100,31 @@ export function useUpdateProduct() {
     onError: (error) => {
       console.error("Error updating product:", error);
       toast.error("Failed to update product. Please try again.");
+    },
+  });
+}
+
+export function useDeleteProduct() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: number) => deleteProduct(id),
+    onSuccess: (response, productId) => {
+      if (response.data) {
+        // Invalidate and refetch products list
+        void queryClient.invalidateQueries({ queryKey: ["products"] });
+
+        // Remove the product from the cache
+        queryClient.removeQueries({ queryKey: ["product", productId] });
+
+        toast.success("Product deleted successfully!");
+      } else if (response.error) {
+        toast.error(response.error);
+      }
+    },
+    onError: (error) => {
+      console.error("Error deleting product:", error);
+      toast.error("Failed to delete product. Please try again.");
     },
   });
 }

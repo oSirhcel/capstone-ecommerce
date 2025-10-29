@@ -42,7 +42,7 @@ export function ProductSelectionForm({ storeId }: ProductSelectionFormProps) {
     // Filter for active products only
     return (
       productsData?.products.filter(
-        (p) => p.status === "active" && p.price !== null,
+        (p) => p.status === "Active" && p.price !== null,
       ) ?? []
     );
   }, [productsData]);

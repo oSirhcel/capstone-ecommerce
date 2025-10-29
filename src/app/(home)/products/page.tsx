@@ -12,7 +12,14 @@ import {
 } from "@/lib/api/products";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { SearchIcon, FilterIcon } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { SearchIcon } from "lucide-react";
 
 // Interface for search API response
 interface SearchResult {
@@ -64,6 +71,16 @@ export default function ProductsPage() {
     searchParams.get("search") || "",
   );
   const currentPage = parseInt(searchParams.get("page") || "1");
+  const sort =
+    (searchParams.get("sort") as
+      | "price-low"
+      | "price-high"
+      | "rating-low"
+      | "rating-high"
+      | "name-asc"
+      | "name-desc"
+      | "release-newest"
+      | "release-oldest") || "release-newest";
 
   const searchQuery = searchParams.get("search");
   const isSearching = Boolean(searchQuery?.trim());
@@ -71,7 +88,7 @@ export default function ProductsPage() {
   // Function to fetch search results
   const fetchSearchResults = async (): Promise<SearchResult> => {
     const response = await fetch(
-      `/api/search?q=${encodeURIComponent(searchQuery!)}&type=products&page=${currentPage}&limit=${PRODUCTS_PER_PAGE}`,
+      `/api/search?q=${encodeURIComponent(searchQuery!)}&type=products&page=${currentPage}&limit=${PRODUCTS_PER_PAGE}&sort=${encodeURIComponent(sort)}`,
     );
     if (!response.ok) {
       throw new Error("Failed to fetch search results");
@@ -86,6 +103,7 @@ export default function ProductsPage() {
         page: currentPage,
         limit: PRODUCTS_PER_PAGE,
         search: searchQuery,
+        sort,
       },
     ],
     queryFn: () =>
@@ -94,6 +112,7 @@ export default function ProductsPage() {
         : fetchProducts({
             page: currentPage,
             limit: PRODUCTS_PER_PAGE,
+            sort,
           }),
   });
 
@@ -117,6 +136,17 @@ export default function ProductsPage() {
   const handlePageChange = (page: number) => {
     const params = new URLSearchParams(searchParams);
     params.set("page", page.toString());
+    router.push(`${pathname}?${params.toString()}`);
+  };
+
+  const handleSortChange = (value: string) => {
+    const params = new URLSearchParams(searchParams);
+    if (value) {
+      params.set("sort", value);
+    } else {
+      params.delete("sort");
+    }
+    params.set("page", "1");
     router.push(`${pathname}?${params.toString()}`);
   };
 
@@ -179,10 +209,21 @@ export default function ProductsPage() {
           </form>
 
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm">
-              <FilterIcon className="mr-2 h-4 w-4" />
-              Filters
-            </Button>
+            <Select value={sort} onValueChange={handleSortChange}>
+              <SelectTrigger className="w-[220px]">
+                <SelectValue placeholder="Sort by" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="release-newest">Release: Newest</SelectItem>
+                <SelectItem value="release-oldest">Release: Oldest</SelectItem>
+                <SelectItem value="price-low">Price: Low to High</SelectItem>
+                <SelectItem value="price-high">Price: High to Low</SelectItem>
+                <SelectItem value="rating-high">Rating: High to Low</SelectItem>
+                <SelectItem value="rating-low">Rating: Low to High</SelectItem>
+                <SelectItem value="name-asc">Name: A → Z</SelectItem>
+                <SelectItem value="name-desc">Name: Z → A</SelectItem>
+              </SelectContent>
+            </Select>
             <p className="text-sm text-gray-600 dark:text-gray-400">
               {pagination.total} products
             </p>

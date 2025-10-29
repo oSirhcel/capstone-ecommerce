@@ -117,6 +117,15 @@ export async function fetchProducts(params?: {
   category?: number;
   store?: string;
   search?: string;
+  sort?:
+    | "price-low"
+    | "price-high"
+    | "rating-low"
+    | "rating-high"
+    | "name-asc"
+    | "name-desc"
+    | "release-newest"
+    | "release-oldest";
 }): Promise<ProductsResponse> {
   const searchParams = new URLSearchParams();
 
@@ -126,6 +135,7 @@ export async function fetchProducts(params?: {
     searchParams.append("category", params.category.toString());
   if (params?.store) searchParams.append("store", params.store);
   if (params?.search) searchParams.append("search", params.search);
+  if (params?.sort) searchParams.append("sort", params.sort);
 
   const response = await fetch(
     `${getBaseUrl()}/api/products?${searchParams.toString()}`,

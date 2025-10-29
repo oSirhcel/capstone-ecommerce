@@ -2,24 +2,41 @@
 
 import { useState, useRef, useEffect } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 
 import { Button } from "@/components/ui/button";
-import { ProductCard } from "@/components/product-card";
+import { ProductCard, ProductCardSkeleton } from "@/components/product-card";
 import { useIsMobile } from "@/hooks/use-mobile";
+import {
+  fetchRelatedProducts,
+  getPrimaryImageUrl,
+  type Product,
+} from "@/lib/api/products";
 
 interface RelatedProductsProps {
   category: string;
-  currentProductId: string;
+  currentProductSlug: string;
 }
 
 export function RelatedProducts({
   category,
-  currentProductId,
+  currentProductSlug,
 }: RelatedProductsProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
   const isMobile = useIsMobile();
+
+  // Fetch related products
+  const {
+    data: relatedProductsData,
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ["related-products", currentProductSlug],
+    queryFn: () => fetchRelatedProducts(currentProductSlug, 6),
+    enabled: !!currentProductSlug,
+  });
 
   const checkScrollButtons = () => {
     const container = scrollContainerRef.current;
@@ -66,57 +83,55 @@ export function RelatedProducts({
     };
   }, []);
 
-  // Mock related products data
-  const relatedProducts = [
-    {
-      name: "Ceramic Espresso Cup Set",
-      price: 29.99,
-      image: "/placeholder.svg?height=300&width=300",
-      rating: 4.7,
-      store: "Artisan Crafts",
-      category: "Home & Kitchen",
-    },
-    {
-      name: "Handcrafted Wooden Coasters",
-      price: 19.99,
-      image: "/placeholder.svg?height=300&width=300",
-      rating: 4.5,
-      store: "Woodworks",
-      category: "Home & Kitchen",
-    },
-    {
-      name: "Ceramic Serving Platter",
-      price: 49.99,
-      image: "/placeholder.svg?height=300&width=300",
-      rating: 4.8,
-      store: "Artisan Crafts",
-      category: "Home & Kitchen",
-    },
-    {
-      name: "Stoneware Dinner Plates Set",
-      price: 64.99,
-      image: "/placeholder.svg?height=300&width=300",
-      rating: 4.6,
-      store: "Modern Home",
-      category: "Home & Kitchen",
-    },
-    {
-      name: "Ceramic Tea Pot",
-      price: 39.99,
-      image: "/placeholder.svg?height=300&width=300",
-      rating: 4.9,
-      store: "Artisan Crafts",
-      category: "Home & Kitchen",
-    },
-    {
-      name: "Handmade Ceramic Vase",
-      price: 54.99,
-      image: "/placeholder.svg?height=300&width=300",
-      rating: 4.7,
-      store: "Artisan Crafts",
-      category: "Home & Kitchen",
-    },
-  ];
+  // Transform API Product to ProductCard props
+  const transformProductToCardProps = (product: Product) => ({
+    id: product.id,
+    slug: product.slug ?? product.id.toString(),
+    name: product.name,
+    price: (product.price ?? 0) / 100, // Convert from cents to dollars
+    image: getPrimaryImageUrl(product),
+    rating: product.rating,
+    reviewCount: product.reviewCount,
+    store: product.store?.name ?? "Unknown Store",
+    category: product.category?.name ?? "Uncategorized",
+  });
+
+  // Handle loading state
+  if (isLoading) {
+    return (
+      <div className="relative">
+        <div className="scrollbar-hide flex gap-4 overflow-x-auto pt-2 pb-4">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <div key={index} className="min-w-[250px] md:min-w-[300px]">
+              <ProductCardSkeleton />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // Handle error state
+  if (error || !relatedProductsData?.products) {
+    return (
+      <div className="text-muted-foreground py-8 text-center">
+        Unable to load related products.
+      </div>
+    );
+  }
+
+  const relatedProducts = relatedProductsData.products.map(
+    transformProductToCardProps,
+  );
+
+  // Handle empty state
+  if (relatedProducts.length === 0) {
+    return (
+      <div className="text-muted-foreground py-8 text-center">
+        No related products found.
+      </div>
+    );
+  }
 
   return (
     <div className="relative">
@@ -124,9 +139,9 @@ export function RelatedProducts({
         ref={scrollContainerRef}
         className="scrollbar-hide flex gap-4 overflow-x-auto pt-2 pb-4"
       >
-        {relatedProducts.map((product, index) => (
-          <div key={index} className="min-w-[250px] md:min-w-[300px]">
-            <ProductCard id={index} {...product} />
+        {relatedProducts.map((product) => (
+          <div key={product.id} className="min-w-[250px] md:min-w-[300px]">
+            <ProductCard {...product} />
           </div>
         ))}
       </div>

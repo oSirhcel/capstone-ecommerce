@@ -291,6 +291,25 @@ export function getPrimaryImageUrl(product: Product): string {
   );
 }
 
+// GET /api/products/[slug]/related - Fetch related products for a specific product
+export async function fetchRelatedProducts(
+  productSlug: string,
+  limit?: number,
+): Promise<{ products: Product[] }> {
+  const searchParams = new URLSearchParams();
+  if (limit) searchParams.append("limit", limit.toString());
+
+  const response = await fetch(
+    `${getBaseUrl()}/api/products/${productSlug}/related?${searchParams.toString()}`,
+  );
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch related products: ${response.statusText}`);
+  }
+
+  return response.json() as Promise<{ products: Product[] }>;
+}
+
 // Utility function to check if user can edit product (placeholder for auth)
 export function canEditProduct(_product: Product, _userId?: string): boolean {
   // TODO: Implement proper authorization logic

@@ -142,7 +142,7 @@ export function ProductPageClient({ productSlug }: ProductPageClientProps) {
           <h2 className="mb-8 text-2xl font-bold">Related Products</h2>
           <RelatedProducts
             category={transformedProduct.category}
-            currentProductId={transformedProduct.id}
+            currentProductSlug={productSlug}
           />
         </section>
       </div>

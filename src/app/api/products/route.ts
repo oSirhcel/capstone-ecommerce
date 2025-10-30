@@ -6,6 +6,7 @@ import {
   categories,
   productImages,
   productTags,
+  tags,
 } from "@/server/db/schema";
 import { eq, desc, asc, and, ilike } from "drizzle-orm";
 
@@ -335,6 +336,17 @@ export async function POST(request: NextRequest) {
       .where(eq(products.id, newProduct.id))
       .limit(1);
 
+    // Get product tags
+    const productTagsData = await db
+      .select({
+        id: tags.id,
+        name: tags.name,
+        slug: tags.slug,
+      })
+      .from(productTags)
+      .innerJoin(tags, eq(productTags.tagId, tags.id))
+      .where(eq(productTags.productId, newProduct.id));
+
     // Get product images
     const productImagesData = await db
       .select({
@@ -350,7 +362,7 @@ export async function POST(request: NextRequest) {
 
     const completeProduct = {
       ...productWithImages[0],
-      tags: [],
+      tags: productTagsData,
       images:
         productImagesData.length > 0
           ? productImagesData

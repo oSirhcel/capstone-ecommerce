@@ -2,6 +2,7 @@ import { generateText } from "ai";
 import { google } from "@ai-sdk/google";
 import type { ChatMessage } from "@/lib/ai/schemas";
 import type { EnhancedChatContext } from "@/lib/ai/context-builder";
+import { ONBOARDING_STEP_CONFIGS } from "@/lib/ai/onboarding-step-configs";
 
 export interface SuggestionChip {
   label: string;
@@ -52,21 +53,34 @@ export async function generateSuggestions(
 function buildSuggestionsPrompt(context: EnhancedChatContext): string {
   const storeStats = context.storeStats;
   const setupStatus = context.setupStatus;
+  const isOnboardingIncomplete = setupStatus && setupStatus.progress < 100;
 
   let storeContext = `Store Context:
 - Current page: ${context.currentPage ?? "unknown"}`;
 
-  if (setupStatus) {
-    storeContext += `\n- Setup progress: ${setupStatus.progress}%`;
-    if (setupStatus.nextSteps.length > 0) {
-      storeContext += `\n- Recommended next steps: ${setupStatus.nextSteps.slice(0, 2).join(", ")}`;
+  if (isOnboardingIncomplete) {
+    storeContext += `\n- ⚠️ ONBOARDING INCOMPLETE: ${setupStatus.progress}% complete`;
+    storeContext += `\n- Next steps: ${setupStatus.nextSteps.slice(0, 3).join(", ")}`;
+
+    if (setupStatus.stepDetails && setupStatus.stepDetails.length > 0) {
+      const nextStep = setupStatus.stepDetails[0];
+      storeContext += `\n- Priority step: ${nextStep.label} - ${nextStep.guidance}`;
+      if (nextStep.route) {
+        storeContext += ` (route: ${nextStep.route})`;
+      }
     }
+  } else if (setupStatus) {
+    storeContext += `\n- Setup: Complete (100%)`;
   }
 
   if (storeStats) {
     storeContext += `\n- Store stats:`;
-    storeContext += `\n  • ${storeStats.productCount} products`;
-    storeContext += `\n  • ${storeStats.activeProducts} active`;
+    if (storeStats.productCount > 0) {
+      storeContext += `\n  • ${storeStats.productCount} products`;
+    }
+    if (storeStats.activeProducts > 0) {
+      storeContext += `\n  • ${storeStats.activeProducts} active`;
+    }
     if (storeStats.totalOrders !== undefined) {
       storeContext += `\n  • ${storeStats.totalOrders} orders`;
     }
@@ -78,13 +92,21 @@ function buildSuggestionsPrompt(context: EnhancedChatContext): string {
     }
   }
 
-  return `You are a helpful assistant providing 2-3 concise next-step suggestions for an e-commerce store owner.
+  let prompt = `You are a helpful assistant providing 2-3 concise next-step suggestions for an e-commerce store owner.
 Based on the conversation and store context, suggest natural follow-up questions or actions.
 
-${storeContext}
+${storeContext}`;
 
-Generate 2-3 contextually relevant suggestions as a JSON array. Consider:
-1. Setup progress - if incomplete, suggest setup steps
+  if (isOnboardingIncomplete) {
+    prompt += `\n\nPRIORITY: Generate suggestions that prioritize onboarding completion.`;
+    prompt += `\n- First suggestion should relate to the next incomplete onboarding step`;
+    prompt += `- Make suggestions actionable and specific to the step`;
+    prompt += `- Use conversational language that encourages progress`;
+    prompt += `\n- Example: "Complete ${setupStatus.stepDetails?.[0]?.label ?? "next step"}" or "Help me set up ${setupStatus.stepDetails?.[0]?.label ?? "next step"}"`;
+  }
+
+  prompt += `\n\nGenerate 2-3 contextually relevant suggestions as a JSON array. Consider:
+1. Setup progress - if incomplete, prioritize onboarding steps
 2. Store activity - if no products, suggest creating one
 3. Current page - provide page-specific suggestions
 4. Natural conversation flow - relate to what the user just asked
@@ -92,14 +114,20 @@ Generate 2-3 contextually relevant suggestions as a JSON array. Consider:
 Each suggestion should be:
 1. A natural, conversational question or action
 2. Relevant to the current context and page
-3. Actionable and helpful for store management
+3. Actionable and helpful for store management`;
 
-Return ONLY valid JSON array like:
+  if (isOnboardingIncomplete) {
+    prompt += `\n4. Prioritize completing onboarding when relevant`;
+  }
+
+  prompt += `\n\nReturn ONLY valid JSON array like:
 [
   {"label": "Show me my recent orders", "actionType": "chat"},
   {"label": "How do I add a product?", "actionType": "chat"},
   {"label": "Set up shipping", "actionType": "action"}
 ]`;
+
+  return prompt;
 }
 
 /**
@@ -140,90 +168,139 @@ function getDefaultSuggestions(
   const suggestions: SuggestionChip[] = [];
   const stats = context.storeStats;
   const setup = context.setupStatus;
+  const isOnboardingIncomplete = setup && setup.progress < 100;
 
-  // Setup-first suggestions if incomplete
-  if (setup && setup.progress < 100) {
-    const nextStep = setup.nextSteps?.[0];
-    if (nextStep) {
+  // Prioritize onboarding if incomplete
+  if (isOnboardingIncomplete && setup.nextSteps.length > 0) {
+    // Map next steps to actionable suggestions
+    const nextStepKeys = setup.nextSteps.slice(0, 2);
+
+    nextStepKeys.forEach((stepKey) => {
+      const stepConfig = ONBOARDING_STEP_CONFIGS[stepKey];
+      if (stepConfig) {
+        // Create actionable suggestions based on step
+        if (stepConfig.route) {
+          // For steps with routes, create navigation/action suggestions
+          suggestions.push({
+            label: `Complete: ${stepConfig.label}`,
+            actionType: "action",
+          });
+          suggestions.push({
+            label: `Help me ${stepConfig.label.toLowerCase()}`,
+            actionType: "chat",
+          });
+        } else {
+          // For steps without routes, create chat suggestions
+          suggestions.push({
+            label: `How do I ${stepConfig.label.toLowerCase()}?`,
+            actionType: "chat",
+          });
+        }
+      } else {
+        // Fallback for unknown steps
+        suggestions.push({
+          label: `Complete ${stepKey}`,
+          actionType: "action",
+        });
+      }
+    });
+
+    // Add progress context if space allows
+    if (suggestions.length < 3 && setup.progress > 0) {
       suggestions.push({
-        label: `${nextStep} (${setup.progress}% done)`,
-        actionType: "action",
+        label: `Show my setup progress (${setup.progress}%)`,
+        actionType: "chat",
       });
     }
   }
 
-  // Page-specific suggestions
-  switch (context.currentPage) {
-    case "add-product":
-      suggestions.push(
-        { label: "How do I add product images?", actionType: "chat" },
-        { label: "What's SEO optimization?", actionType: "chat" },
-        { label: "View my products", actionType: "navigate" },
-      );
-      break;
+  // Page-specific suggestions (only if onboarding is complete or if we have space)
+  if (!isOnboardingIncomplete || suggestions.length < 2) {
+    switch (context.currentPage) {
+      case "add-product":
+        if (suggestions.length < 3) {
+          suggestions.push(
+            { label: "How do I add product images?", actionType: "chat" },
+            { label: "What's SEO optimization?", actionType: "chat" },
+          );
+        }
+        break;
 
-    case "products":
-      if (stats && stats.productCount === 0) {
-        suggestions.push(
-          { label: "Create my first product", actionType: "navigate" },
-          { label: "How do I price products?", actionType: "chat" },
-        );
-      } else {
-        suggestions.push(
-          { label: "How do I manage inventory?", actionType: "chat" },
-          { label: "View product analytics", actionType: "chat" },
-        );
-      }
-      suggestions.push({ label: "View orders", actionType: "navigate" });
-      break;
+      case "products":
+        if (stats && stats.productCount === 0 && suggestions.length < 3) {
+          suggestions.push(
+            { label: "Create my first product", actionType: "navigate" },
+            { label: "How do I price products?", actionType: "chat" },
+          );
+        } else if (suggestions.length < 3) {
+          suggestions.push(
+            { label: "How do I manage inventory?", actionType: "chat" },
+            { label: "View product analytics", actionType: "chat" },
+          );
+        }
+        break;
 
-    case "orders":
-      if (stats?.totalOrders && stats.totalOrders > 0) {
-        suggestions.push(
-          { label: "Show recent orders", actionType: "chat" },
-          { label: "How do I process a refund?", actionType: "chat" },
-        );
-      } else {
-        suggestions.push(
-          { label: "How do orders work?", actionType: "chat" },
-          { label: "View my products", actionType: "navigate" },
-        );
-      }
-      suggestions.push({ label: "View customer details", actionType: "chat" });
-      break;
+      case "orders":
+        if (
+          stats?.totalOrders &&
+          stats.totalOrders > 0 &&
+          suggestions.length < 3
+        ) {
+          suggestions.push(
+            { label: "Show recent orders", actionType: "chat" },
+            { label: "How do I process a refund?", actionType: "chat" },
+          );
+        } else if (suggestions.length < 3) {
+          suggestions.push(
+            { label: "How do orders work?", actionType: "chat" },
+            { label: "View my products", actionType: "navigate" },
+          );
+        }
+        break;
 
-    case "dashboard":
-      if (setup && setup.progress < 100) {
-        suggestions.push(
-          { label: "What's the next setup step?", actionType: "chat" },
-          { label: "View my products", actionType: "navigate" },
-        );
-      } else if (stats && stats.productCount === 0) {
-        suggestions.push(
-          { label: "Create your first product", actionType: "navigate" },
-          { label: "How do I manage my store?", actionType: "chat" },
-        );
-      } else {
-        suggestions.push(
-          { label: "View analytics", actionType: "navigate" },
-          { label: "Show recent orders", actionType: "chat" },
-        );
-      }
-      break;
+      case "dashboard":
+        if (
+          !isOnboardingIncomplete &&
+          stats &&
+          stats.productCount === 0 &&
+          suggestions.length < 3
+        ) {
+          suggestions.push(
+            { label: "Create your first product", actionType: "navigate" },
+            { label: "How do I manage my store?", actionType: "chat" },
+          );
+        } else if (!isOnboardingIncomplete && suggestions.length < 3) {
+          suggestions.push(
+            { label: "View analytics", actionType: "navigate" },
+            { label: "Show recent orders", actionType: "chat" },
+          );
+        }
+        break;
 
-    default:
-      if (stats && stats.productCount === 0) {
-        suggestions.push(
-          { label: "Create your first product", actionType: "navigate" },
-          { label: "What's product SEO?", actionType: "chat" },
-        );
-      } else {
-        suggestions.push(
-          { label: "Show my recent orders", actionType: "chat" },
-          { label: "View analytics", actionType: "navigate" },
-        );
-      }
-      suggestions.push({ label: "Help me with my store", actionType: "chat" });
+      default:
+        if (
+          !isOnboardingIncomplete &&
+          stats &&
+          stats.productCount === 0 &&
+          suggestions.length < 3
+        ) {
+          suggestions.push(
+            { label: "Create your first product", actionType: "navigate" },
+            { label: "What's product SEO?", actionType: "chat" },
+          );
+        } else if (!isOnboardingIncomplete && suggestions.length < 3) {
+          suggestions.push(
+            { label: "Show my recent orders", actionType: "chat" },
+            { label: "View analytics", actionType: "navigate" },
+          );
+        }
+        if (!isOnboardingIncomplete && suggestions.length < 3) {
+          suggestions.push({
+            label: "Help me with my store",
+            actionType: "chat",
+          });
+        }
+    }
   }
 
   return suggestions.slice(0, 3);

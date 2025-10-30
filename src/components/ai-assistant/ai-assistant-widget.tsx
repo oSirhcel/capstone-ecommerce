@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { ChatbotButton } from "./chatbot-button";
 import { ChatbotWindow } from "./chatbot-window";
@@ -11,10 +11,12 @@ import { ChatMessage } from "./chat-message";
 import { TypingIndicator } from "./typing-indicator";
 import { SuggestionChips } from "./suggestion-chips";
 import { ProductDraftCard } from "./product-draft-card";
+import { OnboardingStatusCard } from "./onboarding-status-card";
 import { useAIProductDraft } from "@/contexts/ai-product-draft-context";
 import { useChatMutation } from "@/hooks/ai-assistant/use-chat-mutation";
 import { useMessages } from "@/hooks/ai-assistant/use-messages";
 import { usePathname } from "next/navigation";
+import { useOnboardingStatus } from "@/hooks/onboarding/use-onboarding-status";
 import type { SuggestionChip } from "@/lib/ai/suggestions-generator";
 import type { ExtractedProduct } from "@/lib/ai/extractors/product-extractor";
 
@@ -37,6 +39,25 @@ function formatPageLabel(page: string): string {
   return pageMap[page] ?? page;
 }
 
+/**
+ * Get contextual welcome message based on onboarding progress
+ */
+function getWelcomeMessage(progress: number, hasStore: boolean): string {
+  if (!hasStore || progress < 20) {
+    return "Welcome! Let's set up your store. I'll guide you through each step.";
+  }
+  if (progress < 50) {
+    return `Great start! You're ${progress}% done. Want help with the next step?`;
+  }
+  if (progress < 80) {
+    return `Excellent progress! You're ${progress}% complete. Almost there!`;
+  }
+  if (progress < 100) {
+    return `Almost there! Just a few more steps to complete your store setup.`;
+  }
+  return "Welcome! How can I help you today?";
+}
+
 export function AIAssistantWidget() {
   const router = useRouter();
   const pathname = usePathname();
@@ -48,11 +69,26 @@ export function AIAssistantWidget() {
     page: string;
     label: string;
   } | null>(null);
+  const [welcomeMessage, setWelcomeMessage] = useState<string>(
+    "Welcome! How can I help you today?",
+  );
 
   // Use hooks
   const { messages, addMessage, clearHistory, createMessage } = useMessages();
   const chatMutation = useChatMutation();
   const { setPendingDraft } = useAIProductDraft();
+  const { data: onboardingStatus, isLoading: isLoadingOnboarding } = useOnboardingStatus();
+
+  // Update welcome message based on onboarding status
+  useEffect(() => {
+    if (onboardingStatus) {
+      const message = getWelcomeMessage(
+        onboardingStatus.progress,
+        onboardingStatus.hasStore,
+      );
+      setWelcomeMessage(message);
+    }
+  }, [onboardingStatus]);
 
   // Close chat and reset to initial state
   const handleCloseChat = useCallback(() => {
@@ -155,11 +191,21 @@ export function AIAssistantWidget() {
         <ChatbotHeader onReset={handleCloseChat} />
         <ChatbotBody>
           {messages.length === 0 ? (
-            <div className="text-muted-foreground flex h-full items-center justify-center">
-              <p>Welcome! How can I help you today?</p>
+            <div className="flex h-full flex-col items-center justify-center gap-4 px-4 py-8">
+              <p className="text-muted-foreground text-center">{welcomeMessage}</p>
+              {!isLoadingOnboarding && onboardingStatus && onboardingStatus.progress < 100 && (
+                <div className="w-full max-w-sm">
+                  <OnboardingStatusCard data={onboardingStatus} />
+                </div>
+              )}
             </div>
           ) : (
             <>
+              {!isLoadingOnboarding && onboardingStatus && onboardingStatus.progress < 100 && (
+                <div className="mb-4 px-4 pt-4">
+                  <OnboardingStatusCard data={onboardingStatus} />
+                </div>
+              )}
               {messages.map((message) => (
                 <div key={message.id}>
                   <ChatMessage message={message} />

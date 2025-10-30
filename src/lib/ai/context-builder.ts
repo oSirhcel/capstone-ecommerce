@@ -2,6 +2,13 @@ import type { ChatContext } from "@/types/ai-assistant";
 import { db } from "@/server/db";
 import { stores } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
+import {
+  ONBOARDING_STEP_CONFIGS,
+  type OnboardingStepConfig,
+} from "./onboarding-step-configs";
+
+export type { OnboardingStepConfig };
+export { ONBOARDING_STEP_CONFIGS };
 
 export interface EnhancedChatContext extends ChatContext {
   currentPage?: string;
@@ -18,6 +25,14 @@ export interface EnhancedChatContext extends ChatContext {
     progress: number;
     completedSteps: string[];
     nextSteps: string[];
+    stepDetails?: Array<{
+      key: string;
+      label: string;
+      route?: string;
+      guidance: string;
+      estimatedTime?: string;
+      complexity?: "easy" | "medium" | "hard";
+    }>;
   };
   userRole?: "admin" | "owner";
 }
@@ -98,11 +113,18 @@ export async function buildChatContext(options: {
     });
     if (setupResponse.ok) {
       const setup = (await setupResponse.json()) as SetupStatus;
+
+      // Map next steps to detailed configurations
+      const stepDetails = setup.nextSteps
+        .map((stepKey) => ONBOARDING_STEP_CONFIGS[stepKey])
+        .filter((step): step is OnboardingStepConfig => step !== undefined);
+
       context.setupStatus = {
         hasStore: setup.hasStore,
         progress: setup.progress,
         completedSteps: setup.completedSteps,
         nextSteps: setup.nextSteps,
+        stepDetails,
       };
     }
   } catch {
@@ -139,6 +161,48 @@ function mapPathnameToPageName(pathname?: string): string {
 export function formatContextForPrompt(context: EnhancedChatContext): string {
   let contextStr = "";
 
+  // Prioritize onboarding when incomplete
+  const setupStatus = context.setupStatus;
+  const isOnboardingIncomplete = setupStatus && setupStatus.progress < 100;
+
+  if (isOnboardingIncomplete) {
+    contextStr += `⚠️ ONBOARDING INCOMPLETE - Setup Progress: ${setupStatus.progress}%\n\n`;
+    contextStr += `Completed Steps (${setupStatus.completedSteps.length}):\n`;
+    setupStatus.completedSteps.forEach((stepKey) => {
+      const step = ONBOARDING_STEP_CONFIGS[stepKey];
+      if (step) {
+        contextStr += `✓ ${step.label}\n`;
+      }
+    });
+
+    contextStr += `\nNext Steps (${setupStatus.nextSteps.length} remaining):\n`;
+    if (setupStatus.stepDetails && setupStatus.stepDetails.length > 0) {
+      setupStatus.stepDetails.forEach((step, index) => {
+        contextStr += `${index + 1}. ${step.label}`;
+        if (step.estimatedTime) {
+          contextStr += ` (~${step.estimatedTime})`;
+        }
+        contextStr += `\n   ${step.guidance}`;
+        if (step.route) {
+          contextStr += `\n   Route: ${step.route}`;
+        }
+        contextStr += `\n`;
+      });
+    } else {
+      setupStatus.nextSteps.forEach((stepKey, index) => {
+        const step = ONBOARDING_STEP_CONFIGS[stepKey];
+        if (step) {
+          contextStr += `${index + 1}. ${step.label} - ${step.guidance}\n`;
+        } else {
+          contextStr += `${index + 1}. ${stepKey}\n`;
+        }
+      });
+    }
+
+    contextStr += `\nPRIORITY: Actively guide the user through onboarding steps. Proactively suggest next steps.\n`;
+    contextStr += `Celebrate progress when steps are completed. Use navigate_to_page tool to guide users.\n\n`;
+  }
+
   if (context.currentPage) {
     contextStr += `Current page: ${context.currentPage}\n`;
   }
@@ -151,11 +215,8 @@ export function formatContextForPrompt(context: EnhancedChatContext): string {
     }
   }
 
-  if (context.setupStatus) {
-    contextStr += `Store Setup Progress: ${context.setupStatus.progress}%\n`;
-    if (context.setupStatus.nextSteps.length > 0) {
-      contextStr += `Next steps: ${context.setupStatus.nextSteps.slice(0, 2).join(", ")}\n`;
-    }
+  if (!isOnboardingIncomplete && setupStatus) {
+    contextStr += `Store Setup: Complete (100%)\n`;
   }
 
   return contextStr;

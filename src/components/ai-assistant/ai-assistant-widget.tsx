@@ -9,185 +9,144 @@ import { ChatbotBody } from "./chatbot-body";
 import { ChatInput } from "./chat-input";
 import { ChatMessage } from "./chat-message";
 import { TypingIndicator } from "./typing-indicator";
+import { SuggestionChips } from "./suggestion-chips";
 import { ProductDraftCard } from "./product-draft-card";
-import { FieldUpdateCard } from "./field-update-card";
 import { useAIProductDraft } from "@/contexts/ai-product-draft-context";
-import { useAIFormFields } from "@/contexts/ai-form-fields-context";
 import { useChatMutation } from "@/hooks/ai-assistant/use-chat-mutation";
 import { useMessages } from "@/hooks/ai-assistant/use-messages";
-import { usePageContext } from "@/hooks/ai-assistant/use-page-context";
-import { useProductExtraction } from "@/hooks/ai-assistant/use-product-extraction";
-import { isEditInstruction } from "@/lib/ai/extractors/field-update-extractor";
+import { usePathname } from "next/navigation";
+import type { SuggestionChip } from "@/lib/ai/suggestions-generator";
 import type { ExtractedProduct } from "@/lib/ai/extractors/product-extractor";
+
+/**
+ * Format page path to user-friendly label
+ */
+function formatPageLabel(page: string): string {
+  const pageMap: Record<string, string> = {
+    "/admin/dashboard": "Dashboard",
+    "/admin/products": "Products",
+    "/admin/products/add": "Add Product",
+    "/admin/orders": "Orders",
+    "/admin/customers": "Customers",
+    "/admin/analytics": "Analytics",
+    "/admin/settings/store": "Store Settings",
+    "/admin/settings/shipping": "Shipping Settings",
+    "/admin/settings/payments": "Payment Settings",
+    "/admin/settings/tax": "Tax Settings",
+  };
+  return pageMap[page] ?? page;
+}
 
 export function AIAssistantWidget() {
   const router = useRouter();
-  const { isOnAddProductPage } = usePageContext();
-  const [pendingFieldUpdates, setPendingFieldUpdatesState] = useState<Array<{
-    fieldName: string;
-    value: unknown;
-  }> | null>(null);
-  const [updateMessageId, setUpdateMessageId] = useState<string | null>(null);
-  const [isLoadingUpdates, setIsLoadingUpdates] = useState(false);
+  const pathname = usePathname();
+  const [suggestions, setSuggestions] = useState<SuggestionChip[]>([]);
+  const [currentDraft, setCurrentDraft] = useState<ExtractedProduct | null>(
+    null,
+  );
+  const [pendingNavigation, setPendingNavigation] = useState<{
+    page: string;
+    label: string;
+  } | null>(null);
 
-  // Use new hooks
+  // Use hooks
   const { messages, addMessage, clearHistory, createMessage } = useMessages();
   const chatMutation = useChatMutation();
-  const { currentDraft, extractProduct, clearDraft, isExtracting } =
-    useProductExtraction();
   const { setPendingDraft } = useAIProductDraft();
-  const { setPendingFieldUpdates } = useAIFormFields();
-
-  // Get current form data from context
-  // This is updated by the form component via updateFormData
-  const { currentFormData } = useAIFormFields();
 
   // Close chat and reset to initial state
   const handleCloseChat = useCallback(() => {
     clearHistory();
+    setSuggestions([]);
+    setCurrentDraft(null);
+    setPendingNavigation(null);
   }, [clearHistory]);
+
+  const handleApplyDraft = useCallback(
+    (draft: ExtractedProduct) => {
+      setPendingDraft(draft);
+      setTimeout(() => router.push("/admin/products/add"), 500);
+      setCurrentDraft(null);
+    },
+    [setPendingDraft, router],
+  );
+
+  const handleNavigate = useCallback(
+    (page: string) => {
+      setPendingNavigation(null);
+      router.push(page);
+    },
+    [router],
+  );
 
   const handleSendMessage = useCallback(
     async (content: string) => {
-      // Clear any previous field updates when sending a new message
-      setPendingFieldUpdatesState(null);
-      setUpdateMessageId(null);
-
-      // Add user message using factory
+      // Add user message
       const userMessage = createMessage.user(content);
       addMessage(userMessage);
+      setSuggestions([]);
+      setCurrentDraft(null);
 
-      // Check if user is requesting to edit form fields
-      if (isEditInstruction(content) && currentFormData && isOnAddProductPage) {
-        try {
-          setIsLoadingUpdates(true);
-          const response = await fetch("/api/ai/extract-field-updates", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              instruction: content,
-              currentFormData: currentFormData,
-            }),
-          });
-
-          if (!response.ok) {
-            throw new Error("Failed to extract field updates");
-          }
-
-          const data = (await response.json()) as {
-            updates?: Array<{ fieldName: string; value: unknown }>;
-          };
-
-          // Validate response structure
-          if (
-            data.updates &&
-            Array.isArray(data.updates) &&
-            data.updates.length > 0
-          ) {
-            // Store pending updates for display
-            setPendingFieldUpdatesState(data.updates);
-
-            // Add confirmation message using factory
-            const fieldNames = data.updates.map((u) => u.fieldName);
-            const updateMessage = createMessage.fieldUpdate(fieldNames);
-
-            setUpdateMessageId(updateMessage.id);
-            addMessage(updateMessage);
-            setIsLoadingUpdates(false);
-            return;
-          }
-        } catch (error) {
-          console.error("Field update extraction failed:", error);
-          setIsLoadingUpdates(false);
-          // Fall through to regular chat
-        }
-      }
-
-      // Check if user is describing a product (simple heuristics)
-      const isProductDescription =
-        content.toLowerCase().includes("product") ||
-        content.toLowerCase().includes("price") ||
-        content.toLowerCase().includes("stock") ||
-        content.toLowerCase().includes("sell");
-
-      // If describing a product, try to extract product data
-      if (isProductDescription) {
-        try {
-          const extractionResult = await extractProduct(content);
-
-          if (extractionResult.success && extractionResult.data) {
-            // Add extraction result using factory
-            const extractionMessage = createMessage.productExtraction();
-            addMessage(extractionMessage);
-            return;
-          }
-        } catch (error) {
-          console.error("Product extraction failed:", error);
-          // Fall through to regular chat
-        }
-      }
-
-      // Regular chat response
       try {
+        // Send to AI with context headers
         const response = await chatMutation.mutateAsync({
           messages: [...messages, userMessage],
+          pathname,
         });
 
+        // Add assistant response
         const assistantMessage = createMessage.assistant(response.message);
         addMessage(assistantMessage);
+
+        // Handle tool calls if any
+        if (response.toolCalls && response.toolCalls.length > 0) {
+          for (const toolCall of response.toolCalls) {
+            const toolResult = toolCall.result as {
+              success: boolean;
+              message: string;
+              data?: unknown;
+            };
+
+            // Handle navigation tool
+            if (toolCall.toolName === "navigate_to_page" && toolResult.data) {
+              const navData = toolResult.data as { page: string };
+              const pageLabel = formatPageLabel(navData.page);
+              setPendingNavigation({
+                page: navData.page,
+                label: pageLabel,
+              });
+            }
+
+            // Handle product draft creation
+            if (
+              toolCall.toolName === "create_product_draft" &&
+              toolResult.data
+            ) {
+              const draft = toolResult.data as ExtractedProduct;
+              setCurrentDraft(draft);
+            }
+          }
+        }
+
+        // Set suggestions from response
+        if (response.suggestions && response.suggestions.length > 0) {
+          setSuggestions(response.suggestions);
+        }
       } catch (error) {
         console.error("Error sending message:", error);
         const errorMessage = createMessage.error();
         addMessage(errorMessage);
       }
     },
-    [
-      messages,
-      chatMutation,
-      addMessage,
-      createMessage,
-      extractProduct,
-      currentFormData,
-      isOnAddProductPage,
-      setPendingFieldUpdatesState,
-      setUpdateMessageId,
-      setIsLoadingUpdates,
-    ],
+    [messages, chatMutation, addMessage, createMessage, pathname],
   );
 
-  const handleApplyDraft = useCallback(
-    (draft: ExtractedProduct) => {
-      // Set the draft as pending for the form to pick up
-      setPendingDraft(draft);
-
-      // If not on add product page, navigate there
-      if (!isOnAddProductPage) {
-        router.push("/admin/products/add");
-      }
+  const handleSuggestClick = useCallback(
+    (label: string) => {
+      void handleSendMessage(label);
     },
-    [isOnAddProductPage, setPendingDraft, router],
+    [handleSendMessage],
   );
-
-  const handleApplyFieldUpdates = useCallback(() => {
-    if (!pendingFieldUpdates) return;
-
-    // Convert to context format
-    const updates: Record<string, unknown> = {};
-    for (const update of pendingFieldUpdates) {
-      updates[update.fieldName] = update.value;
-    }
-
-    // Set pending updates in context - this triggers form updates
-    setPendingFieldUpdates(updates);
-
-    // Clear the draft so it doesn't show again
-    clearDraft();
-
-    // Don't clear pending updates or message ID yet - let the card stay visible
-    // It will be cleared when user sends another message or closes chat
-  }, [pendingFieldUpdates, setPendingFieldUpdates, clearDraft]);
 
   return (
     <>
@@ -204,34 +163,42 @@ export function AIAssistantWidget() {
               {messages.map((message) => (
                 <div key={message.id}>
                   <ChatMessage message={message} />
-                  {message.type === "action" &&
-                    message.id !== updateMessageId &&
-                    currentDraft &&
-                    !updateMessageId && (
-                      <ProductDraftCard
-                        draft={currentDraft}
-                        onApply={handleApplyDraft}
-                      />
-                    )}
-                  {message.id === updateMessageId && pendingFieldUpdates && (
-                    <FieldUpdateCard
-                      updates={pendingFieldUpdates}
-                      onApply={handleApplyFieldUpdates}
-                    />
-                  )}
                 </div>
               ))}
-              {(chatMutation.isPending || isExtracting || isLoadingUpdates) && (
-                <TypingIndicator />
+              {currentDraft && (
+                <ProductDraftCard
+                  draft={currentDraft}
+                  onApply={handleApplyDraft}
+                />
               )}
+              {pendingNavigation && (
+                <div className="mb-4 flex flex-col gap-2">
+                  <p className="text-muted-foreground text-sm">
+                    Click to navigate:
+                  </p>
+                  <button
+                    onClick={() => handleNavigate(pendingNavigation.page)}
+                    className="w-full rounded-lg bg-blue-50 px-4 py-2 text-left text-sm font-medium text-blue-600 transition-colors hover:bg-blue-100"
+                  >
+                    → {pendingNavigation.label}
+                  </button>
+                </div>
+              )}
+              {chatMutation.isPending && <TypingIndicator />}
             </>
           )}
         </ChatbotBody>
         <ChatInput
           onSend={handleSendMessage}
-          disabled={chatMutation.isPending || isExtracting}
+          disabled={chatMutation.isPending}
           placeholder="Ask me anything or describe a product..."
         />
+        {suggestions.length > 0 && !chatMutation.isPending && (
+          <SuggestionChips
+            suggestions={suggestions}
+            onSuggestClick={handleSuggestClick}
+          />
+        )}
       </ChatbotWindow>
     </>
   );

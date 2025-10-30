@@ -110,8 +110,7 @@ CRITICAL CONSTRAINTS:
 1. seoTitle MUST be 60 characters or fewer
 2. seoDescription MUST be 200 characters or fewer
 3. Count characters carefully for SEO fields
-4. Generate concise, compelling text for SEO fields
-5. Never include placeholder text`;
+4. Generate concise, compelling text for SEO fields`;
 
     let result;
     try {
@@ -153,7 +152,7 @@ STRICT: Keep seoDescription under 200 characters!`,
           temperature: 0.2,
         });
       } catch (secondError) {
-        console.error("Second extraction attempt failed:", secondError);
+        console.error("Product extraction failed:", secondError);
         throw secondError;
       }
     }

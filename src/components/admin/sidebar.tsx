@@ -11,6 +11,11 @@ import {
   HomeIcon,
   CreditCardIcon,
   ShieldAlertIcon,
+  PercentIcon,
+  SettingsIcon,
+  TruckIcon,
+  WalletCardsIcon,
+  ChevronRightIcon,
 } from "lucide-react";
 import {
   Sidebar,
@@ -23,8 +28,16 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
   SidebarRail,
 } from "@/components/ui/sidebar";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import { useProfileQuery } from "@/hooks/admin/use-profile-query";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -41,12 +54,31 @@ const navigation = [
     icon: ShieldAlertIcon,
   },
   { name: "Analytics", href: "/admin/analytics", icon: BarChart3Icon },
-  { name: "Store Management", href: "/admin/stores", icon: StoreIcon },
+];
+
+const settingsItems = [
+  { name: "Store Management", href: "/admin/settings/store", icon: StoreIcon },
+  { name: "Tax Settings", href: "/admin/settings/tax", icon: PercentIcon },
+  {
+    name: "Shipping Settings",
+    href: "/admin/settings/shipping",
+    icon: TruckIcon,
+  },
+  {
+    name: "Payment Setup",
+    href: "/admin/settings/payments",
+    icon: WalletCardsIcon,
+  },
 ];
 
 export function AdminSidebar() {
   const pathname = usePathname();
   const { data: profile, isLoading } = useProfileQuery();
+
+  // Check if any settings route is active
+  const isSettingsActive = settingsItems.some((item) =>
+    pathname.startsWith(item.href),
+  );
 
   return (
     <Sidebar collapsible="icon">
@@ -111,6 +143,45 @@ export function AdminSidebar() {
                   </SidebarMenuItem>
                 );
               })}
+              <Collapsible
+                asChild
+                defaultOpen={isSettingsActive}
+                className="group/collapsible"
+              >
+                <SidebarMenuItem>
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuButton
+                      tooltip="Settings"
+                      isActive={isSettingsActive}
+                      className={cn(
+                        isSettingsActive &&
+                          "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground border-primary-foreground/30",
+                      )}
+                    >
+                      <SettingsIcon />
+                      <span>Settings</span>
+                      <ChevronRightIcon className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                    </SidebarMenuButton>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <SidebarMenuSub>
+                      {settingsItems.map((item) => {
+                        const isActive = pathname.startsWith(item.href);
+                        return (
+                          <SidebarMenuSubItem key={item.name}>
+                            <SidebarMenuSubButton asChild isActive={isActive}>
+                              <Link href={item.href}>
+                                <item.icon />
+                                <span>{item.name}</span>
+                              </Link>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        );
+                      })}
+                    </SidebarMenuSub>
+                  </CollapsibleContent>
+                </SidebarMenuItem>
+              </Collapsible>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

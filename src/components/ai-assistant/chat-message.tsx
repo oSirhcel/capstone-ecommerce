@@ -1,8 +1,6 @@
 "use client";
 
-import { Bot, User } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import ReactMarkdown from "react-markdown";
 import rehypeSanitize from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
@@ -22,15 +20,6 @@ export function ChatMessage({ message }: ChatMessageProps) {
         isUser ? "flex-row-reverse" : "flex-row",
       )}
     >
-      <Avatar
-        className={cn(
-          isUser ? "bg-primary text-primary-foreground" : "bg-muted",
-        )}
-      >
-        <AvatarFallback>
-          {isUser ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
-        </AvatarFallback>
-      </Avatar>
       <div
         className={cn(
           "max-w-[80%] rounded-lg px-4 py-2",

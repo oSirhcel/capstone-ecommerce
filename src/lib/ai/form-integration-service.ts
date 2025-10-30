@@ -125,7 +125,7 @@ export class FormIntegrationService {
     },
   ): string[] {
     const formValues = mapDraftToFormValues(draft);
-    const fieldNames = Object.keys(formValues);
+    const fieldNames = this.flattenFieldNames(formValues);
 
     // Batch update using reset - triggers only one re-render
     form.reset(
@@ -156,7 +156,7 @@ export class FormIntegrationService {
     },
   ): string[] {
     const formValues = mapFieldUpdatesToFormValues(updates);
-    const fieldNames = Object.keys(formValues);
+    const fieldNames = this.flattenFieldNames(formValues);
 
     // Batch update
     form.reset(
@@ -176,12 +176,53 @@ export class FormIntegrationService {
   }
 
   /**
+   * Flatten nested field names to include nested properties
+   * e.g., { dimensions: { length: 10 } } -> ["dimensions.length"]
+   */
+  private static flattenFieldNames(
+    values: Record<string, unknown>,
+    prefix = "",
+  ): string[] {
+    const fieldNames: string[] = [];
+
+    for (const [key, value] of Object.entries(values)) {
+      const fieldName = prefix ? `${prefix}.${key}` : key;
+
+      if (
+        value !== null &&
+        value !== undefined &&
+        typeof value === "object" &&
+        !Array.isArray(value) &&
+        !(value instanceof Date)
+      ) {
+        // Recursively flatten nested objects
+        const nestedFields = this.flattenFieldNames(
+          value as Record<string, unknown>,
+          fieldName,
+        );
+        fieldNames.push(...nestedFields);
+        // If nested object has any defined values, also include the parent path
+        // This ensures nested fields are tracked even if some are undefined
+        if (nestedFields.length === 0) {
+          // If object has no nested fields, don't add it
+          // But if it has fields, the nested fields are already added
+        }
+      } else if (value !== undefined && value !== null) {
+        // Add non-nested field that has a value
+        fieldNames.push(fieldName);
+      }
+    }
+
+    return fieldNames;
+  }
+
+  /**
    * Get list of fields that would be updated by a draft
    * Useful for preview/highlighting
    */
   static getAffectedFields(draft: ExtractedProduct): string[] {
     const formValues = mapDraftToFormValues(draft);
-    return Object.keys(formValues);
+    return this.flattenFieldNames(formValues);
   }
 
   /**

@@ -1,89 +1,70 @@
 "use client";
 
 import { useState } from "react";
-import { Bot, Minimize2, X } from "lucide-react";
-import { useWidgetState } from "@/contexts/ai-assistant-widget-context";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { RefreshCwIcon } from "lucide-react";
+import { useRightSidebar } from "@/contexts/right-sidebar-context";
 import { Button } from "@/components/ui/button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 interface ChatbotHeaderProps {
   onReset: () => void;
 }
 
 export function ChatbotHeader({ onReset }: ChatbotHeaderProps) {
-  const { status, minimize } = useWidgetState();
-  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const { close } = useRightSidebar();
+  const [open, setOpen] = useState(false);
 
-  const handleClose = () => {
-    setShowConfirmDialog(true);
+  const handleReset = () => {
+    setOpen((prev) => !prev);
   };
 
-  const handleConfirmClose = () => {
+  const handleConfirmReset = () => {
     onReset();
-    setShowConfirmDialog(false);
-    minimize();
+    setOpen(false);
   };
 
   return (
     <>
       <div className="flex h-14 items-center justify-between border-b px-4">
+        <div className="text-lg font-semibold">Chat</div>
         <div className="flex items-center gap-2">
-          <Bot className="text-primary h-5 w-5" />
-          <h2 className="font-semibold">AI Chatbot</h2>
-        </div>
-        <div className="flex items-center gap-2">
-          {status === "expanded" && (
-            <Button
-              onClick={minimize}
-              variant="ghost"
-              size="icon"
-              aria-label="Minimize chat"
-              title="Minimize chat"
-            >
-              <Minimize2 className="h-4 w-4" />
-            </Button>
-          )}
-          <Button
-            onClick={handleClose}
-            variant="ghost"
-            size="icon"
-            aria-label="Close chat"
-            title="Close chat"
-          >
-            <X className="h-4 w-4" />
-          </Button>
+          <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                onClick={handleReset}
+                variant="ghost"
+                size="icon"
+                aria-label="Reset chat"
+                title="Reset chat"
+              >
+                <RefreshCwIcon className="h-4 w-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-80 p-4">
+              <div className="space-y-2">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">Reset Chat?</p>
+                  <p className="text-muted-foreground text-sm">
+                    This will reset your conversation history.
+                  </p>
+                </div>
+                <div className="flex justify-end gap-2 pt-2">
+                  <Button variant="outline" onClick={() => setOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button variant="destructive" onClick={handleConfirmReset}>
+                    Reset Chat
+                  </Button>
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
       </div>
-
-      <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Close Chat?</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to close the chat? This will clear your
-              conversation history.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowConfirmDialog(false)}
-            >
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={handleConfirmClose}>
-              Close Chat
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </>
   );
 }

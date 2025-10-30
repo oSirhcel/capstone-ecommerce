@@ -1,4 +1,4 @@
-import { ProductPageClient } from "./page-client";
+import { redirect } from "next/navigation";
 
 interface ProductPageProps {
   params: Promise<{
@@ -8,6 +8,5 @@ interface ProductPageProps {
 
 export default async function ProductPage({ params }: ProductPageProps) {
   const { id } = await params;
-
-  return <ProductPageClient id={parseInt(id)} />;
+  redirect(`/admin/products/${id}/edit`);
 }

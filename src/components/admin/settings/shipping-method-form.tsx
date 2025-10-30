@@ -9,7 +9,6 @@ import {
   FormField,
   FormItem,
   FormLabel,
-  FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -18,6 +17,8 @@ import {
   useCreateShippingMethodMutation,
   useUpdateShippingMethodMutation,
 } from "@/hooks/admin/settings/use-shipping-methods";
+import { QuantityInput } from "@/components/ui/quantity-input";
+import { MoneyInput } from "@/components/ui/money-input";
 
 const shippingMethodSchema = z.object({
   name: z.string().min(1).max(100),
@@ -84,7 +85,6 @@ export function ShippingMethodForm({
                   disabled={isPending}
                 />
               </FormControl>
-              <FormMessage />
             </FormItem>
           )}
         />
@@ -102,7 +102,6 @@ export function ShippingMethodForm({
                   disabled={isPending}
                 />
               </FormControl>
-              <FormMessage />
             </FormItem>
           )}
         />
@@ -114,16 +113,14 @@ export function ShippingMethodForm({
               <FormItem>
                 <FormLabel>Base Price (AUD)</FormLabel>
                 <FormControl>
-                  <Input
-                    type="number"
-                    min={0}
-                    step="0.5"
-                    value={field.value}
-                    onChange={(e) => field.onChange(Number(e.target.value))}
+                  <MoneyInput
+                    value={field.value != null ? field.value * 100 : null}
+                    onChange={(cents) =>
+                      field.onChange(cents == null ? null : cents / 100)
+                    }
                     disabled={isPending}
                   />
                 </FormControl>
-                <FormMessage />
               </FormItem>
             )}
           />
@@ -134,37 +131,36 @@ export function ShippingMethodForm({
               <FormItem>
                 <FormLabel>Estimated Days</FormLabel>
                 <FormControl>
-                  <Input
-                    type="number"
-                    min={1}
+                  <QuantityInput
                     step={1}
-                    value={field.value}
-                    onChange={(e) => field.onChange(Number(e.target.value))}
+                    min={1}
+                    decimalPlaces={0}
+                    value={field.value ?? 0}
+                    onChange={(value) => field.onChange(value)}
                     disabled={isPending}
                   />
                 </FormControl>
-                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="isActive"
+            render={({ field }) => (
+              <FormItem className="flex items-center justify-between rounded-md border p-3">
+                <FormLabel>Active</FormLabel>
+                <FormControl>
+                  <Switch
+                    checked={field.value}
+                    onCheckedChange={field.onChange}
+                    disabled={isPending}
+                  />
+                </FormControl>
               </FormItem>
             )}
           />
         </div>
-        <FormField
-          control={form.control}
-          name="isActive"
-          render={({ field }) => (
-            <FormItem className="flex items-center justify-between rounded-md border p-3">
-              <FormLabel>Active</FormLabel>
-              <FormControl>
-                <Switch
-                  checked={field.value}
-                  onCheckedChange={field.onChange}
-                  disabled={isPending}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+
         <div className="flex justify-end">
           <Button type="submit" disabled={isPending}>
             {isPending ? "Saving..." : initial?.id ? "Save" : "Create"}

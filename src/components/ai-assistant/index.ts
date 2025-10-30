@@ -1,6 +1,4 @@
 export { AIAssistantWidget } from "./ai-assistant-widget";
-export { ChatbotButton } from "./chatbot-button";
-export { ChatbotWindow } from "./chatbot-window";
 export { ChatbotHeader } from "./chatbot-header";
 export { ChatbotBody } from "./chatbot-body";
 export { ChatInput } from "./chat-input";

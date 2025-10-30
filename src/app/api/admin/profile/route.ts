@@ -51,6 +51,7 @@ export async function GET(): Promise<
       .select({
         id: stores.id,
         name: stores.name,
+        slug: stores.slug,
         description: stores.description,
         createdAt: stores.createdAt,
       })
@@ -69,6 +70,7 @@ export async function GET(): Promise<
         ? {
             id: store.id,
             name: store.name,
+            slug: store.slug,
             description: store.description,
             createdAt: store.createdAt.toISOString(),
           }

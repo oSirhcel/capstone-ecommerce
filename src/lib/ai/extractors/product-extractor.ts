@@ -16,7 +16,6 @@ const productSchema = z.object({
   price: z.number().min(0, "Price must be non-negative").optional(),
   stock: z.number().int().min(0, "Stock must be non-negative").optional(),
   sku: z.string().optional(),
-  categoryId: z.number().optional(),
   tags: z.array(z.string()).optional(),
   seoTitle: z
     .string()
@@ -171,7 +170,6 @@ STRICT: Keep seoDescription under 200 characters!`,
         result.object.sku ?? generateSKU(result.object.name ?? "Product"),
         100,
       ),
-      categoryId: result.object.categoryId,
       tags: Array.from(
         new Set(
           (result.object.tags ?? ["product"])
@@ -224,7 +222,6 @@ STRICT: Keep seoDescription under 200 characters!`,
         price: 29.99,
         stock: 100,
         sku: generateSKU("New Product"),
-        categoryId: undefined,
         tags: ["product", "new"],
         seoTitle: "New Product",
         seoDescription: "Shop new products. Premium quality, great prices.",

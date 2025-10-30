@@ -1,5 +1,6 @@
 import { getBaseUrl } from "@/lib/api/config";
 import { extractProductData } from "@/lib/ai/extractors/product-extractor";
+import { extractFieldUpdates } from "@/lib/ai/extractors/field-update-extractor";
 import { ONBOARDING_STEP_CONFIGS } from "@/lib/ai/onboarding-step-configs";
 
 interface StoreStats {
@@ -308,6 +309,35 @@ export async function executeCompleteOnboardingStep(
 }
 
 /**
+ * Execute the update_product_fields tool
+ */
+export async function executeUpdateProductFields(
+  instruction: string,
+  currentFormData?: Record<string, unknown>,
+): Promise<ToolExecutionResult> {
+  try {
+    const result = await extractFieldUpdates(
+      instruction,
+      currentFormData ?? {},
+    );
+    return {
+      success: true,
+      data: {
+        updates: result.updates,
+        reasoning: result.reasoning,
+      },
+      message: `Extracted ${result.updates.length} field update(s)`,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: "Failed to extract field updates",
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}
+
+/**
  * Main tool execution dispatcher
  */
 export async function executeTool(
@@ -359,6 +389,12 @@ export async function executeTool(
 
     case "complete_onboarding_step":
       return executeCompleteOnboardingStep(args.stepKey as string);
+
+    case "update_product_fields":
+      return executeUpdateProductFields(
+        args.instruction as string,
+        args.currentFormData as Record<string, unknown> | undefined,
+      );
 
     default:
       return {

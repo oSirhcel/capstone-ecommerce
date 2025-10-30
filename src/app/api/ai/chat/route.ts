@@ -6,9 +6,14 @@ import {
 } from "@/lib/ai/assistant-service";
 import {
   chatRequestSchema,
-  chatResponseSchema,
+  chatResponseWithToolsSchema,
   chatErrorResponseSchema,
 } from "@/lib/ai/schemas";
+import { buildChatContext, getUserStoreId } from "@/lib/ai/context-builder";
+import {
+  generateSuggestions,
+  type SuggestionChip,
+} from "@/lib/ai/suggestions-generator";
 
 export async function POST(request: NextRequest) {
   try {
@@ -49,28 +54,62 @@ export async function POST(request: NextRequest) {
           : msg.timestamp,
     }));
 
+    // Build enhanced context
+    const headerPathname = request.headers.get("x-pathname");
+    let headerStoreId = request.headers.get("x-store-id");
+
+    // If store ID not in headers, fetch from database
+    headerStoreId ??= await getUserStoreId(session.user.id);
+
+    const context = await buildChatContext({
+      pathname: headerPathname ?? undefined,
+      storeId: headerStoreId ?? undefined,
+      userId: session.user.id,
+    });
+
     // If streaming is requested, return a streaming response
     if (stream) {
       const streamResponse = await streamChatResponse({
         messages: chatMessages,
-        config: { stream: true },
+        config: {
+          context,
+          stream: true,
+          storeId: headerStoreId ?? undefined,
+        },
       });
 
       return streamResponse;
     }
 
-    // Otherwise, return a regular JSON response
+    // Otherwise, return a regular JSON response with suggestions
     const response = await generateChatResponse({
       messages: chatMessages,
+      config: {
+        context,
+        storeId: headerStoreId ?? undefined,
+        userId: session.user.id,
+        headers: request.headers,
+      },
     });
 
+    // Generate suggestions for next message
+    let suggestions: SuggestionChip[] = [];
+    try {
+      suggestions = await generateSuggestions(chatMessages, context);
+    } catch (error) {
+      console.error("Error generating suggestions:", error);
+      // Suggestions are optional, so continue without them
+    }
+
     const responseData = {
-      message: response,
+      message: response.message,
       timestamp: new Date().toISOString(),
+      toolCalls: response.toolCalls,
+      suggestions,
     };
 
     // Validate response against schema
-    const validatedResponse = chatResponseSchema.parse(responseData);
+    const validatedResponse = chatResponseWithToolsSchema.parse(responseData);
 
     return NextResponse.json(validatedResponse);
   } catch (error) {

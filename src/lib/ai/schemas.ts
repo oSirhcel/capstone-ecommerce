@@ -90,6 +90,35 @@ export const productFieldUpdateResponseSchema = z.object({
   reasoning: z.string().optional(),
 });
 
+// Tool Call Schemas
+export const toolCallResultSchema = z.object({
+  success: z.boolean(),
+  data: z.unknown().optional(),
+  message: z.string(),
+  error: z.string().optional(),
+});
+
+export const toolCallSchema = z.object({
+  toolName: z.string(),
+  result: toolCallResultSchema,
+});
+
+// Suggestion Schemas
+export const suggestionSchema = z.object({
+  label: z.string().describe("The suggestion text"),
+  actionType: z
+    .enum(["chat", "navigate", "action"])
+    .describe("Type of action for the suggestion"),
+});
+
+// Enhanced Chat Response Schemas
+export const chatResponseWithToolsSchema = z.object({
+  message: z.string(),
+  timestamp: z.string(),
+  toolCalls: z.array(toolCallSchema).optional(),
+  suggestions: z.array(suggestionSchema).optional(),
+});
+
 // Type exports
 export type ChatMessage = z.infer<typeof chatMessageSchema>;
 export type ChatRequest = z.infer<typeof chatRequestSchema>;
@@ -110,3 +139,8 @@ export type ProductFieldUpdateRequest = z.infer<
 export type ProductFieldUpdateResponse = z.infer<
   typeof productFieldUpdateResponseSchema
 >;
+
+export type ToolCallResult = z.infer<typeof toolCallResultSchema>;
+export type ToolCall = z.infer<typeof toolCallSchema>;
+export type Suggestion = z.infer<typeof suggestionSchema>;
+export type ChatResponseWithTools = z.infer<typeof chatResponseWithToolsSchema>;

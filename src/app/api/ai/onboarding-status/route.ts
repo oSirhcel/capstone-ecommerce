@@ -1,10 +1,16 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/server/db";
-import { stores, storeSettings, products } from "@/server/db/schema";
-import { eq } from "drizzle-orm";
+import {
+  stores,
+  storeSettings,
+  products,
+  shippingMethods,
+  storePaymentProviders,
+} from "@/server/db/schema";
+import { and, eq } from "drizzle-orm";
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
@@ -36,12 +42,13 @@ export async function GET(request: NextRequest) {
     }
 
     const store = userStores[0];
+    const storeId = String(store.id);
 
     // Check store settings
     const settings = await db
       .select()
       .from(storeSettings)
-      .where(eq(storeSettings.storeId, store.id))
+      .where(eq(storeSettings.storeId, storeId))
       .limit(1);
 
     const hasSettings = settings.length > 0;
@@ -51,17 +58,36 @@ export async function GET(request: NextRequest) {
     const productCount = await db
       .select({ count: products.id })
       .from(products)
-      .where(eq(products.storeId, store.id));
+      .where(eq(products.storeId, storeId));
 
     const hasProducts = productCount.length > 0;
+
+    // Check shipping methods for this store (at least one active)
+    const shippingForStore = await db
+      .select({ id: shippingMethods.id })
+      .from(shippingMethods)
+      .where(eq(shippingMethods.storeId, storeId));
+    const hasShippingMethods = shippingForStore.length > 0;
+
+    // Check payment provider configured (e.g., Stripe connected and active)
+    const paymentProviders = (await db
+      .select({ id: storePaymentProviders.id })
+      .from(storePaymentProviders)
+      .where(
+        and(
+          eq(storePaymentProviders.storeId, storeId),
+          eq(storePaymentProviders.isActive, true),
+        ),
+      )) as Array<{ id: number }>;
+    const hasActivePaymentProvider = paymentProviders.length > 0;
 
     // Determine completion
     const steps = {
       storeCreated: true,
       storeDetails: !!store.description,
       taxConfigured: hasSettings && !!settingsData?.gstRegistered,
-      shippingConfigured: hasSettings && !!settingsData?.shippingPolicy,
-      paymentConfigured: false, // TODO: Add payment settings check when implemented
+      shippingConfigured: hasShippingMethods,
+      paymentConfigured: hasActivePaymentProvider,
       policiesCreated:
         hasSettings &&
         (!!settingsData?.shippingPolicy ||

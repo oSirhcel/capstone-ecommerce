@@ -26,7 +26,7 @@ export interface ProductFormValues {
   seoTitle?: string;
   seoDescription?: string;
   slug?: string;
-  status: "active" | "draft" | "archived";
+  status: "Active" | "Draft" | "Archived";
   featured: boolean;
   images?: string[];
 }

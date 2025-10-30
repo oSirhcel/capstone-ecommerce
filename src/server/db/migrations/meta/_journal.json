@@ -176,6 +176,13 @@
       "when": 1761751479182,
       "tag": "0024_demonic_eternals",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1761753949552,
+      "tag": "0025_funny_kid_colt",
+      "breakpoints": true
     }
   ]
 }

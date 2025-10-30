@@ -305,15 +305,24 @@ export const orderAddresses = pgTable("order_addresses", {
 });
 
 // Shipping methods and rates
-export const shippingMethods = pgTable("shipping_methods", {
-  id: integer().primaryKey().generatedAlwaysAsIdentity(),
-  name: varchar({ length: 100 }).notNull(),
-  description: varchar({ length: 500 }),
-  basePrice: integer().notNull(), // Price in cents
-  estimatedDays: integer().notNull(),
-  isActive: boolean().notNull().default(true),
-  createdAt: timestamp().defaultNow().notNull(),
-});
+export const shippingMethods = pgTable(
+  "shipping_methods",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    name: varchar({ length: 100 }).notNull(),
+    description: varchar({ length: 500 }),
+    basePrice: integer().notNull(), // Price in cents
+    estimatedDays: integer().notNull(),
+    isActive: boolean().notNull().default(true),
+    // Scope shipping methods to a specific store
+    storeId: varchar("storeId", { length: 255 }).references(() => stores.id),
+    createdAt: timestamp().defaultNow().notNull(),
+  },
+  (table) => [
+    // Index for store-level queries
+    index("shipping_methods_store_idx").on(table.storeId),
+  ],
+);
 
 // Payment methods
 export const paymentMethods = pgTable("payment_methods", {
@@ -330,6 +339,32 @@ export const paymentMethods = pgTable("payment_methods", {
   isActive: boolean().notNull().default(true),
   createdAt: timestamp().defaultNow().notNull(),
 });
+
+// Store payment provider configuration (e.g., Stripe Connect)
+export const storePaymentProviders = pgTable(
+  "store_payment_providers",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    storeId: varchar("storeId", { length: 255 })
+      .references(() => stores.id)
+      .notNull(),
+    provider: varchar({ length: 50 }).notNull(), // 'stripe', 'paypal'
+    stripeAccountId: varchar({ length: 255 }), // Stripe Connect account ID
+    stripeAccountStatus: varchar({ length: 50 }), // 'pending', 'active', 'restricted'
+    isActive: boolean().notNull().default(false),
+    connectedAt: timestamp(),
+    createdAt: timestamp().defaultNow().notNull(),
+    updatedAt: timestamp().defaultNow().notNull(),
+  },
+  (table) => [
+    unique("store_payment_provider_store_provider_unique").on(
+      table.storeId,
+      table.provider,
+    ),
+    index("store_payment_providers_store_idx").on(table.storeId),
+    index("store_payment_providers_provider_idx").on(table.provider),
+  ],
+);
 
 // Discounts and coupons
 export const discounts = pgTable("discounts", {

@@ -1,5 +1,6 @@
 import { getBaseUrl } from "@/lib/api/config";
 import { extractProductData } from "@/lib/ai/extractors/product-extractor";
+import { ONBOARDING_STEP_CONFIGS } from "@/lib/ai/onboarding-step-configs";
 
 interface StoreStats {
   totalOrders?: number;
@@ -22,6 +23,7 @@ interface ProductsResponse {
 interface SetupStatusResponse {
   progress: number;
   nextSteps: string[];
+  completedSteps: string[];
 }
 
 export interface ToolExecutionResult {
@@ -225,6 +227,87 @@ export async function executeGetSetupStatus(): Promise<ToolExecutionResult> {
 }
 
 /**
+ * Execute the complete_onboarding_step tool
+ * Validates step completion and provides encouragement
+ */
+export async function executeCompleteOnboardingStep(
+  stepKey: string,
+): Promise<ToolExecutionResult> {
+  try {
+    // Fetch current onboarding status to verify
+    const response = await fetch("/api/ai/onboarding-status", {
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to fetch setup status");
+    }
+
+    const setup = (await response.json()) as SetupStatusResponse;
+    const stepConfig = ONBOARDING_STEP_CONFIGS[stepKey];
+
+    if (!stepConfig) {
+      return {
+        success: false,
+        message: `Unknown onboarding step: ${stepKey}`,
+      };
+    }
+
+    const isCompleted = setup.completedSteps.includes(stepKey);
+
+    if (!isCompleted) {
+      return {
+        success: false,
+        message: `Step "${stepConfig.label}" is not yet completed. Please complete it first.`,
+        data: {
+          stepKey,
+          stepLabel: stepConfig.label,
+          currentProgress: setup.progress,
+          nextSteps: setup.nextSteps,
+        },
+      };
+    }
+
+    // Calculate milestone messages
+    let celebrationMessage = "";
+    if (setup.progress === 100) {
+      celebrationMessage =
+        "🎉 Congratulations! Your store setup is complete! You're ready to start selling.";
+    } else if (setup.progress >= 80) {
+      celebrationMessage = `🎉 Excellent progress! You're at ${setup.progress}% - almost there!`;
+    } else if (setup.progress >= 50) {
+      celebrationMessage = `🎉 Great work! You're ${setup.progress}% complete - you're halfway there!`;
+    } else {
+      celebrationMessage = `🎉 Well done! You've completed "${stepConfig.label}". Keep it up!`;
+    }
+
+    const nextStep = setup.nextSteps[0];
+    const nextStepConfig = nextStep ? ONBOARDING_STEP_CONFIGS[nextStep] : null;
+    const nextStepMessage = nextStepConfig
+      ? ` Next up: ${nextStepConfig.label}${nextStepConfig.guidance ? ` - ${nextStepConfig.guidance}` : ""}.`
+      : "";
+
+    return {
+      success: true,
+      data: {
+        stepKey,
+        stepLabel: stepConfig.label,
+        completed: true,
+        progress: setup.progress,
+        nextSteps: setup.nextSteps,
+      },
+      message: `${celebrationMessage}${nextStepMessage}`,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: "Failed to verify onboarding step completion",
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}
+
+/**
  * Main tool execution dispatcher
  */
 export async function executeTool(
@@ -273,6 +356,9 @@ export async function executeTool(
 
     case "get_setup_status":
       return executeGetSetupStatus();
+
+    case "complete_onboarding_step":
+      return executeCompleteOnboardingStep(args.stepKey as string);
 
     default:
       return {

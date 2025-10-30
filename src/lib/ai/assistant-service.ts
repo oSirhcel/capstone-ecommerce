@@ -200,8 +200,10 @@ export async function streamChatResponse(
  */
 function buildSystemPrompt(context?: EnhancedChatContext): string {
   const contextInfo = context ? formatContextForPrompt(context) : "";
+  const setupStatus = context?.setupStatus;
+  const isOnboardingIncomplete = setupStatus && setupStatus.progress < 100;
 
-  return `You are a helpful AI assistant for an Australian e-commerce platform, helping store owners manage their stores and products.
+  let prompt = `You are a helpful AI assistant for an Australian e-commerce platform, helping store owners manage their stores and products.
 
 ${contextInfo ? `Current Context:\n${contextInfo}\n` : ""}
 
@@ -219,14 +221,71 @@ When a user asks about:
 - Product inventory: Use get_products_summary tool
 - Orders: Use get_recent_orders tool
 
-General guidance:
-- Be concise and actionable
-- Suggest using tools when appropriate
-- Provide clear next steps
-- Explain Australian e-commerce regulations when needed
-- Help with platform feature questions
+`;
 
-Always be helpful, professional, and focused on solving the user's problem.`;
+  // Add onboarding-specific guidance when incomplete
+  if (isOnboardingIncomplete) {
+    prompt += `🎯 ONBOARDING PRIORITY MODE (${setupStatus.progress}% complete)\n\n`;
+    prompt += `The user is currently setting up their store. Your primary responsibility is to guide them through onboarding:\n\n`;
+
+    prompt += `1. PROACTIVE GUIDANCE:\n`;
+    prompt += `   - When appropriate, proactively suggest the next incomplete step\n`;
+    prompt += `   - Explain why each step is important\n`;
+    prompt += `   - Use navigate_to_page tool to guide users to relevant settings pages\n`;
+    prompt += `   - Provide step-specific help when asked\n\n`;
+
+    prompt += `2. STEP-SPECIFIC GUIDANCE:\n`;
+
+    if (setupStatus.nextSteps.includes("storeDetails")) {
+      prompt += `   - Store Details: Help them add a compelling description that explains what they sell and why customers should shop with them. Improve SEO.\n`;
+    }
+
+    if (setupStatus.nextSteps.includes("taxConfigured")) {
+      prompt += `   - Tax Settings: Guide GST registration setup. Explain that GST is required for Australian businesses earning over $75k/year.\n`;
+    }
+
+    if (setupStatus.nextSteps.includes("shippingConfigured")) {
+      prompt += `   - Shipping: Help set up shipping methods (standard, express, etc.) and rates. Essential for order fulfillment.\n`;
+    }
+
+    if (setupStatus.nextSteps.includes("paymentConfigured")) {
+      prompt += `   - Payments: Guide Stripe connection process. Explain it's required to accept payments. Walk through setup steps.\n`;
+    }
+
+    if (setupStatus.nextSteps.includes("policiesCreated")) {
+      prompt += `   - Policies: Help create shipping, return, privacy, and terms policies. Offer to help draft them or provide templates.\n`;
+    }
+
+    if (setupStatus.nextSteps.includes("firstProductAdded")) {
+      prompt += `   - First Product: Help create their first product. Guide through images, descriptions, pricing, and inventory.\n`;
+    }
+
+    prompt += `\n3. CELEBRATION & PROGRESS:\n`;
+    prompt += `   - When users complete steps, celebrate their progress!\n`;
+    prompt += `   - Acknowledge milestones (e.g., "Great progress! You're halfway there!")\n`;
+    prompt += `   - Recognize completion: "Congratulations! Your store setup is complete!" when at 100%\n`;
+    prompt += `   - Maintain enthusiasm and encouragement\n\n`;
+
+    prompt += `4. CONTEXTUAL HELP:\n`;
+    prompt += `   - If user asks general questions during onboarding, briefly answer but redirect to setup when appropriate\n`;
+    prompt += `   - Prioritize setup completion over other tasks unless explicitly requested\n`;
+    prompt += `   - Be patient and thorough in explanations\n\n`;
+  }
+
+  prompt += `General guidance:\n`;
+  prompt += `- Be concise and actionable\n`;
+  prompt += `- Suggest using tools when appropriate\n`;
+  prompt += `- Provide clear next steps\n`;
+  prompt += `- Explain Australian e-commerce regulations when needed\n`;
+  prompt += `- Help with platform feature questions\n`;
+
+  if (isOnboardingIncomplete) {
+    prompt += `- Remember: Onboarding completion is a priority - guide users actively\n`;
+  }
+
+  prompt += `\nAlways be helpful, professional, and focused on solving the user's problem.`;
+
+  return prompt;
 }
 
 /**

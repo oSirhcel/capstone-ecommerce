@@ -123,6 +123,31 @@ export const getSetupStatusTool = tool({
 });
 
 /**
+ * Tool to acknowledge completion of an onboarding step
+ */
+export const completeOnboardingStepTool = tool({
+  description:
+    "Acknowledge that a user has completed an onboarding step. Use this to provide encouragement and suggest the next step. The system will verify completion automatically.",
+  inputSchema: z.object({
+    stepKey: z
+      .enum([
+        "storeCreated",
+        "storeDetails",
+        "taxConfigured",
+        "shippingConfigured",
+        "paymentConfigured",
+        "policiesCreated",
+        "firstProductAdded",
+      ])
+      .describe("The onboarding step that was completed"),
+  }),
+  execute: async ({ stepKey }) => ({
+    toolName: "complete_onboarding_step",
+    stepKey,
+  }),
+});
+
+/**
  * All available tools for the chatbot
  */
 export const chatbotTools = {
@@ -132,6 +157,7 @@ export const chatbotTools = {
   get_recent_orders: getRecentOrdersTool,
   get_products_summary: getProductsSummaryTool,
   get_setup_status: getSetupStatusTool,
+  complete_onboarding_step: completeOnboardingStepTool,
 };
 
 export type AvailableTools = typeof chatbotTools;

@@ -72,11 +72,25 @@ export async function PATCH(
 
     const { slug } = await params;
     const body = (await request.json()) as {
-      name: string;
-      description: string;
-      slug: string;
+      name?: string;
+      description?: string;
+      slug?: string;
+      contactEmail?: string;
+      shippingPolicy?: string;
+      returnPolicy?: string;
+      privacyPolicy?: string;
+      termsOfService?: string;
     };
-    const { name, description, slug: newSlug } = body;
+    const {
+      name,
+      description,
+      slug: newSlug,
+      contactEmail,
+      shippingPolicy,
+      returnPolicy,
+      privacyPolicy,
+      termsOfService,
+    } = body;
 
     // Find the store
     const storeData = await db
@@ -136,7 +150,70 @@ export async function PATCH(
       .where(eq(stores.id, store.id))
       .returning();
 
-    return NextResponse.json(updatedStore);
+    // Update or create settings if any settings fields are provided
+    if (
+      contactEmail !== undefined ||
+      shippingPolicy !== undefined ||
+      returnPolicy !== undefined ||
+      privacyPolicy !== undefined ||
+      termsOfService !== undefined
+    ) {
+      const existingSettings = await db
+        .select()
+        .from(storeSettings)
+        .where(eq(storeSettings.storeId, store.id))
+        .limit(1);
+
+      const settingsData: Record<string, string | null | Date> = {
+        updatedAt: new Date(),
+      };
+
+      if (contactEmail !== undefined)
+        settingsData.contactEmail = contactEmail?.trim() ?? null;
+      if (shippingPolicy !== undefined)
+        settingsData.shippingPolicy = shippingPolicy?.trim() ?? null;
+      if (returnPolicy !== undefined)
+        settingsData.returnPolicy = returnPolicy?.trim() ?? null;
+      if (privacyPolicy !== undefined)
+        settingsData.privacyPolicy = privacyPolicy?.trim() ?? null;
+      if (termsOfService !== undefined)
+        settingsData.termsOfService = termsOfService?.trim() ?? null;
+
+      let settings;
+      if (existingSettings.length > 0) {
+        // Update existing settings
+        [settings] = await db
+          .update(storeSettings)
+          .set(settingsData)
+          .where(eq(storeSettings.storeId, store.id))
+          .returning();
+      } else {
+        // Create new settings
+        [settings] = await db
+          .insert(storeSettings)
+          .values({
+            storeId: store.id,
+            ...settingsData,
+          })
+          .returning();
+      }
+
+      return NextResponse.json({
+        store: updatedStore,
+        settings: {
+          contactEmail: settings.contactEmail,
+          shippingPolicy: settings.shippingPolicy,
+          returnPolicy: settings.returnPolicy,
+          privacyPolicy: settings.privacyPolicy,
+          termsOfService: settings.termsOfService,
+        },
+      });
+    }
+
+    return NextResponse.json({
+      store: updatedStore,
+      settings: null,
+    });
   } catch (error) {
     console.error("Error updating store:", error);
     return NextResponse.json(

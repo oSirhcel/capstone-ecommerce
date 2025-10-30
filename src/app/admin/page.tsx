@@ -2,6 +2,7 @@ import { DashboardCards } from "@/components/admin/dashboard/charts/dashboard-ch
 import { SalesChart } from "@/components/admin/dashboard/charts/sales-chart";
 import { RecentActivity } from "@/components/admin/dashboard/recent-activity";
 import { RecentOrders } from "@/components/admin/dashboard/recent-orders";
+import { OnboardingTracker } from "@/components/onboarding/onboarding-tracker";
 import { Button } from "@/components/ui/button";
 import { HomeIcon } from "lucide-react";
 import Link from "next/link";
@@ -26,6 +27,9 @@ export default function AdminPage() {
           </Link>
         </Button>
       </div>
+
+      {/* Onboarding Tracker */}
+      <OnboardingTracker />
 
       {/* Key Metrics */}
       <DashboardCards />

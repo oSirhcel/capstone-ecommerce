@@ -11,14 +11,22 @@ import { ChatMessage } from "./chat-message";
 import { TypingIndicator } from "./typing-indicator";
 import { SuggestionChips } from "./suggestion-chips";
 import { ProductDraftCard } from "./product-draft-card";
+import { FieldUpdateCard } from "./field-update-card";
 import { OnboardingStatusCard } from "./onboarding-status-card";
 import { useAIProductDraft } from "@/contexts/ai-product-draft-context";
+import { useAIFormFields } from "@/contexts/ai-form-fields-context";
 import { useChatMutation } from "@/hooks/ai-assistant/use-chat-mutation";
 import { useMessages } from "@/hooks/ai-assistant/use-messages";
 import { usePathname } from "next/navigation";
 import { useOnboardingStatus } from "@/hooks/onboarding/use-onboarding-status";
 import type { SuggestionChip } from "@/lib/ai/suggestions-generator";
 import type { ExtractedProduct } from "@/lib/ai/extractors/product-extractor";
+import type { FieldUpdate as ExtractedFieldUpdate } from "@/lib/ai/extractors/field-update-extractor";
+
+interface FieldUpdate {
+  fieldName: string;
+  value: unknown;
+}
 
 /**
  * Format page path to user-friendly label
@@ -65,6 +73,9 @@ export function AIAssistantWidget() {
   const [currentDraft, setCurrentDraft] = useState<ExtractedProduct | null>(
     null,
   );
+  const [pendingFieldUpdates, setPendingFieldUpdates] = useState<FieldUpdate[]>(
+    [],
+  );
   const [pendingNavigation, setPendingNavigation] = useState<{
     page: string;
     label: string;
@@ -77,6 +88,7 @@ export function AIAssistantWidget() {
   const { messages, addMessage, clearHistory, createMessage } = useMessages();
   const chatMutation = useChatMutation();
   const { setPendingDraft } = useAIProductDraft();
+  const { setPendingFieldUpdates: setFormPendingUpdates } = useAIFormFields();
   const { data: onboardingStatus, isLoading: isLoadingOnboarding } = useOnboardingStatus();
 
   // Update welcome message based on onboarding status
@@ -95,6 +107,7 @@ export function AIAssistantWidget() {
     clearHistory();
     setSuggestions([]);
     setCurrentDraft(null);
+    setPendingFieldUpdates([]);
     setPendingNavigation(null);
   }, [clearHistory]);
 
@@ -122,6 +135,7 @@ export function AIAssistantWidget() {
       addMessage(userMessage);
       setSuggestions([]);
       setCurrentDraft(null);
+      setPendingFieldUpdates([]);
 
       try {
         // Send to AI with context headers
@@ -161,6 +175,34 @@ export function AIAssistantWidget() {
               const draft = toolResult.data as ExtractedProduct;
               setCurrentDraft(draft);
             }
+
+            // Handle field updates
+            if (
+              toolCall.toolName === "update_product_fields" &&
+              toolResult.data
+            ) {
+              const updateData = toolResult.data as {
+                updates: ExtractedFieldUpdate[];
+                reasoning?: string;
+              };
+              if (updateData.updates && updateData.updates.length > 0) {
+                // Map to format expected by FieldUpdateCard (fieldName, value)
+                const mappedUpdates = updateData.updates.map((update) => ({
+                  fieldName: update.fieldName,
+                  value: update.value,
+                }));
+                setPendingFieldUpdates(mappedUpdates);
+                // Also set in form context for form integration
+                const updatesMap = updateData.updates.reduce(
+                  (acc, update) => {
+                    acc[update.fieldName] = update.value;
+                    return acc;
+                  },
+                  {} as Record<string, unknown>,
+                );
+                setFormPendingUpdates(updatesMap);
+              }
+            }
           }
         }
 
@@ -174,7 +216,14 @@ export function AIAssistantWidget() {
         addMessage(errorMessage);
       }
     },
-    [messages, chatMutation, addMessage, createMessage, pathname],
+    [
+      messages,
+      chatMutation,
+      addMessage,
+      createMessage,
+      pathname,
+      setFormPendingUpdates,
+    ],
   );
 
   const handleSuggestClick = useCallback(
@@ -216,6 +265,18 @@ export function AIAssistantWidget() {
                   draft={currentDraft}
                   onApply={handleApplyDraft}
                 />
+              )}
+              {pendingFieldUpdates.length > 0 && (
+                <div className="mb-4 px-4">
+                  <FieldUpdateCard
+                    updates={pendingFieldUpdates}
+                    onApply={() => {
+                      // Field updates are already set in form context
+                      // The form will apply them automatically
+                      setPendingFieldUpdates([]);
+                    }}
+                  />
+                </div>
               )}
               {pendingNavigation && (
                 <div className="mb-4 flex flex-col gap-2">

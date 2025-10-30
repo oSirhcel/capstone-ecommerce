@@ -148,6 +148,32 @@ export const completeOnboardingStepTool = tool({
 });
 
 /**
+ * Tool to update specific product fields from natural language instruction
+ */
+export const updateProductFieldsTool = tool({
+  description:
+    "Extract and update specific product fields from a user's edit instruction. Use this when the user wants to modify specific fields of an existing product (e.g., 'change price to $50', 'make description more concise', 'update the name').",
+  inputSchema: z.object({
+    instruction: z
+      .string()
+      .describe(
+        "The user's instruction describing which fields to update and how",
+      ),
+    currentFormData: z
+      .record(z.string(), z.unknown())
+      .optional()
+      .describe(
+        "Current form data (optional, helps provide better context for updates)",
+      ),
+  }),
+  execute: async ({ instruction, currentFormData }) => ({
+    toolName: "update_product_fields",
+    instruction,
+    currentFormData: currentFormData ?? {},
+  }),
+});
+
+/**
  * All available tools for the chatbot
  */
 export const chatbotTools = {
@@ -158,6 +184,7 @@ export const chatbotTools = {
   get_products_summary: getProductsSummaryTool,
   get_setup_status: getSetupStatusTool,
   complete_onboarding_step: completeOnboardingStepTool,
+  update_product_fields: updateProductFieldsTool,
 };
 
 export type AvailableTools = typeof chatbotTools;

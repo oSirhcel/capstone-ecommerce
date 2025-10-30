@@ -13,7 +13,15 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Search, Package, Plus, Minus, Trash2, Loader2 } from "lucide-react";
+import { QuantityInput } from "@/components/ui/quantity-input";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Search, Package, Plus, Trash2, Loader2 } from "lucide-react";
 import type {
   OrderItem,
   OrderFormValues,
@@ -120,140 +128,140 @@ export function ProductSelectionForm({ storeId }: ProductSelectionFormProps) {
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Product Search */}
-        {showProductSearch && (
-          <div className="bg-muted/20 space-y-4 rounded-lg border p-4">
-            <div className="flex items-center justify-between">
-              <h4 className="font-medium">Search Products</h4>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setShowProductSearch(false);
-                  setSearchTerm("");
-                }}
-              >
-                Cancel
-              </Button>
-            </div>
+        {/* Product Search Modal */}
+        <Dialog
+          open={showProductSearch}
+          onOpenChange={(open) => {
+            setShowProductSearch(open);
+            if (!open) {
+              setSearchTerm("");
+            }
+          }}
+        >
+          <DialogContent className="max-h-[80vh] max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Search Products</DialogTitle>
+              <DialogDescription>
+                Search for products to add to this order
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="relative">
+                <Search className="text-muted-foreground absolute top-2.5 left-2.5 h-4 w-4" />
+                <Input
+                  placeholder="Search products by name or SKU..."
+                  className="pl-8"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
 
-            <div className="relative">
-              <Search className="text-muted-foreground absolute top-2.5 left-2.5 h-4 w-4" />
-              <Input
-                placeholder="Search products by name or SKU..."
-                className="pl-8"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-
-            <div className="max-h-60 space-y-2 overflow-y-auto">
-              {isLoadingProducts ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-6 w-6 animate-spin" />
-                </div>
-              ) : products.length > 0 ? (
-                products.map((product) => {
-                  const primaryImage = product.images.find(
-                    (img) => img.isPrimary,
-                  );
-                  const isAlreadyAdded = orderItems.some(
-                    (item) => item.id === String(product.id),
-                  );
-                  return (
-                    <div
-                      key={product.id}
-                      className={`flex items-center gap-3 rounded-lg border p-3 ${
-                        isAlreadyAdded
-                          ? "cursor-not-allowed opacity-60"
-                          : "hover:bg-background cursor-pointer"
-                      }`}
-                      onClick={() => !isAlreadyAdded && addProduct(product)}
-                    >
-                      <Image
-                        src={primaryImage?.imageUrl ?? "/placeholder.svg"}
-                        alt={product.name}
-                        width={40}
-                        height={40}
-                        className="rounded-md object-cover"
-                      />
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <p className="font-medium">{product.name}</p>
-                          {isAlreadyAdded && (
-                            <Badge variant="secondary" className="text-xs">
-                              Added
+              <div className="max-h-[50vh] space-y-2 overflow-y-auto">
+                {isLoadingProducts ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                  </div>
+                ) : products.length > 0 ? (
+                  products.map((product) => {
+                    const primaryImage = product.images.find(
+                      (img) => img.isPrimary,
+                    );
+                    const isAlreadyAdded = orderItems.some(
+                      (item) => item.id === String(product.id),
+                    );
+                    return (
+                      <div
+                        key={product.id}
+                        className={`flex items-center gap-3 rounded-lg border p-3 ${
+                          isAlreadyAdded
+                            ? "cursor-not-allowed opacity-60"
+                            : "hover:bg-background cursor-pointer"
+                        }`}
+                        onClick={() => !isAlreadyAdded && addProduct(product)}
+                      >
+                        <Image
+                          src={primaryImage?.imageUrl ?? "/placeholder.svg"}
+                          alt={product.name}
+                          width={40}
+                          height={40}
+                          className="rounded-md object-cover"
+                        />
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium">{product.name}</p>
+                            {isAlreadyAdded && (
+                              <Badge variant="secondary" className="text-xs">
+                                Added
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-muted-foreground text-sm">
+                            SKU: {product.sku ?? "N/A"}
+                          </p>
+                          <div className="mt-1 flex items-center gap-2">
+                            <span className="font-medium">
+                              ${((product.price ?? 0) / 100).toFixed(2)}
+                            </span>
+                            <Badge variant="outline" className="text-xs">
+                              {product.stock} in stock
                             </Badge>
-                          )}
-                        </div>
-                        <p className="text-muted-foreground text-sm">
-                          SKU: {product.sku ?? "N/A"}
-                        </p>
-                        <div className="mt-1 flex items-center gap-2">
-                          <span className="font-medium">
-                            ${((product.price ?? 0) / 100).toFixed(2)}
-                          </span>
-                          <Badge variant="outline" className="text-xs">
-                            {product.stock} in stock
-                          </Badge>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })
-              ) : (
-                <p className="text-muted-foreground py-8 text-center text-sm">
-                  No products found
-                </p>
-              )}
+                    );
+                  })
+                ) : (
+                  <p className="text-muted-foreground py-8 text-center text-sm">
+                    No products found
+                  </p>
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          </DialogContent>
+        </Dialog>
 
         {/* Order Items */}
         {orderItems.length > 0 ? (
           <div className="space-y-4">
+            {/* Header */}
+            <div className="text-muted-foreground grid grid-cols-12 gap-4 border-b pb-2 text-sm font-medium">
+              <div className="col-span-8">Product</div>
+              <div className="col-span-2 text-center">Quantity</div>
+              <div className="col-span-2 text-center">Total</div>
+            </div>
+            {/* Items */}
             {orderItems.map((item) => (
               <div
                 key={item.id}
-                className="flex items-center gap-4 rounded-lg border p-4"
+                className="grid grid-cols-12 items-center gap-4 rounded-lg border p-4"
               >
-                <Image
-                  src={item.image || "/placeholder.svg"}
-                  alt={item.name}
-                  width={60}
-                  height={60}
-                  className="rounded-md object-cover"
-                />
-                <div className="flex-1">
-                  <p className="font-medium">{item.name}</p>
-                  <p className="text-muted-foreground text-sm">
-                    SKU: {item.sku}
-                  </p>
-                  <p className="font-medium">${item.price.toFixed(2)} each</p>
+                <div className="col-span-8 flex items-center gap-4">
+                  <Image
+                    src={item.image || "/placeholder.svg"}
+                    alt={item.name}
+                    width={60}
+                    height={60}
+                    className="rounded-md object-cover"
+                  />
+                  <div className="flex-1">
+                    <p className="font-medium">{item.name}</p>
+                    <p className="text-muted-foreground text-sm">
+                      SKU: {item.sku}
+                    </p>
+                    <p className="font-medium">${item.price.toFixed(2)} each</p>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-8 w-8 bg-transparent"
-                    onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                  >
-                    <Minus className="h-3 w-3" />
-                  </Button>
-                  <span className="w-8 text-center font-medium">
-                    {item.quantity}
-                  </span>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-8 w-8 bg-transparent"
-                    onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                  >
-                    <Plus className="h-3 w-3" />
-                  </Button>
+                <div className="col-span-2 flex justify-center">
+                  <QuantityInput
+                    value={item.quantity}
+                    onChange={(value) => updateQuantity(item.id, value)}
+                    step={1}
+                    min={1}
+                    decimalPlaces={0}
+                    className="w-24"
+                  />
                 </div>
-                <div className="text-right">
+                <div className="col-span-2 flex items-center justify-end gap-2">
                   <p className="font-medium">
                     ${(item.price * item.quantity).toFixed(2)}
                   </p>

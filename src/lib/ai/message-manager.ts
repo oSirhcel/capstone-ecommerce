@@ -153,10 +153,10 @@ export const MessageListUtils = {
   },
 
   /**
-   * Initialize with welcome message
+   * Initialize with empty messages
    */
   initialize(): ChatMessage[] {
-    return [MessageFactory.welcome()];
+    return [];
   },
 
   /**

@@ -51,7 +51,6 @@ export const productExtractionResponseSchema = z.object({
     price: z.number().min(0).optional(),
     stock: z.number().int().min(0).optional(),
     sku: z.string().optional(),
-    categoryId: z.number().optional(),
     tags: z.array(z.string()).optional(),
     seoTitle: z.string().max(60).optional(),
     seoDescription: z.string().max(200).optional(),

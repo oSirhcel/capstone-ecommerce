@@ -14,6 +14,7 @@ export const adminUserSchema = z.object({
 export const adminStoreSchema = z.object({
   id: z.string(),
   name: z.string(),
+  slug: z.string(),
   description: z.string().nullable(),
   createdAt: z
     .string()
@@ -42,6 +43,7 @@ export interface AdminProfileResponse {
   store: {
     id: string;
     name: string;
+    slug: string;
     description: string | null;
     createdAt: string;
   } | null;

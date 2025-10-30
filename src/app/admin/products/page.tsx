@@ -12,69 +12,16 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Search, Plus, Filter, Eye, Edit, Trash2, Package } from "lucide-react";
+import { Search, Plus, Filter, Trash2, Package } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useProductsQuery } from "@/hooks/products/use-products-query";
-import { useDeleteProduct } from "@/hooks/products/use-product-mutations";
+
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+
 import { type Product } from "@/lib/api/products";
 import { useSession } from "next-auth/react";
-
-function DeleteProductButton({ product }: { product: Product }) {
-  const deleteProductMutation = useDeleteProduct();
-
-  const handleDelete = () => {
-    deleteProductMutation.mutate(product.id);
-  };
-
-  return (
-    <AlertDialog>
-      <AlertDialogTrigger asChild>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-red-600 hover:text-red-700"
-        >
-          <Trash2 className="h-4 w-4" />
-        </Button>
-      </AlertDialogTrigger>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <div className="flex items-center gap-2">
-            <Trash2 className="text-destructive size-5" />
-            <AlertDialogTitle>Delete Product</AlertDialogTitle>
-          </div>
-          <AlertDialogDescription>
-            This will permanently delete &quot;{product.name}&quot; and all of
-            its contents. This action cannot be undone.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction
-            onClick={handleDelete}
-            disabled={deleteProductMutation.isPending}
-            className="bg-destructive hover:bg-destructive/90 text-white"
-          >
-            {deleteProductMutation.isPending ? "Deleting..." : "Delete Product"}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-  );
-}
+import { useRouter } from "next/navigation";
 
 const columns = [
   {
@@ -103,13 +50,6 @@ const columns = [
         </div>
       );
     },
-  },
-  {
-    header: "Store",
-    accessorKey: "store",
-    cell: ({ row }: { row: { original: Product } }) => (
-      <span>{row.original.store?.name ?? "Unknown Store"}</span>
-    ),
   },
   {
     header: "Price",
@@ -156,28 +96,11 @@ const columns = [
       return <Badge variant={variant}>{displayStatus}</Badge>;
     },
   },
-  {
-    header: "Actions",
-    cell: ({ row }: { row: { original: Product } }) => (
-      <div className="flex gap-1">
-        <Link href={`/admin/products/${row.original.id}`}>
-          <Button variant="ghost" size="sm">
-            <Eye className="h-4 w-4" />
-          </Button>
-        </Link>
-        <Link href={`/admin/products/${row.original.id}/edit`}>
-          <Button variant="ghost" size="sm">
-            <Edit className="h-4 w-4" />
-          </Button>
-        </Link>
-        <DeleteProductButton product={row.original} />
-      </div>
-    ),
-  },
 ];
 
 export default function ProductsPage() {
   const session = useSession();
+  const router = useRouter();
   const storeId = session?.data?.store?.id ?? "";
   const [searchTerm, setSearchTerm] = useState("");
   const {
@@ -196,6 +119,10 @@ export default function ProductsPage() {
     (p) => p.stock > 0 && p.stock < 20,
   ).length;
   const outOfStockProducts = products.filter((p) => p.stock === 0).length;
+
+  const handleRowClick = (product: Product) => {
+    router.push(`/admin/products/${product.id}/edit`);
+  };
 
   if (error) {
     return (
@@ -341,6 +268,7 @@ export default function ProductsPage() {
             isLoading={isLoading}
             emptyMessage="No products found. Add your first product to get started."
             emptyIcon={<Package className="h-12 w-12 opacity-20" />}
+            onRowClick={handleRowClick}
           />
         </CardContent>
       </Card>

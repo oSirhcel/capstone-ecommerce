@@ -24,6 +24,7 @@ import {
   useShippingMethodsQuery,
 } from "@/hooks/admin/settings/use-shipping-methods";
 import { ShippingMethodForm } from "./shipping-method-form";
+import { Loader2, Trash2Icon } from "lucide-react";
 
 export function ShippingMethodList() {
   const { data: methods = [] } = useShippingMethodsQuery();
@@ -114,10 +115,20 @@ export function ShippingMethodList() {
                     </DialogContent>
                   </Dialog>
                   <Button
-                    variant="destructive"
+                    className="bg-destructive hover:bg-destructive/90 text-white"
                     onClick={() => deleteMutation.mutate(m.id)}
+                    disabled={deleteMutation.isPending}
                   >
-                    Delete
+                    {deleteMutation.isPending ? (
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Deleting...
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <Trash2Icon className="h-4 w-4" /> Delete
+                      </div>
+                    )}
                   </Button>
                 </div>
               </li>

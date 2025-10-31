@@ -19,8 +19,6 @@ import {
   zeroTrustAssessments,
   riskAssessmentOrderLinks,
   riskAssessmentStoreLinks,
-  type orderStatusEnum,
-  type paymentStatusEnum,
 } from "../src/server/db/schema";
 import { sql, eq, type InferInsertModel } from "drizzle-orm";
 
@@ -45,10 +43,7 @@ function randomInt(min: number, max: number) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-function decisionFromOrder(
-  status: (typeof orderStatusEnum)["_type"],
-  paymentStatus: (typeof paymentStatusEnum)["_type"],
-) {
+function decisionFromOrder(status: string, paymentStatus: string) {
   if (status === "Completed" && paymentStatus === "Paid") {
     return { decision: "allow" as const, min: 5, max: 25 };
   }
@@ -670,7 +665,10 @@ async function main() {
         "Lifestyle store featuring clothing, books, and beauty essentials",
       ownerId: ownerGamma.id,
     };
-    const [insertedGammaStore] = await db.insert(stores).values(gammaStore).returning();
+    const [insertedGammaStore] = await db
+      .insert(stores)
+      .values(gammaStore)
+      .returning();
 
     const gammaSeeds: ProductSeed[] = [
       // Beauty & Personal Care (2)
@@ -882,71 +880,22 @@ async function main() {
       .values(gammaSeeds.map((ps) => ps.product))
       .returning();
 
-    const gammaImageRecords: NewProductImage[] = gammaInsertedProducts.flatMap((p) => {
-      const seed = gammaSeeds.find((ps) => ps.product.name === p.name);
-      const images = seed?.images ?? [];
-      return images.map((img, idx) => ({
-        productId: p.id,
-        imageUrl: img.imageUrl,
-        altText: img.altText ?? `${p.name} image ${idx + 1}`,
-        isPrimary: img.isPrimary ?? idx === 0,
-        displayOrder: img.displayOrder ?? idx,
-      }));
-    });
+    const gammaImageRecords: NewProductImage[] = gammaInsertedProducts.flatMap(
+      (p) => {
+        const seed = gammaSeeds.find((ps) => ps.product.name === p.name);
+        const images = seed?.images ?? [];
+        return images.map((img, idx) => ({
+          productId: p.id,
+          imageUrl: img.imageUrl,
+          altText: img.altText ?? `${p.name} image ${idx + 1}`,
+          isPrimary: img.isPrimary ?? idx === 0,
+          displayOrder: img.displayOrder ?? idx,
+        }));
+      },
+    );
 
     if (gammaImageRecords.length > 0) {
       await db.insert(productImages).values(gammaImageRecords);
-    }
-
-    // Seed up to 4 sensible reviews per product (ensure Gamma products have at least 2)
-    const candidateReviewers = [ownerA.id, ownerB.id, customer1.id, customer2.id, ownerGamma.id];
-    const positiveComments = [
-      "Excellent quality and fast delivery!",
-      "Very satisfied with the purchase.",
-      "Great value for money, highly recommend.",
-      "Works as expected, would buy again.",
-    ];
-    const neutralComments = [
-      "Decent product for the price.",
-      "Okay overall, met expectations.",
-      "Average experience, nothing special.",
-    ];
-    const negativeComments = [
-      "Not as described, disappointed.",
-      "Quality could be better.",
-      "Had issues shortly after purchase.",
-    ];
-
-    function commentForRating(r: number): string {
-      if (r >= 4) return positiveComments[randomInt(0, positiveComments.length - 1)];
-      if (r === 3) return neutralComments[randomInt(0, neutralComments.length - 1)];
-      return negativeComments[randomInt(0, negativeComments.length - 1)];
-    }
-
-    const allReviews: NewReview[] = [];
-    const productsForReviews = [...insertedProducts, ...gammaInsertedProducts];
-    for (const p of productsForReviews) {
-      const isGamma = gammaInsertedProducts.some((gp) => gp.id === p.id);
-      const minCount = isGamma ? 2 : 0;
-      const maxCount = 4;
-      const count = randomInt(minCount, maxCount);
-      const seenReviewer = new Set<string>();
-      for (let i = 0; i < count; i++) {
-        const reviewer = candidateReviewers[randomInt(0, candidateReviewers.length - 1)];
-        if (seenReviewer.has(reviewer)) continue;
-        seenReviewer.add(reviewer);
-        const rating = randomInt(1, 5);
-        allReviews.push({
-          userId: reviewer,
-          productId: p.id,
-          rating,
-          comment: commentForRating(rating),
-          verifiedPurchase: false,
-        });
-      }
-    }
-    if (allReviews.length) {
-      await db.insert(reviews).values(allReviews);
     }
 
     // Create customer users
@@ -974,6 +923,66 @@ async function main() {
     };
 
     await db.insert(users).values([customer1, customer2, mrGood, badAccount]);
+
+    // Seed up to 4 sensible reviews per product (ensure Gamma products have at least 2)
+    const candidateReviewers = [
+      ownerA.id,
+      ownerB.id,
+      customer1.id,
+      customer2.id,
+      ownerGamma.id,
+    ];
+    const positiveComments = [
+      "Excellent quality and fast delivery!",
+      "Very satisfied with the purchase.",
+      "Great value for money, highly recommend.",
+      "Works as expected, would buy again.",
+    ];
+    const neutralComments = [
+      "Decent product for the price.",
+      "Okay overall, met expectations.",
+      "Average experience, nothing special.",
+    ];
+    const negativeComments = [
+      "Not as described, disappointed.",
+      "Quality could be better.",
+      "Had issues shortly after purchase.",
+    ];
+
+    function commentForRating(r: number): string {
+      if (r >= 4)
+        return positiveComments[randomInt(0, positiveComments.length - 1)];
+      if (r === 3)
+        return neutralComments[randomInt(0, neutralComments.length - 1)];
+      return negativeComments[randomInt(0, negativeComments.length - 1)];
+    }
+
+    const allReviews: NewReview[] = [];
+    const productsForReviews = [...insertedProducts, ...gammaInsertedProducts];
+    for (const p of productsForReviews) {
+      const isGamma = gammaInsertedProducts.some((gp) => gp.id === p.id);
+      const minCount = isGamma ? 2 : 0;
+      const maxCount = 4;
+      const count = randomInt(minCount, maxCount);
+      const seenReviewer = new Set<string>();
+      for (let i = 0; i < count; i++) {
+        const reviewer =
+          candidateReviewers[randomInt(0, candidateReviewers.length - 1)];
+        if (seenReviewer.has(reviewer)) continue;
+        seenReviewer.add(reviewer);
+        const rating = randomInt(1, 5);
+        allReviews.push({
+          userId: reviewer,
+          productId: p.id,
+          rating,
+          comment: commentForRating(rating),
+          verifiedPurchase: false,
+        });
+      }
+    }
+    if (allReviews.length) {
+      await db.insert(reviews).values(allReviews);
+    }
 
     // Create user profiles for customers
     const customerProfiles: NewUserProfile[] = [
@@ -1088,14 +1097,20 @@ async function main() {
 
     // --- Risk test orders for MrGood (mostly accepted) and badaccount (denied) ---
     // Backdate account creation
-    await db.update(users).set({ createdAt: daysAgo(28) }).where(sql`id = ${mrGood.id}`);
-    await db.update(users).set({ createdAt: daysAgo(35) }).where(sql`id = ${badAccount.id}`);
+    await db
+      .update(users)
+      .set({ createdAt: daysAgo(28) })
+      .where(sql`id = ${mrGood.id}`);
+    await db
+      .update(users)
+      .set({ createdAt: daysAgo(35) })
+      .where(sql`id = ${badAccount.id}`);
 
     // Build schedule
     const schedule: Array<{
       userId: string;
-      status: (typeof orderStatusEnum)["_type"];
-      paymentStatus: (typeof paymentStatusEnum)["_type"];
+      status: string;
+      paymentStatus: string;
       daysAgo: number;
       amount: number;
     }> = [];
@@ -1145,12 +1160,18 @@ async function main() {
     }
 
     // Select products by store for realistic items
-    const alphaProducts = insertedProducts.filter((p) => p.storeId === alphaStore.id);
-    const alphaByPriceAsc = [...alphaProducts].sort((a, b) => a.price - b.price);
-    const alphaByPriceDesc = [...alphaProducts].sort((a, b) => b.price - a.price);
+    const alphaProducts = insertedProducts.filter(
+      (p) => p.storeId === alphaStore.id,
+    );
+    const alphaByPriceAsc = [...alphaProducts].sort(
+      (a, b) => (a.price ?? 0) - (b.price ?? 0),
+    );
+    const alphaByPriceDesc = [...alphaProducts].sort(
+      (a, b) => (b.price ?? 0) - (a.price ?? 0),
+    );
 
     // Helper to pick items based on status profile
-    function pickItemsForStatus(status: (typeof orderStatusEnum)["_type"]) {
+    function pickItemsForStatus(status: string) {
       // Use different mixes per status
       if (status === "Completed") {
         const p1 = alphaByPriceAsc[1] ?? alphaProducts[0];
@@ -1161,7 +1182,10 @@ async function main() {
         ];
       }
       if (status === "On-hold") {
-        const mid = alphaByPriceAsc[Math.min(2, Math.max(0, alphaByPriceAsc.length - 1))] ?? alphaProducts[0];
+        const mid =
+          alphaByPriceAsc[
+            Math.min(2, Math.max(0, alphaByPriceAsc.length - 1))
+          ] ?? alphaProducts[0];
         return [
           { productId: mid.id, quantity: 3, priceAtTime: mid.price }, // higher quantity triggers review
         ];
@@ -1179,20 +1203,36 @@ async function main() {
     async function createRiskOrderWithItems(params: {
       userId: string;
       storeId: string | null;
-      status: (typeof orderStatusEnum)["_type"];
-      paymentStatus: (typeof paymentStatusEnum)["_type"];
+      status: string;
+      paymentStatus: string;
       createdAt: Date;
     }) {
       const itemLines = pickItemsForStatus(params.status);
-      const totalAmountCents = itemLines.reduce((sum, it) => sum + it.priceAtTime * it.quantity, 0);
+      const totalAmountCents = itemLines.reduce(
+        (sum, it) => sum + (it.priceAtTime ?? 0) * it.quantity,
+        0,
+      );
 
       const [insertedOrder] = await db
         .insert(orders)
         .values({
           userId: params.userId,
           storeId: params.storeId,
-          status: params.status,
-          paymentStatus: params.paymentStatus,
+          status: params.status as
+            | "Completed"
+            | "Processing"
+            | "Shipped"
+            | "Pending"
+            | "Cancelled"
+            | "Refunded"
+            | "On-hold"
+            | "Failed"
+            | "Denied",
+          paymentStatus: params.paymentStatus as
+            | "Pending"
+            | "Paid"
+            | "Failed"
+            | "Refunded",
           totalAmount: totalAmountCents,
           createdAt: params.createdAt,
           updatedAt: params.createdAt,
@@ -1203,7 +1243,7 @@ async function main() {
         orderId: insertedOrder.id,
         productId: it.productId,
         quantity: it.quantity,
-        priceAtTime: it.priceAtTime,
+        priceAtTime: it.priceAtTime ?? 0,
       }));
       await db.insert(orderItems).values(riskOrderItems);
 
@@ -1211,7 +1251,10 @@ async function main() {
         orderId: insertedOrder.id,
         amount: totalAmountCents,
         currency: "AUD",
-        status: params.paymentStatus === "Paid" ? "completed" : (params.paymentStatus as string).toLowerCase(),
+        status:
+          params.paymentStatus === "Paid"
+            ? "completed"
+            : params.paymentStatus.toLowerCase(),
         createdAt: params.createdAt,
         updatedAt: params.createdAt,
       });
@@ -1219,22 +1262,28 @@ async function main() {
       return { insertedOrder, riskOrderItems };
     }
 
-    async function ensureAssessmentForOrder(order: {
-      id: number;
-      userId: string;
-      totalAmount: number;
-      status: (typeof orderStatusEnum)["_type"];
-      paymentStatus: (typeof paymentStatusEnum)["_type"];
-      createdAt: Date;
-    }, itemCount: number) {
+    async function ensureAssessmentForOrder(
+      order: {
+        id: number;
+        userId: string;
+        totalAmount: number;
+        status: string;
+        paymentStatus: string;
+        createdAt: Date;
+      },
+      itemCount: number,
+    ) {
       const existing = await db
         .select({ id: zeroTrustAssessments.id })
         .from(zeroTrustAssessments)
         .where(eq(zeroTrustAssessments.orderId, order.id))
         .limit(1);
-      if (existing[0]) return existing[0].id as number;
+      if (existing[0]) return existing[0].id;
 
-      const { decision, min, max } = decisionFromOrder(order.status, order.paymentStatus);
+      const { decision, min, max } = decisionFromOrder(
+        order.status,
+        order.paymentStatus,
+      );
       const riskScore = randomInt(min, max);
       const confidence = randomInt(70, 98);
 
@@ -1255,15 +1304,15 @@ async function main() {
             decision === "deny"
               ? "multiple_denied_transactions"
               : decision === "warn"
-              ? "additional_verification_required"
-              : "consistent_history",
+                ? "additional_verification_required"
+                : "consistent_history",
           ]),
           aiJustification:
             decision === "deny"
               ? "Transaction denied due to risk factors and recent failed attempts."
               : decision === "warn"
-              ? "Transaction flagged for additional verification due to moderate risk indicators."
-              : "Low-risk transaction aligned with historical behavior.",
+                ? "Transaction flagged for additional verification due to moderate risk indicators."
+                : "Low-risk transaction aligned with historical behavior.",
           justificationGeneratedAt: order.createdAt,
           userAgent: "seed-script",
           ipAddress: "203.0.113.42",
@@ -1274,7 +1323,7 @@ async function main() {
       await db.insert(riskAssessmentOrderLinks).values({
         riskAssessmentId: assessment.id,
         orderId: order.id,
-        createdAt: order.createdAt as unknown as Date,
+        createdAt: order.createdAt,
       });
 
       // Also create store link for admin store-scoped views
@@ -1283,10 +1332,10 @@ async function main() {
         storeId: alphaStore.id,
         storeSubtotal: order.totalAmount,
         storeItemCount: itemCount,
-        createdAt: order.createdAt as unknown as Date,
+        createdAt: order.createdAt,
       });
 
-      return assessment.id as number;
+      return assessment.id;
     }
 
     let riskOrdersCreated = 0;
@@ -1300,7 +1349,7 @@ async function main() {
         paymentStatus: s.paymentStatus,
         createdAt,
       });
-      await ensureAssessmentForOrder(insertedOrder as any, riskOrderItems.length);
+      await ensureAssessmentForOrder(insertedOrder, riskOrderItems.length);
       riskOrdersCreated += 1;
       riskOrderItemsCreated += riskOrderItems.length;
     }
@@ -1321,6 +1370,9 @@ async function main() {
       orderItems: items.length + riskOrderItemsCreated,
       reviews: allReviews.length,
     });
+  } catch (error) {
+    console.error("Seed failed:", error);
+    process.exit(1);
   } finally {
     await pool.end();
   }

@@ -1,15 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useMemo } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { ProductCard, ProductCardSkeleton } from "@/components/product-card";
 import { Pagination } from "@/components/pagination";
-import {
-  fetchProducts,
-  type Product,
-  getPrimaryImageUrl,
-} from "@/lib/api/products";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -20,46 +15,74 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { SearchIcon } from "lucide-react";
-
-// Interface for search API response
-interface SearchResult {
-  products: Product[];
-  stores: Array<{
-    id: string;
-    name: string;
-    description: string | null;
-    ownerId: string;
-    createdAt: string;
-  }>;
-  categories: Array<{
-    id: number;
-    name: string;
-    description: string | null;
-  }>;
-  query: string;
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-  };
-}
+import {
+  searchProducts,
+  type SearchProductsParams,
+  type SearchProduct,
+} from "@/lib/api/search";
+import { fetchProducts, type Product } from "@/lib/api/products";
 
 const PRODUCTS_PER_PAGE = 20;
 
+// Query key factory for React Query
+const searchQueryKeys = {
+  all: ["search-products"] as const,
+  byQuery: (query: string, page: number, limit: number, sort?: string) =>
+    [...searchQueryKeys.all, { query, page, limit, sort }] as const,
+};
+
 // Transform API Product to ProductCard props
-function transformProductToCardProps(product: Product) {
+function transformSearchProductToCardProps(product: SearchProduct | Product) {
+  const images = Array.isArray(product.images) ? product.images : [];
+  const primaryImage = images.find((img) => img.isPrimary);
+  const image =
+    primaryImage?.imageUrl ?? images[0]?.imageUrl ?? "/placeholder.svg";
+
   return {
     id: product.id,
     slug: product.slug,
     name: product.name,
-    price: (product.price ?? 0) / 100, // Convert from cents to dollars
-    image: getPrimaryImageUrl(product),
-    rating: product.rating, // Use actual rating from reviews
-    reviewCount: product.reviewCount, // Include review count
+    price: (product.price ?? 0) / 100,
+    image,
+    rating: product.rating ?? 0,
+    reviewCount: product.reviewCount ?? 0,
     store: product.store?.name ?? "Unknown Store",
     category: product.category?.name ?? "Uncategorized",
   };
+}
+
+// Custom hook for search products
+function useSearchProductsQuery(query: string, page: number, sort: string) {
+  return useQuery({
+    queryKey: searchQueryKeys.byQuery(query, page, PRODUCTS_PER_PAGE, sort),
+    queryFn: async () => {
+      if (!query.trim()) {
+        const result = await fetchProducts({
+          page,
+          limit: PRODUCTS_PER_PAGE,
+          sort: sort as SearchProductsParams["sort"],
+        });
+        // Transform ProductsResponse to match SearchResults structure
+        return {
+          products: result.products,
+          stores: [],
+          categories: [],
+          query: "",
+          pagination: result.pagination,
+        };
+      }
+      return searchProducts({
+        query,
+        page,
+        limit: PRODUCTS_PER_PAGE,
+        sort: sort as SearchProductsParams["sort"],
+      });
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes (formerly cacheTime)
+    retry: 1,
+    retryDelay: 1000,
+  });
 }
 
 export default function ProductsPage() {
@@ -67,10 +90,7 @@ export default function ProductsPage() {
   const router = useRouter();
   const pathname = usePathname();
 
-  const [searchTerm, setSearchTerm] = useState(
-    searchParams.get("search") || "",
-  );
-  const currentPage = parseInt(searchParams.get("page") || "1");
+  const currentPage = parseInt(searchParams.get("page") ?? "1");
   const sort =
     (searchParams.get("sort") as
       | "price-low"
@@ -81,57 +101,27 @@ export default function ProductsPage() {
       | "name-desc"
       | "release-newest"
       | "release-oldest") || "release-newest";
+  const searchQuery = searchParams.get("search") ?? "";
 
-  const searchQuery = searchParams.get("search");
-  const isSearching = Boolean(searchQuery?.trim());
+  // Use custom hook for search
+  const { data, isLoading, error } = useSearchProductsQuery(
+    searchQuery,
+    currentPage,
+    sort,
+  );
 
-  // Function to fetch search results
-  const fetchSearchResults = async (): Promise<SearchResult> => {
-    const response = await fetch(
-      `/api/search?q=${encodeURIComponent(searchQuery!)}&type=products&page=${currentPage}&limit=${PRODUCTS_PER_PAGE}&sort=${encodeURIComponent(sort)}`,
-    );
-    if (!response.ok) {
-      throw new Error("Failed to fetch search results");
-    }
-    return response.json();
-  };
+  const products = useMemo(() => data?.products ?? [], [data?.products]);
 
-  const { data, isLoading, error } = useQuery({
-    queryKey: [
-      isSearching ? "search-products" : "products",
-      {
-        page: currentPage,
-        limit: PRODUCTS_PER_PAGE,
-        search: searchQuery,
-        sort,
-      },
-    ],
-    queryFn: () =>
-      isSearching
-        ? fetchSearchResults()
-        : fetchProducts({
-            page: currentPage,
-            limit: PRODUCTS_PER_PAGE,
-            sort,
-          }),
-  });
-
-  const products = data?.products || [];
-  const pagination = isSearching
-    ? {
-        page: currentPage,
-        limit: PRODUCTS_PER_PAGE,
-        total: data?.products?.length || 0,
-        totalPages: Math.ceil(
-          (data?.products?.length || 0) / PRODUCTS_PER_PAGE,
-        ),
-      }
-    : data?.pagination || {
+  const pagination = useMemo(
+    () =>
+      data?.pagination ?? {
         page: 1,
         limit: PRODUCTS_PER_PAGE,
         total: 0,
-        totalPages: 1,
-      };
+        totalPages: 0,
+      },
+    [data?.pagination],
+  );
 
   const handlePageChange = (page: number) => {
     const params = new URLSearchParams(searchParams);
@@ -150,29 +140,29 @@ export default function ProductsPage() {
     router.push(`${pathname}?${params.toString()}`);
   };
 
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const searchTerm = (formData.get("search") as string)?.trim() ?? "";
+
     const params = new URLSearchParams(searchParams);
-    if (searchTerm.trim()) {
-      params.set("search", searchTerm.trim());
+    if (searchTerm) {
+      params.set("search", searchTerm);
     } else {
       params.delete("search");
     }
-    params.set("page", "1"); // Reset to first page on new search
+    params.set("page", "1");
     router.push(`${pathname}?${params.toString()}`);
   };
 
   const clearSearch = () => {
-    setSearchTerm("");
     const params = new URLSearchParams(searchParams);
     params.delete("search");
     params.set("page", "1");
     router.push(`${pathname}?${params.toString()}`);
   };
 
-  useEffect(() => {
-    setSearchTerm(searchParams.get("search") || "");
-  }, [searchParams]);
+  const isSearching = Boolean(searchQuery.trim());
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -193,16 +183,16 @@ export default function ProductsPage() {
             <div className="relative flex-1">
               <SearchIcon className="absolute top-2.5 left-2.5 h-4 w-4 text-gray-400" />
               <Input
+                name="search"
                 type="search"
                 placeholder="Search products..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                defaultValue={searchQuery}
                 className="pl-8"
               />
             </div>
             <Button type="submit">Search</Button>
-            {searchParams.get("search") && (
-              <Button variant="outline" onClick={clearSearch}>
+            {isSearching && (
+              <Button variant="outline" type="button" onClick={clearSearch}>
                 Clear
               </Button>
             )}
@@ -255,16 +245,14 @@ export default function ProductsPage() {
           {!isLoading && !error && products.length === 0 && (
             <div className="py-12 text-center">
               <div className="font-medium text-gray-500">
-                {searchParams.get("search")
-                  ? "No products found"
-                  : "No products available"}
+                {isSearching ? "No products found" : "No products available"}
               </div>
               <p className="mt-2 text-gray-400">
-                {searchParams.get("search")
+                {isSearching
                   ? "Try adjusting your search terms or browse all products."
                   : "Check back later for new products."}
               </p>
-              {searchParams.get("search") && (
+              {isSearching && (
                 <Button
                   variant="outline"
                   onClick={clearSearch}
@@ -282,19 +270,21 @@ export default function ProductsPage() {
                 {products.map((product) => (
                   <ProductCard
                     key={product.id}
-                    {...transformProductToCardProps(product)}
+                    {...transformSearchProductToCardProps(product)}
                   />
                 ))}
               </div>
 
               {/* Pagination */}
-              <div className="pt-8">
-                <Pagination
-                  currentPage={pagination.page}
-                  totalPages={pagination.totalPages}
-                  onPageChange={handlePageChange}
-                />
-              </div>
+              {pagination.totalPages > 1 && (
+                <div className="pt-8">
+                  <Pagination
+                    currentPage={pagination.page}
+                    totalPages={pagination.totalPages}
+                    onPageChange={handlePageChange}
+                  />
+                </div>
+              )}
             </>
           )}
         </div>

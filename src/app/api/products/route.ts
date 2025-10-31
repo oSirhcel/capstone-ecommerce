@@ -101,6 +101,22 @@ export async function GET(request: NextRequest) {
         break;
     }
 
+    // Get total count for pagination (before applying limit/offset)
+    const [{ totalCount }] = await db
+      .select({
+        totalCount: count().mapWith(Number),
+      })
+      .from(products)
+      .leftJoin(stores, eq(products.storeId, stores.id))
+      .leftJoin(categories, eq(products.categoryId, categories.id))
+      .where(
+        whereConditions.length === 0
+          ? undefined
+          : whereConditions.length === 1
+            ? whereConditions[0]
+            : and(...whereConditions),
+      );
+
     const productsData = await query
       .orderBy(orderByClause as Parameters<typeof query.orderBy>[0])
       .limit(limit)
@@ -165,8 +181,8 @@ export async function GET(request: NextRequest) {
       pagination: {
         page,
         limit,
-        total: productsData.length,
-        totalPages: Math.ceil(productsData.length / limit),
+        total: totalCount,
+        totalPages: Math.ceil(totalCount / limit),
       },
     });
   } catch (error) {

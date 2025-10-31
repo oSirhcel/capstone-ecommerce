@@ -71,7 +71,23 @@ export async function GET(request: NextRequest) {
     };
 
     // Search products
+    let totalProductCount = 0;
     if (!type || type === "all" || type === "products") {
+      // Get total count for pagination (before applying limit/offset)
+      const [{ count: productCount }] = await db
+        .select({
+          count: count().mapWith(Number),
+        })
+        .from(products)
+        .where(
+          or(
+            ilike(products.name, searchTerm),
+            ilike(products.description, searchTerm),
+          ),
+        );
+      
+      totalProductCount = productCount;
+
       const productsData = await db
         .select({
           id: products.id,
@@ -219,10 +235,12 @@ export async function GET(request: NextRequest) {
       results.categories = categoriesData;
     }
 
-    const totalResults =
+    // For product-specific searches, use actual total count; otherwise use returned results
+    const total = type === "products" ? totalProductCount : (
       results.products.length +
       results.stores.length +
-      results.categories.length;
+      results.categories.length
+    );
 
     return NextResponse.json({
       ...results,
@@ -230,8 +248,8 @@ export async function GET(request: NextRequest) {
       pagination: {
         page,
         limit,
-        total: totalResults,
-        totalPages: Math.ceil(totalResults / limit),
+        total,
+        totalPages: Math.ceil(total / limit),
       },
     });
   } catch (error) {

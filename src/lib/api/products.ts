@@ -34,6 +34,9 @@ export interface Product {
     name: string;
     slug: string;
     description?: string;
+    createdAt?: Date;
+    productCount?: number;
+    averageRating?: number;
   };
   category?: {
     id: number;

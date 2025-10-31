@@ -183,6 +183,13 @@
       "when": 1761753949552,
       "tag": "0025_funny_kid_colt",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1761938451572,
+      "tag": "0026_regular_vertigo",
+      "breakpoints": true
     }
   ]
 }

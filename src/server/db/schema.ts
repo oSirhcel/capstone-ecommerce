@@ -179,17 +179,6 @@ export const reviews = pgTable("reviews", {
   createdAt: timestamp().defaultNow().notNull(),
 });
 
-export const wishlists = pgTable("wishlists", {
-  id: integer().primaryKey().generatedAlwaysAsIdentity(),
-  userId: varchar("userId", { length: 255 })
-    .references(() => users.id)
-    .notNull(),
-  productId: integer()
-    .references(() => products.id)
-    .notNull(),
-  createdAt: timestamp().defaultNow().notNull(),
-});
-
 // Product images table to handle multiple images per product
 export const productImages = pgTable("product_images", {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),

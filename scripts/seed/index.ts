@@ -40,7 +40,6 @@ async function main() {
         "shipping_methods",
         "order_addresses",
         "addresses",
-        "wishlists",
         "reviews",
         "order_items",
         "orders",

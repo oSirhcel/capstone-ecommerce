@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import {
+  CheckIcon,
   HeartIcon,
   MinusIcon,
   PlusIcon,
@@ -15,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { useCart } from "@/contexts/cart-context";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 interface ProductInfoProps {
   product: {
@@ -35,10 +37,21 @@ interface ProductInfoProps {
 }
 
 export function ProductInfo({ product }: ProductInfoProps) {
+  const [isCopied, setIsCopied] = useState(false);
   const [quantity, setQuantity] = useState(1);
   const { addItem } = useCart();
   const { data: session } = useSession();
   const router = useRouter();
+
+  const handleShare = async () => {
+    const url = window.location.href;
+    await navigator.clipboard.writeText(url);
+    toast.success("Product link copied to clipboard");
+    setIsCopied(true);
+    setTimeout(() => {
+      setIsCopied(false);
+    }, 2000);
+  };
 
   const handleAddToCart = () => {
     const price =
@@ -188,7 +201,7 @@ export function ProductInfo({ product }: ProductInfoProps) {
         </div>
       </div>
 
-      <div className="flex flex-col gap-4 sm:flex-row">
+      <div className="flex flex-col items-center gap-4 sm:flex-row">
         <Button
           className="flex-1"
           size="lg"
@@ -197,12 +210,19 @@ export function ProductInfo({ product }: ProductInfoProps) {
         >
           Add to Cart
         </Button>
-        <Button variant="outline" size="icon" className="h-11 w-11">
-          <HeartIcon className="h-5 w-5" />
-          <span className="sr-only">Add to wishlist</span>
-        </Button>
-        <Button variant="outline" size="icon" className="h-11 w-11">
-          <Share2Icon className="h-5 w-5" />
+
+        <Button
+          variant="outline"
+          size="icon"
+          className="size-11"
+          onClick={handleShare}
+          disabled={isCopied}
+        >
+          {isCopied ? (
+            <CheckIcon className="size-5" />
+          ) : (
+            <Share2Icon className="size-5" />
+          )}
           <span className="sr-only">Share product</span>
         </Button>
       </div>

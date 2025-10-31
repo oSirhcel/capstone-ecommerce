@@ -14,7 +14,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SearchIcon, TagIcon, ArrowLeftIcon } from "lucide-react";
 import Link from "next/link";
-import { getKnownCategoryName } from "@/lib/utils/category-slug";
+import {
+  getKnownCategoryName,
+  slugToCategoryName,
+} from "@/lib/utils/category-slug";
 
 const PRODUCTS_PER_PAGE = 20;
 
@@ -60,9 +63,8 @@ export default function CategoryPage({ params }: CategoryPageProps) {
   useEffect(() => {
     void params.then(({ slug }) => {
       const knownName = getKnownCategoryName(slug);
-      if (knownName) {
-        setCategoryName(knownName);
-      }
+      // Fallback to converting slug to a readable name if not in the map
+      setCategoryName(knownName ?? slugToCategoryName(slug));
     });
   }, [params]);
 

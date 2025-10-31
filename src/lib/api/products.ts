@@ -117,6 +117,15 @@ export async function fetchProducts(params?: {
   category?: number;
   store?: string;
   search?: string;
+  sort?:
+    | "price-low"
+    | "price-high"
+    | "rating-low"
+    | "rating-high"
+    | "name-asc"
+    | "name-desc"
+    | "release-newest"
+    | "release-oldest";
 }): Promise<ProductsResponse> {
   const searchParams = new URLSearchParams();
 
@@ -126,6 +135,7 @@ export async function fetchProducts(params?: {
     searchParams.append("category", params.category.toString());
   if (params?.store) searchParams.append("store", params.store);
   if (params?.search) searchParams.append("search", params.search);
+  if (params?.sort) searchParams.append("sort", params.sort);
 
   const response = await fetch(
     `${getBaseUrl()}/api/products?${searchParams.toString()}`,
@@ -289,6 +299,25 @@ export function getPrimaryImageUrl(product: Product): string {
   return (
     primaryImage?.imageUrl ?? product.images[0]?.imageUrl ?? "/placeholder.svg"
   );
+}
+
+// GET /api/products/[slug]/related - Fetch related products for a specific product
+export async function fetchRelatedProducts(
+  productSlug: string,
+  limit?: number,
+): Promise<{ products: Product[] }> {
+  const searchParams = new URLSearchParams();
+  if (limit) searchParams.append("limit", limit.toString());
+
+  const response = await fetch(
+    `${getBaseUrl()}/api/products/${productSlug}/related?${searchParams.toString()}`,
+  );
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch related products: ${response.statusText}`);
+  }
+
+  return response.json() as Promise<{ products: Product[] }>;
 }
 
 // Utility function to check if user can edit product (placeholder for auth)

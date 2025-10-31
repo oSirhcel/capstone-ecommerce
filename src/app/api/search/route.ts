@@ -12,6 +12,7 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get("page") ?? "1");
     const limit = parseInt(searchParams.get("limit") ?? "20");
     const type = searchParams.get("type"); // 'products', 'stores', 'categories', or 'all'
+    const sort = searchParams.get("sort") ?? undefined; // applies when type includes products
 
     if (!query || query.trim().length === 0) {
       return NextResponse.json({
@@ -101,12 +102,24 @@ export async function GET(request: NextRequest) {
             ilike(products.description, searchTerm),
           ),
         )
-        .orderBy(desc(products.createdAt))
+        .orderBy(
+          sort === "price-low"
+            ? asc(products.price)
+            : sort === "price-high"
+              ? desc(products.price)
+              : sort === "name-asc"
+                ? asc(products.name)
+                : sort === "name-desc"
+                  ? desc(products.name)
+                  : sort === "release-oldest"
+                    ? asc(products.createdAt)
+                    : desc(products.createdAt),
+        )
         .limit(type === "products" ? limit : 10)
         .offset(type === "products" ? offset : 0);
 
       // Get product images and review statistics for each product
-      const productsWithImages = await Promise.all(
+      let productsWithImages = await Promise.all(
         productsData.map(async (product) => {
           const images = await db
             .select({
@@ -148,6 +161,13 @@ export async function GET(request: NextRequest) {
           };
         }),
       );
+
+      // If sorting by rating, sort after enrichment
+      if (sort === "rating-low" || sort === "rating-high") {
+        productsWithImages = productsWithImages.sort((a, b) =>
+          sort === "rating-low" ? a.rating - b.rating : b.rating - a.rating,
+        );
+      }
 
       results.products = productsWithImages;
     }

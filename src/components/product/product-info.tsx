@@ -53,7 +53,10 @@ export function ProductInfo({ product }: ProductInfoProps) {
   const router = useRouter();
 
   const handleAddToCart = () => {
-    const price = product.discountPrice ?? product.price;
+    const price =
+      product.discountPrice !== undefined
+        ? Math.min(product.price, product.discountPrice)
+        : product.price;
 
     // If not logged in, redirect to sign in and do NOT show success toast
     if (!session?.user) {
@@ -131,21 +134,35 @@ export function ProductInfo({ product }: ProductInfoProps) {
       </div>
 
       <div className="flex items-baseline gap-2">
-        {product.discountPrice ? (
-          <>
-            <span className="text-2xl font-bold">
-              ${product.discountPrice.toFixed(2)}
-            </span>
-            <span className="text-muted-foreground text-lg line-through">
-              ${product.price.toFixed(2)}
-            </span>
-            <Badge className="ml-2 bg-green-100 text-green-800 hover:bg-green-100 dark:bg-green-900 dark:text-green-100 dark:hover:bg-green-900">
-              {Math.round(
-                ((product.price - product.discountPrice) / product.price) * 100,
-              )}
-              % OFF
-            </Badge>
-          </>
+        {product.discountPrice !== undefined ? (
+          (() => {
+            const originalPrice = Math.max(
+              product.price,
+              product.discountPrice,
+            );
+            const discountedPrice = Math.min(
+              product.price,
+              product.discountPrice,
+            );
+            const discountPct = Math.round(
+              ((originalPrice - discountedPrice) / originalPrice) * 100,
+            );
+            return (
+              <>
+                <span className="text-2xl font-bold">
+                  ${discountedPrice.toFixed(2)}
+                </span>
+                <span className="text-muted-foreground text-lg line-through">
+                  ${originalPrice.toFixed(2)}
+                </span>
+                {discountPct > 0 && (
+                  <Badge className="ml-2 bg-green-100 text-green-800 hover:bg-green-100 dark:bg-green-900 dark:text-green-100 dark:hover:bg-green-900">
+                    {discountPct}% OFF
+                  </Badge>
+                )}
+              </>
+            );
+          })()
         ) : (
           <span className="text-2xl font-bold">
             ${product.price.toFixed(2)}

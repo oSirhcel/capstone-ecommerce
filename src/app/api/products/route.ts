@@ -18,6 +18,7 @@ export async function GET(request: NextRequest) {
     const category = searchParams.get("category");
     const store = searchParams.get("store");
     const search = searchParams.get("search");
+    const sort = searchParams.get("sort") ?? "release-newest";
 
     const offset = (page - 1) * limit;
 
@@ -74,13 +75,37 @@ export async function GET(request: NextRequest) {
             : and(...whereConditions),
       );
 
+    // Build sorting for fields directly available
+    let orderByClause;
+    switch (sort) {
+      case "price-low":
+        orderByClause = asc(products.price);
+        break;
+      case "price-high":
+        orderByClause = desc(products.price);
+        break;
+      case "name-asc":
+        orderByClause = asc(products.name);
+        break;
+      case "name-desc":
+        orderByClause = desc(products.name);
+        break;
+      case "release-oldest":
+        orderByClause = asc(products.createdAt);
+        break;
+      case "release-newest":
+      default:
+        orderByClause = desc(products.createdAt);
+        break;
+    }
+
     const productsData = await query
-      .orderBy(desc(products.createdAt))
+      .orderBy(orderByClause as any)
       .limit(limit)
       .offset(offset);
 
     // Get product images and review statistics for each product
-    const productsWithImages = await Promise.all(
+    let productsWithImages = await Promise.all(
       productsData.map(async (product) => {
         const images = await db
           .select({
@@ -122,6 +147,13 @@ export async function GET(request: NextRequest) {
         };
       }),
     );
+
+    // Apply rating-based sorting client-side after enrichment
+    if (sort === "rating-low" || sort === "rating-high") {
+      productsWithImages = productsWithImages.sort((a, b) =>
+        sort === "rating-low" ? a.rating - b.rating : b.rating - a.rating,
+      );
+    }
 
     return NextResponse.json({
       products: productsWithImages,

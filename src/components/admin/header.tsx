@@ -7,6 +7,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -67,6 +68,14 @@ export function AdminHeader() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-56" align="end">
+              <DropdownMenuLabel className="font-normal">
+                <div className="flex flex-col space-y-1">
+                  <p className="text-sm leading-none font-medium">
+                    {profile?.user.username}
+                  </p>
+                </div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
               {profile?.store?.slug && (
                 <>
                   <DropdownMenuItem asChild>
@@ -77,7 +86,6 @@ export function AdminHeader() {
                 </>
               )}
 
-              <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
                 <Link href={`/account`}>My Account</Link>
               </DropdownMenuItem>

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CheckIcon } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 import { NewArrivals } from "@/components/new-arrivals";
 import { fetchFeaturedStores } from "@/lib/api/stores";
 import { useQuery } from "@tanstack/react-query";
@@ -53,7 +54,7 @@ export default function Home() {
                 alt="Hero Image"
                 width={550}
                 height={550}
-                className="rounded-xl object-cover"
+                className="rounded-xl object-contain"
                 priority
               />
             </div>
@@ -106,12 +107,13 @@ export default function Home() {
               featuredStores.map((store) => (
                 <StoreCard
                   key={store.id}
-                  id={store.id}
                   name={store.name}
                   description={store.description}
                   productCount={store.productCount ?? 0}
                   createdAt={store.createdAt.toString()}
-                  ownerId={store.ownerId}
+                  slug={store.slug}
+                  image={"/placeholder.svg"}
+                  rating={0}
                 />
               ))
             ) : (
@@ -195,7 +197,7 @@ export default function Home() {
                 alt="Seller Dashboard"
                 width={550}
                 height={550}
-                className="rounded-xl object-cover"
+                className="rounded-xl object-contain"
               />
             </div>
           </div>
@@ -217,8 +219,8 @@ export default function Home() {
           </div>
           <NewArrivals limit={6} />
           <div className="flex justify-center">
-            <Button variant="outline" size="lg">
-              View All New Arrivals
+            <Button variant="outline" size="lg" asChild>
+              <Link href="/products/new-arrivals">View All New Arrivals</Link>
             </Button>
           </div>
         </div>

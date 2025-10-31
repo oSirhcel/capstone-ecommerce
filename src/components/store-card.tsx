@@ -37,7 +37,7 @@ export function StoreCard({
               alt={name}
               width={300}
               height={200}
-              className="aspect-[3/2] w-full object-cover"
+              className="aspect-[3/2] w-full object-contain"
             />
             <Badge className="absolute top-2 right-2" variant="secondary">
               <Store className="mr-1 h-3 w-3" />

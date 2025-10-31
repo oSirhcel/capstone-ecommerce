@@ -66,19 +66,13 @@ const Header = () => {
               Stores
             </Link>
             <Link
-              href="#"
-              className="text-muted-foreground hover:text-primary text-sm font-medium transition-colors"
-            >
-              Trending
-            </Link>
-            <Link
-              href="#"
+              href="/products/new-arrivals"
               className="text-muted-foreground hover:text-primary text-sm font-medium transition-colors"
             >
               New Arrivals
             </Link>
             <Link
-              href="#"
+              href="/products/deals"
               className="text-muted-foreground hover:text-primary text-sm font-medium transition-colors"
             >
               Deals
@@ -158,7 +152,10 @@ const Footer = () => {
                 </Link>
               </li>
               <li>
-                <Link href="#" className="hover:text-foreground">
+                <Link
+                  href="/products/new-arrivals"
+                  className="hover:text-foreground"
+                >
                   New Arrivals
                 </Link>
               </li>
@@ -173,7 +170,7 @@ const Footer = () => {
                 </Link>
               </li>
               <li>
-                <Link href="#" className="hover:text-foreground">
+                <Link href="/products/deals" className="hover:text-foreground">
                   Deals & Discounts
                 </Link>
               </li>

@@ -609,7 +609,7 @@ export function ProductForm({
                               alt="Main product image"
                               width={300}
                               height={300}
-                              className="h-48 w-48 rounded-lg border object-cover sm:h-64 sm:w-64 md:h-72 md:w-72 lg:h-80 lg:w-80"
+                              className="h-48 w-48 rounded-lg border object-contain sm:h-64 sm:w-64 md:h-72 md:w-72 lg:h-80 lg:w-80"
                             />
                             <Button
                               type="button"
@@ -635,7 +635,7 @@ export function ProductForm({
                                   alt={`Product image ${idx + 2}`}
                                   width={80}
                                   height={80}
-                                  className="h-full min-h-[60px] w-full min-w-[60px] rounded-lg border object-cover"
+                                  className="h-full min-h-[60px] w-full min-w-[60px] rounded-lg border object-contain"
                                 />
                                 <Button
                                   type="button"

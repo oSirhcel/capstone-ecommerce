@@ -17,6 +17,7 @@ interface ProductCardProps {
   reviewCount?: number;
   store: string;
   category: string;
+  compareAtPrice?: number | null;
 }
 
 export function ProductCard({
@@ -29,11 +30,19 @@ export function ProductCard({
   reviewCount,
   store,
   category,
+  compareAtPrice,
 }: ProductCardProps) {
   // Use slug if available, otherwise generate one from name, or fall back to id
   const productUrl = slug
     ? `/product/${slug}`
     : `/product/${generateSlug(name)}`;
+
+  // Calculate discount if compareAtPrice exists and is greater than price
+  const hasDiscount =
+    compareAtPrice != null && compareAtPrice > 0 && compareAtPrice > price;
+  const discountPercentage = hasDiscount
+    ? Math.round(((compareAtPrice - price) / compareAtPrice) * 100)
+    : 0;
 
   return (
     <Link href={productUrl}>
@@ -45,9 +54,14 @@ export function ProductCard({
               alt={name}
               width={300}
               height={300}
-              className="aspect-square w-full object-cover"
+              className="aspect-square w-full object-contain"
             />
             <Badge className="absolute top-2 right-2">{category}</Badge>
+            {hasDiscount && discountPercentage > 0 && (
+              <Badge className="absolute top-2 left-2 bg-green-100 text-green-800 hover:bg-green-100 dark:bg-green-900 dark:text-green-100 dark:hover:bg-green-900">
+                {discountPercentage}% OFF
+              </Badge>
+            )}
           </div>
         </CardContent>
         <CardFooter className="flex flex-col items-start gap-2 p-4">
@@ -66,7 +80,14 @@ export function ProductCard({
             </div>
           </div>
           <h3 className="line-clamp-1 font-medium">{name}</h3>
-          <p className="font-bold">${price.toFixed(2)}</p>
+          <div className="flex items-baseline gap-2">
+            <p className="font-bold">${price.toFixed(2)}</p>
+            {hasDiscount && (
+              <p className="text-muted-foreground text-sm line-through">
+                ${compareAtPrice.toFixed(2)}
+              </p>
+            )}
+          </div>
         </CardFooter>
       </Card>
     </Link>

@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/select";
 import { SearchIcon } from "lucide-react";
 import { type SearchProductsParams } from "@/lib/api/search";
-import { fetchProducts, type Product } from "@/lib/api/products";
+import { fetchProducts, transformProductToCardProps } from "@/lib/api/products";
 
 const PRODUCTS_PER_PAGE = 20;
 
@@ -29,29 +29,6 @@ const searchQueryKeys = {
   byQuery: (query: string, page: number, limit: number, sort?: string) =>
     [...searchQueryKeys.all, { query, page, limit, sort }] as const,
 };
-
-// Transform API Product to ProductCard props
-function transformProductToCardProps(product: Product) {
-  const images = Array.isArray(product.images) ? product.images : [];
-  const primaryImage = images.find((img) => img.isPrimary);
-  const image =
-    primaryImage?.imageUrl ?? images[0]?.imageUrl ?? "/placeholder.svg";
-
-  return {
-    id: product.id,
-    slug: product.slug,
-    name: product.name,
-    price: (product.price ?? 0) / 100,
-    compareAtPrice: product.compareAtPrice
-      ? product.compareAtPrice / 100
-      : null,
-    image,
-    rating: product.rating ?? 0,
-    reviewCount: product.reviewCount ?? 0,
-    store: product.store?.name ?? "Unknown Store",
-    category: product.category?.name ?? "Uncategorized",
-  };
-}
 
 // Custom hook for deals products with filtering
 function useDealsProductsQuery(query: string, page: number, sort: string) {

@@ -10,7 +10,6 @@ import {
   cartItems,
   orderItems,
   reviews,
-  wishlists,
   inventoryLogs,
 } from "@/server/db/schema";
 import { eq, asc, sql, count, notInArray, and, inArray } from "drizzle-orm";
@@ -571,9 +570,6 @@ export async function DELETE(
 
     // Delete cart items
     await db.delete(cartItems).where(eq(cartItems.productId, productId));
-
-    // Delete wishlist items
-    await db.delete(wishlists).where(eq(wishlists.productId, productId));
 
     // Delete reviews
     await db.delete(reviews).where(eq(reviews.productId, productId));

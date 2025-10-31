@@ -52,6 +52,7 @@ export async function GET(request: NextRequest) {
         sku: products.sku,
         description: products.description,
         price: products.price,
+        compareAtPrice: products.compareAtPrice,
         slug: products.slug,
         stock: products.stock,
         status: products.status,
@@ -73,12 +74,12 @@ export async function GET(request: NextRequest) {
       .from(products)
       .leftJoin(stores, eq(products.storeId, stores.id))
       .leftJoin(categories, eq(products.categoryId, categories.id))
-      // Apply WHERE conditions if any
+      // Apply WHERE conditions - always filter by Active status
       .where(
         whereConditions.length === 0
-          ? undefined
+          ? eq(products.status, "Active")
           : whereConditions.length === 1
-            ? whereConditions[0]
+            ? and(whereConditions[0], eq(products.status, "Active"))
             : and(...whereConditions, eq(products.status, "Active")),
       );
 
@@ -116,10 +117,10 @@ export async function GET(request: NextRequest) {
       .leftJoin(categories, eq(products.categoryId, categories.id))
       .where(
         whereConditions.length === 0
-          ? undefined
+          ? eq(products.status, "Active")
           : whereConditions.length === 1
-            ? whereConditions[0]
-            : and(...whereConditions),
+            ? and(whereConditions[0], eq(products.status, "Active"))
+            : and(...whereConditions, eq(products.status, "Active")),
       );
 
     const productsData = await query
@@ -217,7 +218,7 @@ export async function POST(request: NextRequest) {
       seoTitle?: string;
       seoDescription?: string;
       slug?: string;
-      status?: "Active" | "Inactive" | "Draft" | "Archived";
+      status?: "Active" | "Draft" | "Archived";
       featured?: boolean;
       tagIds?: number[];
       storeId: string;
@@ -310,9 +311,7 @@ export async function POST(request: NextRequest) {
         ? "Active"
         : status === "Archived"
           ? "Archived"
-          : status === "Inactive"
-            ? "Inactive"
-            : "Draft";
+          : "Draft";
 
     // Create the product
     const [newProduct] = await db

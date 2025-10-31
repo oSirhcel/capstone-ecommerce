@@ -348,6 +348,10 @@ export const transformProductToCardProps = (
     slug: product.slug!,
     name: product.name,
     price: (product.price ?? 0) / 100, // Convert from cents to dollars
+    compareAtPrice:
+      "compareAtPrice" in product && product.compareAtPrice != null
+        ? product.compareAtPrice / 100 // Convert from cents to dollars
+        : null,
     image: getPrimaryImageUrl(product),
     rating: product.rating, // Use actual rating from reviews
     reviewCount: product.reviewCount, // Include review count

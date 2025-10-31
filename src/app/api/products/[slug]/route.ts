@@ -12,7 +12,6 @@ import {
   reviews,
   wishlists,
   inventoryLogs,
-  productVariants,
 } from "@/server/db/schema";
 import { eq, asc, sql, count, notInArray } from "drizzle-orm";
 
@@ -535,11 +534,6 @@ export async function DELETE(
 
     // Delete reviews
     await db.delete(reviews).where(eq(reviews.productId, productId));
-
-    // Delete product variants
-    await db
-      .delete(productVariants)
-      .where(eq(productVariants.productId, productId));
 
     // Delete inventory logs (historical data - consider archiving in production)
     await db

@@ -8,7 +8,8 @@ export interface Store {
   description: string | null;
   ownerId: string;
   createdAt: Date;
-  productCount?: number; // Only included when fetched with product count
+  productCount: number;
+  averageRating: number;
 }
 
 export interface StoreSettings {
@@ -160,7 +161,9 @@ export async function fetchStoreById(id: string): Promise<Store> {
 
 // GET /api/stores/featured - Fetch featured stores for homepage
 export async function fetchFeaturedStores(limit = 6): Promise<Store[]> {
-  const response = await fetch(`${getBaseUrl()}/api/stores?limit=${limit}`);
+  const response = await fetch(
+    `${getBaseUrl()}/api/stores?limit=${limit}&sort=rating-high`,
+  );
 
   if (!response.ok) {
     throw new Error(`Failed to fetch featured stores: ${response.statusText}`);

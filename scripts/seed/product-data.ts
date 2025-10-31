@@ -18,7 +18,7 @@ export interface ProductSeed {
   seoTitle: string;
   seoDescription: string;
   slug: string;
-  status: "Active" | "Inactive" | "Draft" | "Archived";
+  status: "Active" | "Draft" | "Archived";
   featured: boolean;
   categoryName: string;
   tags: string[];

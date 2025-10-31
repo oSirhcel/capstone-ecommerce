@@ -24,7 +24,8 @@ export const users = pgTable("users", {
 export const categories = pgTable("categories", {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),
   name: varchar({ length: 255 }).notNull(),
-  description: varchar({ length: 500 }),
+  description: varchar({ length: 500 }).notNull(),
+  image: text().notNull(),
 });
 
 export const stores = pgTable("stores", {
@@ -40,7 +41,6 @@ export const stores = pgTable("stores", {
 
 export const productStatusEnum = pgEnum("product_status", [
   "Active",
-  "Inactive",
   "Draft",
   "Archived",
 ]);
@@ -526,21 +526,6 @@ export const inventoryLogs = pgTable("inventory_logs", {
   quantity: integer().notNull(), // Positive for additions, negative for subtractions
   reason: varchar({ length: 255 }),
   referenceId: integer(), // Order ID, purchase order ID, etc.
-  createdAt: timestamp().defaultNow().notNull(),
-});
-
-// Product variants (size, color, etc.)
-export const productVariants = pgTable("product_variants", {
-  id: integer().primaryKey().generatedAlwaysAsIdentity(),
-  productId: integer()
-    .references(() => products.id)
-    .notNull(),
-  name: varchar({ length: 100 }).notNull(), // 'Size', 'Color', etc.
-  value: varchar({ length: 100 }).notNull(), // 'Large', 'Red', etc.
-  priceAdjustment: integer().notNull().default(0), // Price adjustment in cents
-  stock: integer().notNull().default(0),
-  sku: varchar({ length: 100 }).unique(),
-  isActive: boolean().notNull().default(true),
   createdAt: timestamp().defaultNow().notNull(),
 });
 

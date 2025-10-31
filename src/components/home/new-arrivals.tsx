@@ -3,10 +3,13 @@
 import { useQuery } from "@tanstack/react-query";
 import {
   fetchProducts,
-  getPrimaryImageUrl,
+  transformProductToCardProps,
   type Product,
 } from "@/lib/api/products";
-import { ProductCard, ProductCardSkeleton } from "@/components/product-card";
+import {
+  ProductCard,
+  ProductCardSkeleton,
+} from "@/components/home/product-card";
 
 interface NewArrivalsProps {
   limit?: number;
@@ -44,15 +47,7 @@ export function NewArrivals({ limit = 6 }: NewArrivalsProps) {
         products.map((product: Product) => (
           <ProductCard
             key={product.id}
-            id={product.id}
-            slug={product.slug}
-            name={product.name}
-            price={(product.price ?? 0) / 100}
-            image={getPrimaryImageUrl(product)}
-            rating={product.rating}
-            reviewCount={product.reviewCount}
-            store={product.store?.name ?? "Unknown Store"}
-            category={product.category?.name ?? "Uncategorized"}
+            {...transformProductToCardProps(product)}
           />
         ))}
     </div>

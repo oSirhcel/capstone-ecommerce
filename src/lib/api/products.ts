@@ -1,5 +1,6 @@
 // Product API utility functions
 import { getBaseUrl, type ApiResponse } from "./config";
+import { type SearchProduct } from "./search";
 
 export interface Product {
   id: number;
@@ -28,7 +29,7 @@ export interface Product {
   updatedAt: Date;
   rating: number; // Average rating from reviews
   reviewCount: number; // Total number of reviews
-  store?: {
+  store: {
     id: string;
     name: string;
     slug: string;
@@ -117,6 +118,7 @@ export async function fetchProducts(params?: {
   category?: number;
   store?: string;
   search?: string;
+  featured?: boolean;
   sort?:
     | "price-low"
     | "price-high"
@@ -135,6 +137,7 @@ export async function fetchProducts(params?: {
     searchParams.append("category", params.category.toString());
   if (params?.store) searchParams.append("store", params.store);
   if (params?.search) searchParams.append("search", params.search);
+  if (params?.featured) searchParams.append("featured", "true");
   if (params?.sort) searchParams.append("sort", params.sort);
 
   const response = await fetch(
@@ -289,7 +292,7 @@ export function formatWeight(weight: string | null): string {
 }
 
 // Utility function to get primary image URL
-export function getPrimaryImageUrl(product: Product): string {
+export function getPrimaryImageUrl(product: Product | SearchProduct): string {
   const primaryImage = product.images.find((img) => img.isPrimary);
   return (
     primaryImage?.imageUrl ?? product.images[0]?.imageUrl ?? "/placeholder.svg"
@@ -315,9 +318,37 @@ export async function fetchRelatedProducts(
   return response.json() as Promise<{ products: Product[] }>;
 }
 
+// GET /api/products - Fetch featured products sorted by highest rating
+export async function fetchFeaturedProducts(
+  limit = 20,
+): Promise<ProductsResponse> {
+  return fetchProducts({
+    featured: true,
+    limit,
+    sort: "rating-high",
+  });
+}
+
 // Utility function to check if user can edit product (placeholder for auth)
 export function canEditProduct(_product: Product, _userId?: string): boolean {
   // TODO: Implement proper authorization logic
   // For now, return false (will be updated when auth is implemented)
   return false;
 }
+
+// Transform API Product to ProductCard props
+export const transformProductToCardProps = (
+  product: Product | SearchProduct,
+) => {
+  return {
+    id: product.id,
+    slug: product.slug!,
+    name: product.name,
+    price: (product.price ?? 0) / 100, // Convert from cents to dollars
+    image: getPrimaryImageUrl(product),
+    rating: product.rating, // Use actual rating from reviews
+    reviewCount: product.reviewCount, // Include review count
+    store: product.store.name,
+    category: product.category!.name,
+  };
+};

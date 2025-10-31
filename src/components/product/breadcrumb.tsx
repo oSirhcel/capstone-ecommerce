@@ -25,7 +25,7 @@ export function Breadcrumb({ items }: BreadcrumbProps) {
             ) : (
               <Link
                 href={item.href}
-                className="hover:text-foreground cursor-pointer hover:underline"
+                className="hover:text-foreground cursor-pointer truncate hover:underline"
               >
                 {item.label}
               </Link>

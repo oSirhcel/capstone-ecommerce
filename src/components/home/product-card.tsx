@@ -5,37 +5,29 @@ import Link from "next/link";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { generateSlug } from "@/lib/utils/slug";
 
 interface ProductCardProps {
-  id: number;
-  slug: string | null;
+  slug: string;
   name: string;
   price: number;
   image: string;
   rating: number;
-  reviewCount?: number;
   store: string;
   category: string;
   compareAtPrice?: number | null;
 }
 
 export function ProductCard({
-  id,
   slug,
   name,
   price,
   image,
   rating,
-  reviewCount,
   store,
   category,
   compareAtPrice,
 }: ProductCardProps) {
-  // Use slug if available, otherwise generate one from name, or fall back to id
-  const productUrl = slug
-    ? `/product/${slug}`
-    : `/product/${generateSlug(name)}`;
+  const productUrl = `/product/${slug}`;
 
   // Calculate discount if compareAtPrice exists and is greater than price
   const hasDiscount =
@@ -45,49 +37,39 @@ export function ProductCard({
     : 0;
 
   return (
-    <Link href={productUrl}>
-      <Card className="overflow-hidden transition-all hover:shadow-md">
+    <Link href={productUrl} className="group block">
+      <Card className="hover:border-primary/50 overflow-hidden border transition-all duration-300 hover:shadow-lg">
         <CardContent className="p-0">
-          <div className="relative">
+          <div className="relative overflow-hidden">
             <Image
               src={image || "/placeholder.svg"}
               alt={name}
               width={300}
               height={300}
-              className="aspect-square w-full object-contain"
+              className="aspect-square w-full object-contain transition-transform duration-300 group-hover:scale-105"
             />
-            <Badge className="absolute top-2 right-2">{category}</Badge>
             {hasDiscount && discountPercentage > 0 && (
               <Badge className="absolute top-2 left-2 bg-green-100 text-green-800 hover:bg-green-100 dark:bg-green-900 dark:text-green-100 dark:hover:bg-green-900">
                 {discountPercentage}% OFF
               </Badge>
             )}
+            <Badge className="absolute top-3 right-3 shadow-sm">
+              {category}
+            </Badge>
           </div>
         </CardContent>
         <CardFooter className="flex flex-col items-start gap-2 p-4">
-          <div className="flex w-full items-center justify-between">
-            <p className="text-muted-foreground text-sm">{store}</p>
+          <div className="flex w-full items-center justify-between text-sm">
+            <p className="text-muted-foreground">{store}</p>
             <div className="flex items-center gap-1">
-              <StarIcon className="fill-primary text-primary h-3.5 w-3.5" />
-              <span className="text-sm font-medium">
-                {rating > 0 ? rating.toFixed(1) : "No rating"}
-              </span>
-              {reviewCount !== undefined && reviewCount > 0 && (
-                <span className="text-muted-foreground text-xs">
-                  ({reviewCount})
-                </span>
-              )}
+              <StarIcon className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+              <span className="font-medium">{rating}</span>
             </div>
           </div>
-          <h3 className="line-clamp-1 font-medium">{name}</h3>
-          <div className="flex items-baseline gap-2">
-            <p className="font-bold">${price.toFixed(2)}</p>
-            {hasDiscount && (
-              <p className="text-muted-foreground text-sm line-through">
-                ${compareAtPrice.toFixed(2)}
-              </p>
-            )}
-          </div>
+          <h3 className="group-hover:text-primary line-clamp-2 leading-snug font-medium transition-colors">
+            {name}
+          </h3>
+          <p className="text-lg font-bold">${price.toFixed(2)}</p>
         </CardFooter>
       </Card>
     </Link>

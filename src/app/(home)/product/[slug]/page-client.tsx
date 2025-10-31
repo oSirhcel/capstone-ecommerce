@@ -41,13 +41,6 @@ function transform(product: Product) {
       { name: "Added", value: product.createdAt.toLocaleString() },
     ],
     images: product.images.map((img) => img.imageUrl),
-    options: [
-      {
-        id: "size",
-        name: "Size",
-        values: ["S", "M", "L", "XL"],
-      },
-    ],
     category: product.category?.name ?? "Uncategorized",
     tags: [
       "product",
@@ -123,7 +116,11 @@ export function ProductPageClient({ productSlug }: ProductPageClientProps) {
               label: transformedProduct.category,
               href: categoryHref,
             },
-            { label: transformedProduct.name, href: `#`, current: true },
+            {
+              label: "",
+              href: `#`,
+              current: true,
+            },
           ]}
         />
 

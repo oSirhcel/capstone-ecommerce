@@ -3,8 +3,11 @@
 import { useMemo } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { ProductCard, ProductCardSkeleton } from "@/components/product-card";
-import { Pagination } from "@/components/pagination";
+import {
+  ProductCard,
+  ProductCardSkeleton,
+} from "@/components/home/product-card";
+import { Pagination } from "@/components/home/pagination";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {

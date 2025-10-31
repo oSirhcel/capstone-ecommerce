@@ -1,75 +1,51 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Star, Store, Calendar } from "lucide-react";
+import { StarIcon, PackageIcon } from "lucide-react";
 
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface StoreCardProps {
   name: string;
   slug: string;
-  description: string | null;
   image: string;
   productCount: number;
-  rating: number;
-  createdAt: string;
+  averageRating: number;
 }
 
 export function StoreCard({
   name,
   slug,
-  description,
   image,
   productCount,
-  rating,
-  createdAt,
+  averageRating,
 }: StoreCardProps) {
-  const joinedYear = new Date(createdAt).getFullYear();
-
   return (
     <Link href={`/stores/${slug}`} className="block">
-      <Card className="overflow-hidden transition-all hover:shadow-md">
+      <Card className="hover:border-primary/50 overflow-hidden border transition-all duration-300 hover:shadow-lg">
         <CardContent className="p-0">
-          <div className="relative">
+          <div className="relative overflow-hidden">
             <Image
-              src={image ?? "/placeholder.svg"}
+              src={image || "/placeholder.svg"}
               alt={name}
               width={300}
-              height={200}
-              className="aspect-[3/2] w-full object-contain"
+              height={300}
+              className="aspect-square w-full object-cover transition-transform duration-300 group-hover:scale-105"
             />
-            <Badge className="absolute top-2 right-2" variant="secondary">
-              <Store className="mr-1 h-3 w-3" />
-              Store
-            </Badge>
           </div>
         </CardContent>
         <CardFooter className="flex flex-col items-start gap-3 p-4">
-          <div className="w-full">
-            <h3 className="line-clamp-1 text-lg font-semibold">{name}</h3>
-            {description && (
-              <p className="text-muted-foreground mt-1 line-clamp-2 text-sm">
-                {description}
-              </p>
-            )}
-          </div>
-
+          <h3 className="group-hover:text-primary text-lg font-semibold transition-colors">
+            {name}
+          </h3>
           <div className="flex w-full items-center justify-between text-sm">
-            <div className="flex items-center gap-4">
-              <span className="text-muted-foreground">
-                {productCount} product{productCount !== 1 ? "s" : ""}
-              </span>
-              <div className="flex items-center gap-1">
-                <Calendar className="text-muted-foreground h-3 w-3" />
-                <span className="text-muted-foreground">
-                  Since {joinedYear}
-                </span>
-              </div>
+            <div className="text-muted-foreground flex items-center gap-1.5">
+              <PackageIcon className="h-4 w-4" />
+              <span>{productCount} products</span>
             </div>
             <div className="flex items-center gap-1">
-              <Star className="fill-primary text-primary h-3.5 w-3.5" />
-              <span className="font-medium">{rating}</span>
+              <StarIcon className="h-4 w-4 fill-amber-400 text-amber-400" />
+              <span className="font-medium">{averageRating}</span>
             </div>
           </div>
         </CardFooter>

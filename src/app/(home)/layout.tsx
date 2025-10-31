@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 
 import Image from "next/image";
 import Link from "next/link";
-import { AuthNav } from "@/components/auth-nav";
+import { AuthNav } from "@/components/home/auth-nav";
 import { CartButton } from "@/components/cart/cart-button";
 import { CartProvider } from "@/contexts/cart-context";
 import { CartDrawer } from "@/components/cart/cart-drawer";
@@ -21,7 +21,7 @@ const HomeLayout = ({ children }: { children: React.ReactNode }) => {
     <CartProvider>
       <div className="flex min-h-screen flex-col">
         <Header />
-        <main className="flex-1">{children}</main>
+        <main className="mx-auto flex-1">{children}</main>
         <Footer />
       </div>
       <CartDrawer />

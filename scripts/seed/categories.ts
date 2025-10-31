@@ -11,24 +11,33 @@ const categoryData = [
   {
     name: "Electronics",
     description: "Gadgets, devices, and electronic accessories",
+    image: "/images/categories/electronics.jpg",
   },
   {
     name: "Fashion & Clothing",
     description: "Fashion and apparel for all occasions",
+    image: "/images/categories/fashion.jpg",
   },
   {
     name: "Home & Living",
     description: "Home essentials, furniture, and decor",
+    image: "/images/categories/home.jpg",
   },
   {
     name: "Sports & Outdoors",
     description: "Sports equipment and outdoor adventure gear",
+    image: "/images/categories/sports.jpg",
   },
   {
     name: "Beauty & Personal Care",
     description: "Beauty products and personal care essentials",
+    image: "/images/categories/beauty.jpg",
   },
-  { name: "Handmade", description: "Artisan crafts and handmade goods" },
+  {
+    name: "Handmade",
+    description: "Artisan crafts and handmade goods",
+    image: "/images/categories/handmade.jpg",
+  },
 ];
 
 export async function seedCategories(

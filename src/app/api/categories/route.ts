@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/server/db";
-import { categories } from "@/server/db/schema";
-import { asc } from "drizzle-orm";
+import { categories, products } from "@/server/db/schema";
+import { asc, eq, sql } from "drizzle-orm";
 
 // GET /api/categories - Get all categories
 export async function GET() {
@@ -11,8 +11,12 @@ export async function GET() {
         id: categories.id,
         name: categories.name,
         description: categories.description,
+        image: categories.image,
+        count: sql<number>`COUNT(${products.id})`.mapWith(Number).as("count"),
       })
       .from(categories)
+      .leftJoin(products, eq(categories.id, products.categoryId))
+      .groupBy(categories.id)
       .orderBy(asc(categories.name));
 
     return NextResponse.json({
@@ -23,7 +27,7 @@ export async function GET() {
     console.error("Error fetching categories:", error);
     return NextResponse.json(
       { error: "Failed to fetch categories" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

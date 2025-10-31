@@ -5,18 +5,18 @@ export interface SearchProduct {
   price: number;
   stock: number;
   storeId: string;
-  categoryId: number | null;
+  categoryId: number;
   createdAt: string;
   updatedAt: string;
   store: {
     id: string;
     name: string;
     slug: string;
-  } | null;
+  };
   category: {
     id: number;
     name: string;
-  } | null;
+  };
   images: Array<{
     id: number;
     imageUrl: string;

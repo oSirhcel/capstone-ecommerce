@@ -32,7 +32,6 @@ async function main() {
         "zero_trust_assessments",
         "payment_transactions",
         "order_shipping",
-        "product_variants",
         "inventory_logs",
         "order_discounts",
         "discounts",

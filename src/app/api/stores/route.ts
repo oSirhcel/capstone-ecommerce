@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
-import { stores, products } from "@/server/db/schema";
-import { eq, desc, asc, count, ilike } from "drizzle-orm";
+import { stores, products, reviews } from "@/server/db/schema";
+import { eq, asc, count, ilike, sql, inArray } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 
 interface SessionUser {
@@ -19,20 +19,26 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get("page") ?? "1");
     const limit = parseInt(searchParams.get("limit") ?? "20");
     const search = searchParams.get("search");
-
-    const offset = (page - 1) * limit;
+    const sort = searchParams.get("sort") ?? "name";
 
     // Build the base query with conditional WHERE
     const whereCondition = search?.trim()
       ? ilike(stores.name, `%${search.trim()}%`)
       : undefined;
 
-    // Get stores with pagination
+    // For rating-based sorting, we need to fetch all stores first, calculate ratings, then sort
+    // Otherwise, we can paginate directly from the database
+    const shouldSortByRating = sort === "rating-high";
+
+    // Get stores - fetch all stores if sorting by rating to ensure we get the top-rated ones
+    // For non-rating sorts, use normal pagination
+    const offset = (page - 1) * limit;
+
     const baseStoresQuery = db
       .select({
         id: stores.id,
         name: stores.name,
-        slug: stores.slug, // NEW
+        slug: stores.slug,
         description: stores.description,
         ownerId: stores.ownerId,
         createdAt: stores.createdAt,
@@ -42,28 +48,58 @@ export async function GET(request: NextRequest) {
     const storesData = whereCondition
       ? await baseStoresQuery
           .where(whereCondition)
-          .orderBy(asc(stores.name))
-          .limit(limit)
-          .offset(offset)
+          .orderBy(sort === "name" ? asc(stores.name) : asc(stores.createdAt))
+          .limit(shouldSortByRating ? 500 : limit)
+          .offset(shouldSortByRating ? 0 : offset)
       : await baseStoresQuery
-          .orderBy(asc(stores.name))
-          .limit(limit)
-          .offset(offset);
+          .orderBy(sort === "name" ? asc(stores.name) : asc(stores.createdAt))
+          .limit(shouldSortByRating ? 500 : limit)
+          .offset(shouldSortByRating ? 0 : offset);
 
-    // Get product count for each store
+    // Get product count and average rating for each store
     const storesWithProductCount = await Promise.all(
       storesData.map(async (store) => {
-        const [productCountResult] = await db
-          .select({ count: count() })
+        // Get product IDs for this store (reuse for both count and rating)
+        const storeProducts = await db
+          .select({ id: products.id })
           .from(products)
           .where(eq(products.storeId, store.id));
 
+        const productIds = storeProducts.map((p) => p.id);
+        const productCount = productIds.length;
+
+        // Calculate average rating from reviews
+        let averageRating = 0;
+        if (productIds.length > 0) {
+          const [reviewStats] = await db
+            .select({
+              avgRating: sql<string>`avg(${reviews.rating})`,
+            })
+            .from(reviews)
+            .where(inArray(reviews.productId, productIds));
+
+          averageRating = reviewStats?.avgRating
+            ? Math.round(parseFloat(reviewStats.avgRating) * 10) / 10
+            : 0;
+        }
+
         return {
           ...store,
-          productCount: productCountResult?.count || 0,
+          productCount,
+          averageRating,
         };
       }),
     );
+
+    // Sort by rating if needed
+    let sortedStores = storesWithProductCount;
+    if (shouldSortByRating) {
+      sortedStores = storesWithProductCount.sort(
+        (a, b) => b.averageRating - a.averageRating,
+      );
+      // Apply pagination after sorting
+      sortedStores = sortedStores.slice(offset, offset + limit);
+    }
 
     // Get total count for pagination (with search filter if applied)
     const baseTotalQuery = db.select({ count: count() }).from(stores);
@@ -74,7 +110,7 @@ export async function GET(request: NextRequest) {
     const total = totalResult?.count || 0;
 
     return NextResponse.json({
-      stores: storesWithProductCount,
+      stores: sortedStores,
       pagination: {
         page,
         limit,

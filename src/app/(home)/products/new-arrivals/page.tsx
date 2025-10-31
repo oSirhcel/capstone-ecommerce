@@ -3,8 +3,11 @@
 import { useMemo } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { ProductCard, ProductCardSkeleton } from "@/components/product-card";
-import { Pagination } from "@/components/pagination";
+import {
+  ProductCard,
+  ProductCardSkeleton,
+} from "@/components/home/product-card";
+import { Pagination } from "@/components/home/pagination";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -15,12 +18,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { SearchIcon } from "lucide-react";
-import {
-  searchProducts,
-  type SearchProductsParams,
-  type SearchProduct,
-} from "@/lib/api/search";
-import { fetchProducts, type Product } from "@/lib/api/products";
+import { searchProducts, type SearchProductsParams } from "@/lib/api/search";
+import { fetchProducts, transformProductToCardProps } from "@/lib/api/products";
 
 const PRODUCTS_PER_PAGE = 20;
 
@@ -30,26 +29,6 @@ const searchQueryKeys = {
   byQuery: (query: string, page: number, limit: number, sort?: string) =>
     [...searchQueryKeys.all, { query, page, limit, sort }] as const,
 };
-
-// Transform API Product to ProductCard props
-function transformSearchProductToCardProps(product: SearchProduct | Product) {
-  const images = Array.isArray(product.images) ? product.images : [];
-  const primaryImage = images.find((img) => img.isPrimary);
-  const image =
-    primaryImage?.imageUrl ?? images[0]?.imageUrl ?? "/placeholder.svg";
-
-  return {
-    id: product.id,
-    slug: product.slug,
-    name: product.name,
-    price: (product.price ?? 0) / 100,
-    image,
-    rating: product.rating ?? 0,
-    reviewCount: product.reviewCount ?? 0,
-    store: product.store?.name ?? "Unknown Store",
-    category: product.category?.name ?? "Uncategorized",
-  };
-}
 
 // Custom hook for search products
 function useSearchProductsQuery(query: string, page: number, sort: string) {
@@ -272,7 +251,7 @@ export default function NewArrivalsPage() {
                 {products.map((product) => (
                   <ProductCard
                     key={product.id}
-                    {...transformSearchProductToCardProps(product)}
+                    {...transformProductToCardProps(product)}
                   />
                 ))}
               </div>

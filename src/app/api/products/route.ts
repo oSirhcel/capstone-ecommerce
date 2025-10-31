@@ -20,6 +20,7 @@ export async function GET(request: NextRequest) {
     const category = searchParams.get("category");
     const store = searchParams.get("store");
     const search = searchParams.get("search");
+    const featured = searchParams.get("featured") === "true";
     const sort = searchParams.get("sort") ?? "release-newest";
 
     const offset = (page - 1) * limit;
@@ -37,6 +38,10 @@ export async function GET(request: NextRequest) {
 
     if (search) {
       whereConditions.push(ilike(products.name, `%${search}%`));
+    }
+
+    if (featured) {
+      whereConditions.push(eq(products.featured, true));
     }
 
     // Build the main query
@@ -74,7 +79,7 @@ export async function GET(request: NextRequest) {
           ? undefined
           : whereConditions.length === 1
             ? whereConditions[0]
-            : and(...whereConditions),
+            : and(...whereConditions, eq(products.status, "Active")),
       );
 
     // Build sorting for fields directly available

@@ -1,8 +1,14 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { db } from "@/server/db";
-import { products, stores, categories, productImages, reviews } from "@/server/db/schema";
-import { eq, desc, asc, or, ilike, sql, count } from "drizzle-orm";
+import {
+  products,
+  stores,
+  categories,
+  productImages,
+  reviews,
+} from "@/server/db/schema";
+import { eq, desc, asc, or, ilike, sql, count, and } from "drizzle-orm";
 
 // GET /api/search - Search across products, stores, and categories
 export async function GET(request: NextRequest) {
@@ -85,7 +91,7 @@ export async function GET(request: NextRequest) {
             ilike(products.description, searchTerm),
           ),
         );
-      
+
       totalProductCount = productCount;
 
       const productsData = await db
@@ -113,9 +119,12 @@ export async function GET(request: NextRequest) {
         .leftJoin(stores, eq(products.storeId, stores.id))
         .leftJoin(categories, eq(products.categoryId, categories.id))
         .where(
-          or(
-            ilike(products.name, searchTerm),
-            ilike(products.description, searchTerm),
+          and(
+            or(
+              ilike(products.name, searchTerm),
+              ilike(products.description, searchTerm),
+            ),
+            eq(products.status, "Active"),
           ),
         )
         .orderBy(
@@ -152,7 +161,10 @@ export async function GET(request: NextRequest) {
           // Get review statistics for this product
           const [reviewStats] = await db
             .select({
-              averageRating: sql<number>`ROUND(AVG(${reviews.rating})::numeric, 2)`.mapWith(Number),
+              averageRating:
+                sql<number>`ROUND(AVG(${reviews.rating})::numeric, 2)`.mapWith(
+                  Number,
+                ),
               reviewCount: count().mapWith(Number),
             })
             .from(reviews)
@@ -236,11 +248,12 @@ export async function GET(request: NextRequest) {
     }
 
     // For product-specific searches, use actual total count; otherwise use returned results
-    const total = type === "products" ? totalProductCount : (
-      results.products.length +
-      results.stores.length +
-      results.categories.length
-    );
+    const total =
+      type === "products"
+        ? totalProductCount
+        : results.products.length +
+          results.stores.length +
+          results.categories.length;
 
     return NextResponse.json({
       ...results,

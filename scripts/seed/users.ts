@@ -220,7 +220,7 @@ export async function seedUsers(
     password: string;
     createdDaysAgo: number;
   }> = [
-    { username: "MrGood", password: "NotBad", createdDaysAgo: 28 },
+    { username: "Test123", password: "Test123", createdDaysAgo: 28 },
     { username: "badaccount", password: "badacc", createdDaysAgo: 35 },
     { username: "test_buyer", password: "Test123", createdDaysAgo: 45 },
     { username: "verified_user", password: "Test123", createdDaysAgo: 60 },

@@ -4,7 +4,7 @@ import { RecentActivity } from "@/components/admin/dashboard/recent-activity";
 import { RecentOrders } from "@/components/admin/dashboard/recent-orders";
 import { OnboardingTracker } from "@/components/onboarding/onboarding-tracker";
 import { Button } from "@/components/ui/button";
-import { HomeIcon } from "lucide-react";
+import { HomeIcon, StoreIcon } from "lucide-react";
 import Link from "next/link";
 
 export default function AdminPage() {
@@ -16,14 +16,13 @@ export default function AdminPage() {
             Dashboard Overview
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
-            Welcome back! Here&apos;s what&apos;s happening with your
-            marketplace.
+            Welcome back! Here&apos;s what&apos;s happening with your store.
           </p>
         </div>
         <Button asChild variant="outline">
           <Link href="/" className="flex items-center">
-            <HomeIcon className="mr-2 h-4 w-4" />
-            Back to Store
+            <StoreIcon className="mr-2 h-4 w-4" />
+            Marketplace
           </Link>
         </Button>
       </div>

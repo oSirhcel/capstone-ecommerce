@@ -57,13 +57,13 @@ export function AdminHeader() {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button size="default" variant="ghost" className="py-6">
-                <div className="text-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg bg-blue-950">
-                  <StoreIcon className="size-4" />
-                </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-semibold">
                     {profile?.store?.name}
                   </span>
+                </div>
+                <div className="text-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg bg-blue-950">
+                  <StoreIcon className="size-4" />
                 </div>
               </Button>
             </DropdownMenuTrigger>
@@ -79,9 +79,7 @@ export function AdminHeader() {
               {profile?.store?.slug && (
                 <>
                   <DropdownMenuItem asChild>
-                    <Link href={`/stores/${profile.store.slug}`}>
-                      Storefront
-                    </Link>
+                    <Link href={`/stores/${profile.store.slug}`}>Store</Link>
                   </DropdownMenuItem>
                 </>
               )}

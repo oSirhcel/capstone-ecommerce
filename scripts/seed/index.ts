@@ -10,6 +10,7 @@ import { seedTags } from "./tags";
 import { seedProducts } from "./products";
 import { seedAddresses } from "./addresses";
 import { seedReviews } from "./reviews";
+import { seedOrders } from "./orders";
 
 async function main() {
   const databaseUrl = process.env.DATABASE_URL;
@@ -82,6 +83,9 @@ async function main() {
     const reviews = await seedReviews(db, users, products);
     console.log();
 
+    const orders = await seedOrders(db, users, stores, products, addresses);
+    console.log();
+
     console.log("🎉 Seed complete!");
     console.log("\n📊 Summary:");
     console.log(`   Users:      ${users.length}`);
@@ -91,6 +95,7 @@ async function main() {
     console.log(`   Products:   ${products.length}`);
     console.log(`   Addresses:  ${addresses.length}`);
     console.log(`   Reviews:    ${reviews.length}`);
+    console.log(`   Orders:     ${orders.length}`);
   } catch (error) {
     console.error("❌ Seed failed:", error);
     process.exit(1);

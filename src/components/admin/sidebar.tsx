@@ -40,6 +40,7 @@ import {
 
 import { cn } from "@/lib/utils";
 import { useProfileQuery } from "@/hooks/admin/use-profile-query";
+import Image from "next/image";
 
 const navigation = [
   { name: "Home", href: "/admin", icon: HomeIcon },
@@ -85,9 +86,7 @@ export function AdminSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
               <Link href="/admin">
-                <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
-                  <StoreIcon className="size-4" />
-                </div>
+                <Image src="/logo.svg" alt="buyio" width={32} height={32} />
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-semibold">buyio</span>
                   <span className="truncate text-xs">Admin Panel</span>

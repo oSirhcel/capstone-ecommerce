@@ -55,7 +55,7 @@ export async function GET() {
     console.error("Error fetching profile:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -69,8 +69,8 @@ export async function PUT(request: NextRequest) {
     }
 
     const userId = (session.user as SessionUser).id;
-    const body = await request.json();
-    
+    const body = (await request.json()) as z.infer<typeof ProfileUpdateSchema>;
+
     const updateData = ProfileUpdateSchema.parse(body);
 
     // Check if username is already taken (if being updated)
@@ -84,7 +84,7 @@ export async function PUT(request: NextRequest) {
       if (existingUser && existingUser.id !== userId) {
         return NextResponse.json(
           { error: "Username already taken" },
-          { status: 409 }
+          { status: 409 },
         );
       }
     }
@@ -98,24 +98,21 @@ export async function PUT(request: NextRequest) {
       updateObject.username = updateData.username;
     }
 
-    await db
-      .update(users)
-      .set(updateObject)
-      .where(eq(users.id, userId));
+    await db.update(users).set(updateObject).where(eq(users.id, userId));
 
     return NextResponse.json({ message: "Profile updated successfully" });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: "Validation error", details: error.errors },
-        { status: 400 }
+        { error: "Validation error", details: z.treeifyError(error) },
+        { status: 400 },
       );
     }
 
     console.error("Error updating profile:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

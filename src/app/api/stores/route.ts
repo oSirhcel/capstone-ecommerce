@@ -27,32 +27,18 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get("page") ?? "1");
     const limit = parseInt(searchParams.get("limit") ?? "6");
-    const search = searchParams.get("search");
+    const search = searchParams.get("search")?.trim();
     const categoryId = searchParams.get("category")
       ? parseInt(searchParams.get("category")!)
       : null;
     const sort = searchParams.get("sort") ?? "name";
 
-    // Build conditions for filtering
-    const conditions = [];
-    if (search?.trim()) {
-      conditions.push(ilike(stores.name, `%${search.trim()}%`));
-    }
-    const whereCondition =
-      conditions.length > 0 ? and(...conditions) : undefined;
-
     const offset = (page - 1) * limit;
     const shouldSortByRating = sort === "rating-high";
     const shouldSortByProducts = sort === "products-high";
 
-    // Build WHERE conditions including category filter
-    const whereConditions = [];
-    if (whereCondition) {
-      whereConditions.push(whereCondition);
-    }
-
-    // Get category store IDs once if category filter is applied
-    let categoryStoreIds: string[] = [];
+    // Get category store IDs if category filter is applied
+    let categoryStoreIds: string[] | undefined;
     if (categoryId) {
       const categoryStoreIdsResult = await db
         .selectDistinct({ storeId: products.storeId })
@@ -66,7 +52,6 @@ export async function GET(request: NextRequest) {
 
       categoryStoreIds = categoryStoreIdsResult.map((p) => p.storeId);
       if (categoryStoreIds.length === 0) {
-        // No stores have products in this category
         return NextResponse.json({
           stores: [],
           pagination: {
@@ -77,15 +62,10 @@ export async function GET(request: NextRequest) {
           },
         });
       }
-
-      whereConditions.push(inArray(stores.id, categoryStoreIds));
     }
 
-    const finalWhereCondition =
-      whereConditions.length > 0 ? and(...whereConditions) : undefined;
-
-    // Build query with conditional WHERE
-    const queryBuilder = db
+    // Build query with conditional WHERE using drizzle pattern
+    const storesWithStats = await db
       .select({
         id: stores.id,
         name: stores.name,
@@ -104,78 +84,56 @@ export async function GET(request: NextRequest) {
       })
       .from(stores)
       .leftJoin(products, eq(products.storeId, stores.id))
-      .leftJoin(reviews, eq(reviews.productId, products.id));
-
-    const query = finalWhereCondition
-      ? queryBuilder.where(finalWhereCondition).groupBy(stores.id)
-      : queryBuilder.groupBy(stores.id);
-
-    // Handle sorting - for rating/product sorting, we need to fetch all and sort
-    // For name/newest, we can sort at database level
-    let orderByClause;
-    if (sort === "name") {
-      orderByClause = asc(stores.name);
-    } else if (sort === "newest") {
-      orderByClause = desc(stores.createdAt);
-    } else if (shouldSortByRating) {
-      orderByClause = desc(
-        sql`COALESCE(ROUND(AVG(${reviews.rating})::numeric, 1), 0)`,
-      );
-    } else if (shouldSortByProducts) {
-      orderByClause = desc(sql`COUNT(DISTINCT ${products.id})`);
-    } else {
-      orderByClause = asc(stores.name);
-    }
-
-    // For rating/product sorting, fetch all stores then paginate in memory
-    // For other sorts, paginate at database level
-    const fetchLimit =
-      shouldSortByRating || shouldSortByProducts ? 5000 : limit;
-    const fetchOffset = shouldSortByRating || shouldSortByProducts ? 0 : offset;
-
-    const storesWithStats = await query
-      .orderBy(orderByClause)
-      .limit(fetchLimit)
-      .offset(fetchOffset);
+      .leftJoin(reviews, eq(reviews.productId, products.id))
+      .where(
+        and(
+          search ? ilike(stores.name, `%${search}%`) : undefined,
+          categoryStoreIds ? inArray(stores.id, categoryStoreIds) : undefined,
+        ),
+      )
+      .groupBy(stores.id)
+      .orderBy(
+        sort === "name"
+          ? asc(stores.name)
+          : sort === "newest"
+            ? desc(stores.createdAt)
+            : shouldSortByRating
+              ? desc(
+                  sql`COALESCE(ROUND(AVG(${reviews.rating})::numeric, 1), 0)`,
+                )
+              : shouldSortByProducts
+                ? desc(sql`COUNT(DISTINCT ${products.id})`)
+                : asc(stores.name),
+      )
+      .limit(shouldSortByRating || shouldSortByProducts ? 5000 : limit)
+      .offset(shouldSortByRating || shouldSortByProducts ? 0 : offset);
 
     // Sort in memory if needed (for rating/product sorting)
     let sortedStores = storesWithStats;
-    if (shouldSortByRating || shouldSortByProducts) {
-      if (shouldSortByRating) {
-        sortedStores = storesWithStats.sort(
-          (a, b) => b.averageRating - a.averageRating,
-        );
-      } else if (shouldSortByProducts) {
-        sortedStores = storesWithStats.sort(
-          (a, b) => b.productCount - a.productCount,
-        );
-      }
-      // Apply pagination after sorting
+    if (shouldSortByRating) {
+      sortedStores = storesWithStats.sort(
+        (a, b) => b.averageRating - a.averageRating,
+      );
+      sortedStores = sortedStores.slice(offset, offset + limit);
+    } else if (shouldSortByProducts) {
+      sortedStores = storesWithStats.sort(
+        (a, b) => b.productCount - a.productCount,
+      );
       sortedStores = sortedStores.slice(offset, offset + limit);
     }
 
-    // Get total count for pagination (with search and category filters if applied)
-    let total = 0;
-    if (categoryId && categoryStoreIds.length > 0) {
-      // Reuse categoryStoreIds from above
-      const categoryCountConditions = [inArray(stores.id, categoryStoreIds)];
-      if (whereCondition) {
-        categoryCountConditions.push(whereCondition);
-      }
-      const [totalResult] = await db
-        .select({ count: sql<number>`COUNT(*)`.mapWith(Number) })
-        .from(stores)
-        .where(and(...categoryCountConditions));
-      total = totalResult?.count || 0;
-    } else {
-      const baseTotalQuery = db
-        .select({ count: sql<number>`COUNT(*)`.mapWith(Number) })
-        .from(stores);
-      const [totalResult] = whereCondition
-        ? await baseTotalQuery.where(whereCondition)
-        : await baseTotalQuery;
-      total = totalResult?.count || 0;
-    }
+    // Get total count for pagination
+    const [totalResult] = await db
+      .select({ count: sql<number>`COUNT(*)`.mapWith(Number) })
+      .from(stores)
+      .where(
+        and(
+          search ? ilike(stores.name, `%${search}%`) : undefined,
+          categoryStoreIds ? inArray(stores.id, categoryStoreIds) : undefined,
+        ),
+      );
+
+    const total = totalResult?.count || 0;
 
     return NextResponse.json({
       stores: sortedStores,

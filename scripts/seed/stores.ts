@@ -286,43 +286,6 @@ export async function seedStores(
   const storeInserts: NewStore[] = [];
   const settingsInserts: NewStoreSettings[] = [];
 
-  for (let i = 0; i < storeData.length; i++) {
-    const data = storeData[i];
-    const owner = storeOwners[i];
-
-    const id = i === 0 ? "default-store-id" : uuidv4();
-    const slug = generateSlug(data.name);
-
-    storeInserts.push({
-      id,
-      name: data.name,
-      slug,
-      imageUrl: data.imageUrl,
-      description: data.description,
-      ownerId: owner.id,
-      createdAt: daysAgo(Math.floor(Math.random() * 300) + 90),
-    });
-
-    // GST rate is 10% in Australia
-    settingsInserts.push({
-      storeId: id,
-      currency: "AUD",
-      taxRate: "0.1000",
-      gstRegistered: true,
-      businessName: `${data.name} Pty Ltd`,
-      contactEmail: `contact@${slug.replace(/\s+/g, "")}.com.au`,
-    });
-
-    seededStores.push({
-      id,
-      name: data.name,
-      slug,
-      imageUrl: data.imageUrl,
-      ownerId: owner.id,
-      categoryFocus: data.focus,
-    });
-  }
-
   // Create a store for at least one test user
   const testUsers = users.filter((u) => u.role === "test_account");
   if (testUsers.length > 0) {
@@ -367,6 +330,43 @@ export async function seedStores(
     });
 
     console.log(`  Created store for test user: ${testUser.username}`);
+  }
+
+  for (let i = 0; i < storeData.length; i++) {
+    const data = storeData[i];
+    const owner = storeOwners[i];
+
+    const id = i === 0 ? "default-store-id" : uuidv4();
+    const slug = generateSlug(data.name);
+
+    storeInserts.push({
+      id,
+      name: data.name,
+      slug,
+      imageUrl: data.imageUrl,
+      description: data.description,
+      ownerId: owner.id,
+      createdAt: daysAgo(Math.floor(Math.random() * 300) + 90),
+    });
+
+    // GST rate is 10% in Australia
+    settingsInserts.push({
+      storeId: id,
+      currency: "AUD",
+      taxRate: "0.1000",
+      gstRegistered: true,
+      businessName: `${data.name} Pty Ltd`,
+      contactEmail: `contact@${slug.replace(/\s+/g, "")}.com.au`,
+    });
+
+    seededStores.push({
+      id,
+      name: data.name,
+      slug,
+      imageUrl: data.imageUrl,
+      ownerId: owner.id,
+      categoryFocus: data.focus,
+    });
   }
 
   await db.insert(stores).values(storeInserts);

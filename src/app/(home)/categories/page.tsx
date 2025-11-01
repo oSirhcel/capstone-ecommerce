@@ -1,18 +1,10 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import Link from "next/link";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { TagIcon, ArrowRightIcon } from "lucide-react";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { TagIcon } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { categoryNameToSlug } from "@/lib/utils/category-slug";
-import { fetchCategories, type Category } from "@/lib/api/categories";
+import { fetchCategories } from "@/lib/api/categories";
 import { CategoryCard } from "@/components/home/category-card";
 
 function CategoryCardSkeleton() {
@@ -99,7 +91,7 @@ export default function AllCategoriesPage() {
                     key={category.id}
                     name={category.name}
                     count={category.count}
-                    image={category.image}
+                    imageUrl={category.imageUrl}
                   />
                 ))}
               </div>

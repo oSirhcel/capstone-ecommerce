@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { Mail, Phone, User, MapPin } from "lucide-react";
 import Link from "next/link";
@@ -10,7 +10,6 @@ interface Customer {
   name: string;
   email: string;
   phone: string;
-  avatar: string;
 }
 
 interface ShippingAddress {
@@ -48,7 +47,6 @@ export function OrderCustomer({
       <CardContent className="space-y-4">
         <div className="flex items-center gap-3">
           <Avatar>
-            <AvatarImage src={customer.avatar || "/placeholder.svg"} />
             <AvatarFallback>
               {customer.name
                 .split(" ")

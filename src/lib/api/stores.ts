@@ -8,7 +8,9 @@ export interface Store {
   description: string | null;
   ownerId: string;
   createdAt: Date;
-  productCount?: number; // Only included when fetched with product count
+  productCount: number;
+  averageRating: number;
+  imageUrl: string;
 }
 
 export interface StoreSettings {
@@ -128,12 +130,16 @@ export async function fetchStores(params?: {
   page?: number;
   limit?: number;
   search?: string;
+  category?: number;
+  sort?: string;
 }): Promise<StoresResponse> {
   const searchParams = new URLSearchParams();
 
   if (params?.page) searchParams.append("page", params.page.toString());
   if (params?.limit) searchParams.append("limit", params.limit.toString());
   if (params?.search) searchParams.append("search", params.search);
+  if (params?.category) searchParams.append("category", params.category.toString());
+  if (params?.sort) searchParams.append("sort", params.sort);
 
   const response = await fetch(
     `${getBaseUrl()}/api/stores?${searchParams.toString()}`,
@@ -162,7 +168,9 @@ export async function fetchStoreById(id: string): Promise<Store> {
 
 // GET /api/stores/featured - Fetch featured stores for homepage
 export async function fetchFeaturedStores(limit = 6): Promise<Store[]> {
-  const response = await fetch(`${getBaseUrl()}/api/stores?limit=${limit}`);
+  const response = await fetch(
+    `${getBaseUrl()}/api/stores?limit=${limit}&sort=rating-high`,
+  );
 
   if (!response.ok) {
     throw new Error(`Failed to fetch featured stores: ${response.statusText}`);

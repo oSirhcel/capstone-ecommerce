@@ -268,7 +268,7 @@ export default function OrderPage() {
                       alt={item.productName ?? "Product"}
                       width={80}
                       height={80}
-                      className="rounded-md object-cover"
+                      className="rounded-md object-contain"
                     />
                     <div className="flex-1">
                       <h4 className="font-medium">

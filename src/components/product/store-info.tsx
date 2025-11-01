@@ -26,7 +26,7 @@ export function StoreInfo({ store }: StoreInfoProps) {
             alt={store.name}
             width={80}
             height={80}
-            className="h-16 w-16 rounded-full object-cover"
+            className="h-16 w-16 rounded-full object-contain"
           />
           <div>
             <h3 className="font-medium">{store.name}</h3>

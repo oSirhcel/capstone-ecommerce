@@ -7,32 +7,39 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from "@/components/ui/chart";
+import { useSession } from "next-auth/react";
+import { useSalesDataQuery } from "@/hooks/admin/dashboard/use-dashboard-query";
 
-const data = [
-  { name: "Jan", sales: 4000, orders: 240 },
-  { name: "Feb", sales: 3000, orders: 139 },
-  { name: "Mar", sales: 2000, orders: 980 },
-  { name: "Apr", sales: 2780, orders: 390 },
-  { name: "May", sales: 1890, orders: 480 },
-  { name: "Jun", sales: 2390, orders: 380 },
-  { name: "Jul", sales: 3490, orders: 430 },
-  { name: "Aug", sales: 4000, orders: 240 },
-  { name: "Sep", sales: 3000, orders: 139 },
-  { name: "Oct", sales: 2000, orders: 980 },
-  { name: "Nov", sales: 2780, orders: 390 },
-  { name: "Dec", sales: 1890, orders: 480 },
-];
+const chartConfig = {
+  sales: {
+    label: "Sales",
+    color: "var(--color-chart-1)",
+  },
+  orders: {
+    label: "Orders",
+    color: "var(--color-chart-5)",
+  },
+} satisfies ChartConfig;
 
 export function SalesChart() {
+  const session = useSession();
+  const storeId = session?.data?.store?.id;
+  const { data: salesData, isLoading } = useSalesDataQuery(storeId);
+
+  const chartData =
+    salesData?.map((item) => ({
+      name: item.name,
+      sales: item.sales,
+      orders: item.orders,
+    })) ?? [];
+
   return (
     <Card>
       <CardHeader>
@@ -40,30 +47,53 @@ export function SalesChart() {
         <CardDescription>Monthly sales and order trends</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="h-[300px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
-              <YAxis />
-              <Tooltip />
-              <Line
-                type="monotone"
+        {isLoading ? (
+          <div className="flex h-[300px] items-center justify-center">
+            <div className="text-muted-foreground">Loading chart data...</div>
+          </div>
+        ) : chartData.length === 0 ? (
+          <div className="flex h-[300px] items-center justify-center">
+            <div className="text-muted-foreground">No data available</div>
+          </div>
+        ) : (
+          <ChartContainer config={chartConfig} className="h-[300px] w-full">
+            <BarChart data={chartData} accessibilityLayer>
+              <CartesianGrid vertical={false} />
+              <XAxis
+                dataKey="name"
+                tickLine={false}
+                tickMargin={10}
+                axisLine={false}
+              />
+              <YAxis
+                yAxisId="sales"
+                tickLine={false}
+                axisLine={false}
+                tickMargin={10}
+              />
+              <YAxis
+                yAxisId="orders"
+                orientation="right"
+                tickLine={false}
+                axisLine={false}
+                tickMargin={10}
+              />
+              <ChartTooltip content={<ChartTooltipContent />} />
+              <Bar
+                yAxisId="sales"
                 dataKey="sales"
-                stroke="hsl(var(--primary))"
-                strokeWidth={2}
-                name="Sales ($)"
+                fill="var(--color-sales)"
+                radius={[4, 4, 0, 0]}
               />
-              <Line
-                type="monotone"
+              <Bar
+                yAxisId="orders"
                 dataKey="orders"
-                stroke="hsl(var(--destructive))"
-                strokeWidth={2}
-                name="Orders"
+                fill="var(--color-orders)"
+                radius={[4, 4, 0, 0]}
               />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
+            </BarChart>
+          </ChartContainer>
+        )}
       </CardContent>
     </Card>
   );

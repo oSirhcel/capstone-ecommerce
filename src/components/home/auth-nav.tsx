@@ -12,7 +12,7 @@ import {
   DropdownMenuItem,
   DropdownMenuGroup,
 } from "@/components/ui/dropdown-menu";
-import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import {
   Dialog,
   DialogContent,

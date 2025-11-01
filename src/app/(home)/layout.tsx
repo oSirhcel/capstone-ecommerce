@@ -1,20 +1,10 @@
-import {
-  MenuIcon,
-  SearchIcon,
-  FacebookIcon,
-  InstagramIcon,
-  TwitterIcon,
-} from "lucide-react";
-
-import { Button } from "@/components/ui/button";
+import { FacebookIcon, InstagramIcon, TwitterIcon } from "lucide-react";
 
 import Image from "next/image";
 import Link from "next/link";
-import { AuthNav } from "@/components/home/auth-nav";
-import { CartButton } from "@/components/cart/cart-button";
 import { CartProvider } from "@/contexts/cart-context";
 import { CartDrawer } from "@/components/cart/cart-drawer";
-import { HeaderSearchBar } from "@/components/ui/headersearch";
+import { Header } from "@/components/home/header";
 
 const HomeLayout = ({ children }: { children: React.ReactNode }) => {
   return (
@@ -31,76 +21,6 @@ const HomeLayout = ({ children }: { children: React.ReactNode }) => {
 
 export default HomeLayout;
 
-const Header = () => {
-  return (
-    <header className="bg-background/95 supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50 w-full border-b px-4 backdrop-blur md:px-6">
-      <div className="container mx-auto flex h-16 items-center justify-between">
-        <div className="flex items-center gap-6">
-          <Link href="/" className="flex items-center gap-2">
-            <Image
-              src="/placeholder.svg?height=32&width=32"
-              alt="Logo"
-              width={32}
-              height={32}
-              className="rounded-md"
-            />
-            <span className="hidden font-bold sm:inline-block">buyio</span>
-          </Link>
-          <nav className="hidden gap-6 md:flex">
-            <Link
-              href="/stores"
-              className="text-muted-foreground hover:text-primary text-sm font-medium transition-colors"
-            >
-              Stores
-            </Link>
-            <Link
-              href="/categories"
-              className="text-muted-foreground hover:text-primary text-sm font-medium transition-colors"
-            >
-              Categories
-            </Link>
-            <Link
-              href="/products"
-              className="text-muted-foreground hover:text-primary text-sm font-medium transition-colors"
-            >
-              All Products
-            </Link>
-
-            <Link
-              href="/products/new-arrivals"
-              className="text-muted-foreground hover:text-primary text-sm font-medium transition-colors"
-            >
-              New Arrivals
-            </Link>
-            <Link
-              href="/products/deals"
-              className="text-muted-foreground hover:text-primary text-sm font-medium transition-colors"
-            >
-              Deals
-            </Link>
-          </nav>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="relative hidden w-full max-w-sm lg:flex">
-            <SearchIcon className="text-muted-foreground absolute top-2.5 left-2.5 h-4 w-4" />
-            <HeaderSearchBar />
-          </div>
-          <CartButton />
-          <AuthNav />
-          <Button variant="ghost" size="icon" className="md:hidden">
-            <SearchIcon className="size-5" />
-            <span className="sr-only">Search</span>
-          </Button>
-          <Button variant="ghost" size="icon" className="md:hidden">
-            <MenuIcon className="size-5" />
-            <span className="sr-only">Menu</span>
-          </Button>
-        </div>
-      </div>
-    </header>
-  );
-};
-
 const Footer = () => {
   return (
     <footer className="bg-background w-full border-t px-4 md:px-6">
@@ -108,14 +28,8 @@ const Footer = () => {
         <div className="grid gap-8 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5">
           <div className="space-y-4">
             <div className="flex items-center gap-2">
-              <Image
-                src="/placeholder.svg?height=32&width=32"
-                alt="Logo"
-                width={32}
-                height={32}
-                className="rounded-md"
-              />
-              <span className="font-bold">buyio</span>
+              <Image src="/logo-text.svg" alt="Logo" width={72} height={32} />
+              <span className="sr-only">buyio</span>
             </div>
             <p className="text-muted-foreground text-sm">
               The marketplace for unique products from independent creators.
@@ -248,21 +162,6 @@ const Footer = () => {
               <li>
                 <Link href="#" className="hover:text-foreground">
                   Shipping & Returns
-                </Link>
-              </li>
-              <li>
-                <Link href="#" className="hover:text-foreground">
-                  Privacy Policy
-                </Link>
-              </li>
-              <li>
-                <Link href="#" className="hover:text-foreground">
-                  Terms of Service
-                </Link>
-              </li>
-              <li>
-                <Link href="#" className="hover:text-foreground">
-                  Cookie Policy
                 </Link>
               </li>
             </ul>

@@ -592,3 +592,55 @@ export const storeSettings = pgTable("store_settings", {
   createdAt: timestamp().defaultNow().notNull(),
   updatedAt: timestamp().defaultNow().notNull(),
 });
+
+// Analytics tracking tables
+export const pageViews = pgTable(
+  "page_views",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    userId: varchar("userId", { length: 255 }).references(() => users.id),
+    productId: integer().references(() => products.id),
+    storeId: varchar("storeId", { length: 255 }).references(() => stores.id),
+    referrer: text(), // HTTP referrer URL
+    userAgent: text(),
+    ipAddress: varchar({ length: 45 }), // IPv6 compatible
+    createdAt: timestamp().defaultNow().notNull(),
+  },
+  (table) => [
+    index("page_views_store_id_idx").on(table.storeId),
+    index("page_views_created_at_idx").on(table.createdAt),
+    index("page_views_product_id_idx").on(table.productId),
+  ],
+);
+
+export const cartEventTypeEnum = pgEnum("cart_event_type", [
+  "view",
+  "add",
+  "remove",
+  "checkout",
+]);
+
+export const cartEvents = pgTable(
+  "cart_events",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    userId: varchar("userId", { length: 255 })
+      .references(() => users.id)
+      .notNull(),
+    productId: integer()
+      .references(() => products.id)
+      .notNull(),
+    storeId: varchar("storeId", { length: 255 })
+      .references(() => stores.id)
+      .notNull(),
+    eventType: cartEventTypeEnum().notNull(),
+    quantity: integer().notNull().default(1),
+    createdAt: timestamp().defaultNow().notNull(),
+  },
+  (table) => [
+    index("cart_events_store_id_idx").on(table.storeId),
+    index("cart_events_created_at_idx").on(table.createdAt),
+    index("cart_events_user_id_idx").on(table.userId),
+    index("cart_events_event_type_idx").on(table.eventType),
+  ],
+);

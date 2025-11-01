@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { categoryNameToSlug } from "@/lib/utils/category-slug";
+import { Skeleton } from "../ui/skeleton";
 
 interface CategoryCardProps {
   name: string;
@@ -33,5 +34,22 @@ export function CategoryCard({ name, count, image }: CategoryCardProps) {
         </CardContent>
       </Card>
     </Link>
+  );
+}
+
+export function CategoryCardSkeleton() {
+  return (
+    <Card className="overflow-hidden border">
+      <CardContent className="p-0">
+        <div className="relative overflow-hidden">
+          <Skeleton className="aspect-square w-full" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+          <div className="absolute bottom-0 w-full p-4">
+            <Skeleton className="mb-0.5 h-4 w-32 bg-white/20" />
+            <Skeleton className="h-3.5 w-24 bg-white/10" />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

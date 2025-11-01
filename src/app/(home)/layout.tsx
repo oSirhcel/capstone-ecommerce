@@ -21,7 +21,7 @@ const HomeLayout = ({ children }: { children: React.ReactNode }) => {
     <CartProvider>
       <div className="flex min-h-screen flex-col">
         <Header />
-        <main className="mx-auto flex-1">{children}</main>
+        <main className="flex-1">{children}</main>
         <Footer />
       </div>
       <CartDrawer />
@@ -33,7 +33,7 @@ export default HomeLayout;
 
 const Header = () => {
   return (
-    <header className="bg-background/95 supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50 w-full border-b backdrop-blur">
+    <header className="bg-background/95 supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50 w-full border-b px-4 backdrop-blur md:px-6">
       <div className="container mx-auto flex h-16 items-center justify-between">
         <div className="flex items-center gap-6">
           <Link href="/" className="flex items-center gap-2">
@@ -44,9 +44,15 @@ const Header = () => {
               height={32}
               className="rounded-md"
             />
-            <span className="hidden font-bold sm:inline-block">LOGO</span>
+            <span className="hidden font-bold sm:inline-block">buyio</span>
           </Link>
           <nav className="hidden gap-6 md:flex">
+            <Link
+              href="/stores"
+              className="text-muted-foreground hover:text-primary text-sm font-medium transition-colors"
+            >
+              Stores
+            </Link>
             <Link
               href="/categories"
               className="text-muted-foreground hover:text-primary text-sm font-medium transition-colors"
@@ -59,12 +65,7 @@ const Header = () => {
             >
               All Products
             </Link>
-            <Link
-              href="/stores"
-              className="text-muted-foreground hover:text-primary text-sm font-medium transition-colors"
-            >
-              Stores
-            </Link>
+
             <Link
               href="/products/new-arrivals"
               className="text-muted-foreground hover:text-primary text-sm font-medium transition-colors"
@@ -102,7 +103,7 @@ const Header = () => {
 
 const Footer = () => {
   return (
-    <footer className="bg-background w-full border-t">
+    <footer className="bg-background w-full border-t px-4 md:px-6">
       <div className="container mx-auto flex flex-col gap-8 py-8 md:py-12 lg:py-16">
         <div className="grid gap-8 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5">
           <div className="space-y-4">
@@ -114,7 +115,7 @@ const Footer = () => {
                 height={32}
                 className="rounded-md"
               />
-              <span className="font-bold">Buyio</span>
+              <span className="font-bold">buyio</span>
             </div>
             <p className="text-muted-foreground text-sm">
               The marketplace for unique products from independent creators.
@@ -269,7 +270,7 @@ const Footer = () => {
         </div>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-muted-foreground text-xs">
-            © 2025 Buyio. All rights reserved.
+            © 2025 buyio. All rights reserved.
           </p>
           <div className="flex gap-4">
             <Link

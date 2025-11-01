@@ -56,24 +56,27 @@ export function StoreCard({
 
 export function StoreCardSkeleton() {
   return (
-    <Card className="overflow-hidden">
-      <CardContent className="p-0">
-        <Skeleton className="aspect-[3/2] w-full" />
-      </CardContent>
-      <CardFooter className="flex flex-col items-start gap-3 p-4">
-        <div className="w-full space-y-2">
-          <Skeleton className="h-5 w-3/4" />
-          <Skeleton className="h-4 w-full" />
-          <Skeleton className="h-4 w-2/3" />
-        </div>
-        <div className="flex w-full items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Skeleton className="h-4 w-16" />
-            <Skeleton className="h-4 w-20" />
+    <div className="block">
+      <Card className="overflow-hidden border">
+        <CardContent className="p-0">
+          <div className="relative overflow-hidden">
+            <Skeleton className="aspect-square w-full" />
           </div>
-          <Skeleton className="h-4 w-8" />
-        </div>
-      </CardFooter>
-    </Card>
+        </CardContent>
+        <CardFooter className="flex flex-col items-start gap-3 p-4">
+          <Skeleton className="h-7 w-3/4" />
+          <div className="flex w-full items-center justify-between text-sm">
+            <div className="flex items-center gap-1.5">
+              <Skeleton className="h-5 w-4" />
+              <Skeleton className="h-5 w-20" />
+            </div>
+            <div className="flex items-center gap-1">
+              <Skeleton className="h-5 w-4" />
+              <Skeleton className="h-5 w-8" />
+            </div>
+          </div>
+        </CardFooter>
+      </Card>
+    </div>
   );
 }

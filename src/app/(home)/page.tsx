@@ -1,36 +1,47 @@
 "use client";
 
-import { StoreCard } from "@/components/home/store-card";
+import { StoreCard, StoreCardSkeleton } from "@/components/home/store-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { CheckIcon, SparklesIcon } from "lucide-react";
-import Image from "next/image";
-import Link from "next/link";
-import { NewArrivals } from "@/components/home/new-arrivals";
+import {
+  SearchIcon,
+  SparklesIcon,
+  StoreIcon,
+  ZapIcon,
+  ArrowRightIcon,
+  PackageIcon,
+  ShieldIcon,
+} from "lucide-react";
 import { fetchFeaturedStores } from "@/lib/api/stores";
 import { useQuery } from "@tanstack/react-query";
-import { Skeleton } from "@/components/ui/skeleton";
-
-import {
-  Search,
-  TrendingUp,
-  Sparkles,
-  Store,
-  ArrowRight,
-  Package,
-  Shield,
-  Zap,
-} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { CategoryCard } from "@/components/home/category-card";
+import {
+  CategoryCard,
+  CategoryCardSkeleton,
+} from "@/components/home/category-card";
 import { fetchCategories } from "@/lib/api/categories";
 import {
   fetchFeaturedProducts,
+  fetchProducts,
   transformProductToCardProps,
 } from "@/lib/api/products";
-import { ProductCard } from "@/components/home/product-card";
+import {
+  ProductCard,
+  ProductCardSkeleton,
+} from "@/components/home/product-card";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function Home() {
+  const [search, setSearch] = useState("");
+  const router = useRouter();
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (search.trim()) {
+      router.push(`/search?q=${encodeURIComponent(search.trim())}`);
+    }
+  };
+
   // Fetch featured stores using React Query
   const {
     data: featuredStores,
@@ -55,17 +66,31 @@ export default function Home() {
     queryFn: () => fetchFeaturedProducts(5),
   });
 
+  const {
+    data: newArrivalsProducts,
+    isLoading: isLoadingNewArrivals,
+    error: newArrivalsError,
+  } = useQuery({
+    queryKey: ["new-arrivals-products"],
+    queryFn: () =>
+      fetchProducts({
+        limit: 6,
+        sort: "release-newest",
+      }),
+    select: (res) => res.products,
+  });
+
   return (
     <>
       <section className="from-background to-muted/20 flex w-full bg-gradient-to-b py-16 md:py-24 lg:py-32">
-        <div className="container px-4 md:px-6">
+        <div className="container mx-auto px-4 md:px-6">
           <div className="mx-auto flex max-w-4xl flex-col items-center space-y-8 text-center">
             <Badge
               variant="secondary"
               className="px-4 py-1.5 text-sm font-medium"
             >
-              <Sparkles className="mr-1.5 inline h-3.5 w-3.5" />
-              Join 50,000+ creators and shoppers
+              <SparklesIcon className="mr-1.5 inline h-3.5 w-3.5" />
+              Join 1000+ creators and shoppers across Australia
             </Badge>
 
             <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl">
@@ -81,10 +106,12 @@ export default function Home() {
             </p>
 
             <div className="w-full max-w-2xl">
-              <div className="group relative">
-                <Search className="text-muted-foreground group-focus-within:text-primary absolute top-1/2 left-4 h-5 w-5 -translate-y-1/2 transition-colors" />
+              <form onSubmit={handleSearch} className="group relative">
+                <SearchIcon className="text-muted-foreground group-focus-within:text-primary absolute top-1/2 left-4 h-5 w-5 -translate-y-1/2 transition-colors" />
                 <Input
                   type="search"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search for products, stores, or categories..."
                   className="focus-visible:border-primary h-14 rounded-full border-2 pr-4 pl-12 text-base shadow-sm transition-all focus-visible:shadow-md"
                 />
@@ -94,39 +121,41 @@ export default function Home() {
                 >
                   Search
                 </Button>
-              </div>
+              </form>
 
               <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
                 <span className="text-muted-foreground text-sm">Popular:</span>
-                {[
-                  "Digital Art",
-                  "Handmade Jewelry",
-                  "Home Decor",
-                  "Vintage",
-                ].map((term) => (
-                  <Button
-                    key={term}
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 rounded-full text-xs"
-                  >
-                    {term}
-                  </Button>
-                ))}
+                {["Kitchen", "Handmade", "Home Decor", "Fashion"].map(
+                  (term) => (
+                    <Button
+                      key={term}
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 rounded-full text-xs"
+                      onClick={() => {
+                        router.push(
+                          `/search?q=${encodeURIComponent(term.toLowerCase())}`,
+                        );
+                      }}
+                    >
+                      {term}
+                    </Button>
+                  ),
+                )}
               </div>
             </div>
 
             <div className="text-muted-foreground flex flex-wrap items-center justify-center gap-8 pt-4 text-sm">
               <div className="flex items-center gap-2">
-                <Shield className="h-4 w-4" />
+                <ShieldIcon className="h-4 w-4" />
                 <span>Secure Checkout</span>
               </div>
               <div className="flex items-center gap-2">
-                <Zap className="h-4 w-4" />
+                <ZapIcon className="h-4 w-4" />
                 <span>Fast Shipping</span>
               </div>
               <div className="flex items-center gap-2">
-                <Package className="h-4 w-4" />
+                <PackageIcon className="h-4 w-4" />
                 <span>Easy Returns</span>
               </div>
             </div>
@@ -134,8 +163,9 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="w-full py-16 md:py-20">
-        <div className="container px-4 md:px-6">
+      {/* Categories Section */}
+      <section className="w-full px-4 py-16 md:px-6 md:py-20">
+        <div className="container mx-auto">
           <div className="mb-8 flex items-center justify-between">
             <div>
               <h2 className="text-3xl font-bold tracking-tight">
@@ -148,31 +178,49 @@ export default function Home() {
             <Button
               variant="ghost"
               className="hidden items-center gap-2 md:flex"
+              onClick={() => router.push("/categories")}
             >
               View All
-              <ArrowRight className="h-4 w-4" />
+              <ArrowRightIcon className="h-4 w-4" />
             </Button>
           </div>
 
-          <div className="mx-auto grid max-w-5xl grid-cols-2 gap-6 md:grid-cols-3">
-            {categories?.categories.map((category) => (
-              <CategoryCard
-                key={category.id}
-                name={category.name}
-                count={category.count}
-                image={category.image}
-              />
-            ))}
+          <div className="mx-auto grid max-w-7xl grid-cols-2 gap-6 md:grid-cols-3">
+            {isLoadingCategories ? (
+              Array.from({ length: 6 }).map((_, index) => (
+                <CategoryCardSkeleton key={`skeleton-${index}`} />
+              ))
+            ) : categoriesError ? (
+              <div className="col-span-full py-12 text-center">
+                <p className="text-muted-foreground">
+                  Failed to load categories
+                </p>
+              </div>
+            ) : categories?.categories.length === 0 ? (
+              <div className="col-span-full py-12 text-center">
+                <p className="text-muted-foreground">No categories available</p>
+              </div>
+            ) : (
+              categories?.categories.map((category) => (
+                <CategoryCard
+                  key={category.id}
+                  name={category.name}
+                  count={category.count}
+                  image={category.image}
+                />
+              ))
+            )}
           </div>
         </div>
       </section>
 
-      <section className="bg-muted/30 w-full py-16 md:py-20">
-        <div className="container px-4 md:px-6">
+      {/* Featured Stores Section */}
+      <section className="bg-muted/30 w-full px-4 py-16 md:px-6 md:py-20">
+        <div className="container mx-auto">
           <div className="mb-8 flex items-center justify-between">
             <div>
               <div className="mb-2 flex items-center gap-2">
-                <Store className="text-primary h-5 w-5" />
+                <StoreIcon className="text-primary h-5 w-5" />
                 <Badge variant="secondary" className="text-xs">
                   Featured
                 </Badge>
@@ -187,37 +235,25 @@ export default function Home() {
             <Button
               variant="outline"
               className="hidden items-center gap-2 bg-transparent md:flex"
+              onClick={() => router.push("/stores")}
             >
               Explore Stores
-              <ArrowRight className="h-4 w-4" />
+              <ArrowRightIcon className="h-4 w-4" />
             </Button>
           </div>
 
-          <div className="mx-auto grid max-w-5xl grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+          <div className="mx-auto grid max-w-7xl grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
             {isLoadingStores ? (
-              // Loading skeletons
               Array.from({ length: 6 }).map((_, index) => (
-                <div key={`skeleton-${index}`} className="space-y-3">
-                  <Skeleton className="aspect-[3/2] w-full rounded-lg" />
-                  <div className="space-y-2 p-4">
-                    <Skeleton className="h-5 w-3/4" />
-                    <Skeleton className="h-4 w-full" />
-                    <div className="flex justify-between">
-                      <Skeleton className="h-4 w-20" />
-                      <Skeleton className="h-4 w-12" />
-                    </div>
-                  </div>
-                </div>
+                <StoreCardSkeleton key={`skeleton-${index}`} />
               ))
             ) : storesError ? (
-              // Error state
               <div className="col-span-full py-12 text-center">
                 <p className="text-muted-foreground">
                   Failed to load featured stores
                 </p>
               </div>
             ) : featuredStores && featuredStores.length > 0 ? (
-              // Real store data
               featuredStores.map((store) => (
                 <StoreCard
                   key={store.id}
@@ -240,8 +276,9 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="w-full py-16 md:py-20">
-        <div className="container px-4 md:px-6">
+      {/* Featured Products Section */}
+      <section className="w-full px-4 py-16 md:px-6 md:py-20">
+        <div className="container mx-auto">
           <div className="mb-8 flex items-center justify-between">
             <div>
               <div className="mb-2 flex items-center gap-2">
@@ -258,19 +295,38 @@ export default function Home() {
               </p>
             </div>
           </div>
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-5">
-            {featuredProducts.data?.products.map((product) => (
-              <ProductCard
-                key={product.id}
-                {...transformProductToCardProps(product)}
-              />
-            ))}
+          <div className="mx-auto grid max-w-7xl grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-5">
+            {featuredProducts.isLoading ? (
+              Array.from({ length: 5 }).map((_, index) => (
+                <ProductCardSkeleton key={`featured-skeleton-${index}`} />
+              ))
+            ) : featuredProducts.error ? (
+              <div className="col-span-full py-12 text-center">
+                <p className="text-muted-foreground">
+                  Failed to load featured products
+                </p>
+              </div>
+            ) : featuredProducts.data?.products.length === 0 ? (
+              <div className="col-span-full py-12 text-center">
+                <p className="text-muted-foreground">
+                  No featured products available
+                </p>
+              </div>
+            ) : (
+              featuredProducts.data?.products.map((product) => (
+                <ProductCard
+                  key={product.id}
+                  {...transformProductToCardProps(product)}
+                />
+              ))
+            )}
           </div>
         </div>
       </section>
 
-      <section className="from-primary/5 via-primary/10 to-background w-full bg-gradient-to-br py-20 md:py-28">
-        <div className="container px-4 md:px-6">
+      {/* For Creators Section */}
+      <section className="from-primary/5 via-primary/10 to-background w-full bg-gradient-to-br px-4 py-20 md:px-6 md:py-28">
+        <div className="container mx-auto">
           <div className="mx-auto max-w-4xl">
             <div className="space-y-6 text-center">
               <Badge variant="outline" className="px-4 py-1.5">
@@ -290,7 +346,7 @@ export default function Home() {
               <div className="grid grid-cols-1 gap-6 pt-8 text-left md:grid-cols-3">
                 <div className="space-y-2">
                   <div className="bg-primary/10 mb-3 flex h-10 w-10 items-center justify-center rounded-lg">
-                    <Zap className="text-primary h-5 w-5" />
+                    <ZapIcon className="text-primary h-5 w-5" />
                   </div>
                   <h3 className="font-semibold">Quick Setup</h3>
                   <p className="text-muted-foreground text-sm">
@@ -300,7 +356,7 @@ export default function Home() {
 
                 <div className="space-y-2">
                   <div className="bg-primary/10 mb-3 flex h-10 w-10 items-center justify-center rounded-lg">
-                    <Store className="text-primary h-5 w-5" />
+                    <StoreIcon className="text-primary h-5 w-5" />
                   </div>
                   <h3 className="font-semibold">Global Reach</h3>
                   <p className="text-muted-foreground text-sm">
@@ -310,7 +366,7 @@ export default function Home() {
 
                 <div className="space-y-2">
                   <div className="bg-primary/10 mb-3 flex h-10 w-10 items-center justify-center rounded-lg">
-                    <Shield className="text-primary h-5 w-5" />
+                    <ShieldIcon className="text-primary h-5 w-5" />
                   </div>
                   <h3 className="font-semibold">Secure & Simple</h3>
                   <p className="text-muted-foreground text-sm">
@@ -336,8 +392,9 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="w-full py-16 md:py-20">
-        <div>
+      {/* New Arrivals Section */}
+      <section className="w-full px-4 py-16 md:px-6 md:py-20">
+        <div className="container mx-auto">
           <div className="mb-8 flex items-center justify-between">
             <div>
               <h2 className="text-3xl font-bold tracking-tight">
@@ -350,18 +407,40 @@ export default function Home() {
             <Button
               variant="outline"
               className="hidden items-center gap-2 bg-transparent md:flex"
+              onClick={() => router.push("/products/new-arrivals")}
             >
               View All
-              <ArrowRight className="h-4 w-4" />
+              <ArrowRightIcon className="h-4 w-4" />
             </Button>
           </div>
 
-          <NewArrivals limit={6} />
+          <div className="mx-auto grid max-w-7xl grid-cols-1 gap-6 py-12 md:grid-cols-2 lg:grid-cols-3">
+            {isLoadingNewArrivals ? (
+              Array.from({ length: 6 }).map((_, idx) => (
+                <ProductCardSkeleton key={`new-arrivals-skel-${idx}`} />
+              ))
+            ) : newArrivalsError ? (
+              <div className="col-span-full py-8 text-center text-red-600">
+                Failed to load products
+              </div>
+            ) : newArrivalsProducts?.length === 0 ? (
+              <div className="text-muted-foreground col-span-full py-8 text-center">
+                No products available at the moment.
+              </div>
+            ) : (
+              newArrivalsProducts?.map((product) => (
+                <ProductCard
+                  key={product.id}
+                  {...transformProductToCardProps(product)}
+                />
+              ))
+            )}
+          </div>
         </div>
       </section>
 
-      <section className="bg-muted/50 w-full py-16 md:py-20">
-        <div className="container px-4 md:px-6">
+      <section className="bg-muted/50 w-full px-4 py-16 md:px-6 md:py-20">
+        <div className="container mx-auto">
           <div className="mx-auto max-w-2xl space-y-6 text-center">
             <h2 className="text-3xl font-bold tracking-tight">
               Stay in the loop
@@ -384,7 +463,7 @@ export default function Home() {
             </form>
 
             <p className="text-muted-foreground text-xs">
-              Join 50,000+ subscribers. Unsubscribe anytime.
+              Join other creators and shoppers. Unsubscribe anytime.
             </p>
           </div>
         </div>

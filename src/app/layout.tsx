@@ -23,8 +23,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Buyio - Buy and Sell Online",
-  description: "Buyio is a platform for buying and selling products online",
+  title: "buyio - Buy and Sell Online",
+  description: "buyio is a platform for buying and selling products online",
 };
 
 export default function RootLayout({

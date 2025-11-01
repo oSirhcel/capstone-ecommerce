@@ -66,7 +66,7 @@ export function ProductCard({
               <span className="font-medium">{rating}</span>
             </div>
           </div>
-          <h3 className="group-hover:text-primary line-clamp-2 leading-snug font-medium transition-colors">
+          <h3 className="group-hover:text-primary line-clamp-1 leading-snug font-medium transition-colors">
             {name}
           </h3>
           <p className="text-lg font-bold">${price.toFixed(2)}</p>
@@ -78,21 +78,22 @@ export function ProductCard({
 
 export function ProductCardSkeleton() {
   return (
-    <Card className="overflow-hidden">
+    <Card className="overflow-hidden border">
       <CardContent className="p-0">
-        <div className="relative">
+        <div className="relative overflow-hidden">
           <Skeleton className="aspect-square w-full" />
         </div>
       </CardContent>
       <CardFooter className="flex flex-col items-start gap-2 p-4">
-        <div className="flex w-full items-center justify-between">
-          <Skeleton className="h-4 w-24" />
-          <div className="flex items-center gap-1">
-            <Skeleton className="h-4 w-10" />
+        <div className="flex w-full items-center justify-between text-sm">
+          <Skeleton className="h-5 w-24" />
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-3.5 w-3.5 rounded-full" />
+            <Skeleton className="h-5 w-8" />
           </div>
         </div>
         <Skeleton className="h-5 w-3/5" />
-        <Skeleton className="h-5 w-16" />
+        <Skeleton className="h-7.5 w-16" />
       </CardFooter>
     </Card>
   );

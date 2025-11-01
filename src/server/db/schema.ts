@@ -25,19 +25,27 @@ export const categories = pgTable("categories", {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),
   name: varchar({ length: 255 }).notNull(),
   description: varchar({ length: 500 }).notNull(),
-  image: text().notNull(),
+  imageUrl: text().notNull(),
 });
 
-export const stores = pgTable("stores", {
-  id: varchar("id", { length: 255 }).primaryKey().notNull(),
-  name: varchar({ length: 255 }).unique().notNull(),
-  slug: varchar({ length: 255 }).unique().notNull(),
-  description: varchar({ length: 1000 }),
-  ownerId: varchar("ownerId", { length: 255 })
-    .references(() => users.id)
-    .notNull(),
-  createdAt: timestamp().defaultNow().notNull(),
-});
+export const stores = pgTable(
+  "stores",
+  {
+    id: varchar("id", { length: 255 }).primaryKey().notNull(),
+    name: varchar({ length: 255 }).unique().notNull(),
+    slug: varchar({ length: 255 }).unique().notNull(),
+    imageUrl: text().notNull(),
+    description: varchar({ length: 1000 }),
+    ownerId: varchar("ownerId", { length: 255 })
+      .references(() => users.id)
+      .notNull(),
+    createdAt: timestamp().defaultNow().notNull(),
+  },
+  (table) => [
+    index("stores_name_idx").on(table.name),
+    index("stores_created_at_idx").on(table.createdAt),
+  ],
+);
 
 export const productStatusEnum = pgEnum("product_status", [
   "Active",
@@ -45,33 +53,40 @@ export const productStatusEnum = pgEnum("product_status", [
   "Archived",
 ]);
 
-export const products = pgTable("products", {
-  id: integer().primaryKey().generatedAlwaysAsIdentity(),
-  name: varchar({ length: 255 }).notNull(),
-  sku: varchar({ length: 50 }).unique(), // Nullable for drafts, unique constraint allows multiple NULLs
-  description: varchar({ length: 1500 }),
-  price: integer(), // Price in cents - nullable for drafts
-  compareAtPrice: integer(), // Compare at price in cents
-  costPerItem: integer(), // Cost per item in cents
-  stock: integer().notNull().default(0),
-  trackQuantity: boolean().notNull().default(true),
-  allowBackorders: boolean().notNull().default(false),
-  weight: decimal({ precision: 8, scale: 3 }), // Weight in kg
-  length: decimal({ precision: 8, scale: 2 }), // Length in cm
-  width: decimal({ precision: 8, scale: 2 }), // Width in cm
-  height: decimal({ precision: 8, scale: 2 }), // Height in cm
-  seoTitle: varchar({ length: 60 }),
-  seoDescription: varchar({ length: 200 }),
-  slug: varchar({ length: 255 }).unique(),
-  status: productStatusEnum().notNull().default("Draft"),
-  featured: boolean().notNull().default(false),
-  storeId: varchar("storeId", { length: 255 })
-    .references(() => stores.id)
-    .notNull(),
-  categoryId: integer().references(() => categories.id),
-  createdAt: timestamp().defaultNow().notNull(),
-  updatedAt: timestamp().defaultNow().notNull(),
-});
+export const products = pgTable(
+  "products",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    name: varchar({ length: 255 }).notNull(),
+    sku: varchar({ length: 50 }).unique(), // Nullable for drafts, unique constraint allows multiple NULLs
+    description: varchar({ length: 1500 }),
+    price: integer(), // Price in cents - nullable for drafts
+    compareAtPrice: integer(), // Compare at price in cents
+    costPerItem: integer(), // Cost per item in cents
+    stock: integer().notNull().default(0),
+    trackQuantity: boolean().notNull().default(true),
+    allowBackorders: boolean().notNull().default(false),
+    weight: decimal({ precision: 8, scale: 3 }), // Weight in kg
+    length: decimal({ precision: 8, scale: 2 }), // Length in cm
+    width: decimal({ precision: 8, scale: 2 }), // Width in cm
+    height: decimal({ precision: 8, scale: 2 }), // Height in cm
+    seoTitle: varchar({ length: 60 }),
+    seoDescription: varchar({ length: 200 }),
+    slug: varchar({ length: 255 }).unique(),
+    status: productStatusEnum().notNull().default("Draft"),
+    featured: boolean().notNull().default(false),
+    storeId: varchar("storeId", { length: 255 })
+      .references(() => stores.id)
+      .notNull(),
+    categoryId: integer().references(() => categories.id),
+    createdAt: timestamp().defaultNow().notNull(),
+    updatedAt: timestamp().defaultNow().notNull(),
+  },
+  (table) => [
+    index("products_store_id_idx").on(table.storeId),
+    index("products_category_id_idx").on(table.categoryId),
+  ],
+);
 
 export const tags = pgTable("tags", {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),
@@ -165,19 +180,23 @@ export const orderItems = pgTable("order_items", {
   priceAtTime: integer().notNull(), // Price in cents at time of purchase
 });
 
-export const reviews = pgTable("reviews", {
-  id: integer().primaryKey().generatedAlwaysAsIdentity(),
-  userId: varchar("userId", { length: 255 })
-    .references(() => users.id)
-    .notNull(),
-  productId: integer()
-    .references(() => products.id)
-    .notNull(),
-  rating: integer().notNull(),
-  comment: varchar({ length: 1000 }),
-  verifiedPurchase: boolean().notNull().default(false),
-  createdAt: timestamp().defaultNow().notNull(),
-});
+export const reviews = pgTable(
+  "reviews",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    userId: varchar("userId", { length: 255 })
+      .references(() => users.id)
+      .notNull(),
+    productId: integer()
+      .references(() => products.id)
+      .notNull(),
+    rating: integer().notNull(),
+    comment: varchar({ length: 1000 }),
+    verifiedPurchase: boolean().notNull().default(false),
+    createdAt: timestamp().defaultNow().notNull(),
+  },
+  (table) => [index("reviews_product_id_idx").on(table.productId)],
+);
 
 // Product images table to handle multiple images per product
 export const productImages = pgTable("product_images", {

@@ -22,7 +22,9 @@ export function isTokenRevoked(jti: string): boolean {
 
 // Custom error class for revoked tokens
 export class SessionRevokedError extends Error {
-  constructor(message = "Your session has been terminated for security reasons") {
+  constructor(
+    message = "Your session has been terminated for security reasons",
+  ) {
     super(message);
     this.name = "SessionRevokedError";
   }
@@ -137,7 +139,7 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
         session.user.id = token.sub!;
       }
       if (token.storeId) {
-        session.store = { id: token.storeId as string };
+        session.store = { id: token.storeId };
       }
       return session;
     },

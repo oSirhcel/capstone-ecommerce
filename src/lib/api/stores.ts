@@ -10,6 +10,7 @@ export interface Store {
   createdAt: Date;
   productCount: number;
   averageRating: number;
+  imageUrl: string;
 }
 
 export interface StoreSettings {
@@ -127,12 +128,16 @@ export async function fetchStores(params?: {
   page?: number;
   limit?: number;
   search?: string;
+  category?: number;
+  sort?: string;
 }): Promise<StoresResponse> {
   const searchParams = new URLSearchParams();
 
   if (params?.page) searchParams.append("page", params.page.toString());
   if (params?.limit) searchParams.append("limit", params.limit.toString());
   if (params?.search) searchParams.append("search", params.search);
+  if (params?.category) searchParams.append("category", params.category.toString());
+  if (params?.sort) searchParams.append("sort", params.sort);
 
   const response = await fetch(
     `${getBaseUrl()}/api/stores?${searchParams.toString()}`,

@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 interface StoreCardProps {
   name: string;
   slug: string;
-  image: string;
+  imageUrl: string;
   productCount: number;
   averageRating: number;
 }
@@ -16,17 +16,17 @@ interface StoreCardProps {
 export function StoreCard({
   name,
   slug,
-  image,
+  imageUrl,
   productCount,
   averageRating,
 }: StoreCardProps) {
   return (
     <Link href={`/stores/${slug}`} className="block">
-      <Card className="hover:border-primary/50 overflow-hidden border transition-all duration-300 hover:shadow-lg">
+      <Card className="hover:border-primary/50 overflow-hidden border py-0 transition-all duration-300 hover:shadow-lg">
         <CardContent className="p-0">
           <div className="relative overflow-hidden">
             <Image
-              src={image || "/placeholder.svg"}
+              src={imageUrl}
               alt={name}
               width={300}
               height={300}
@@ -57,7 +57,7 @@ export function StoreCard({
 export function StoreCardSkeleton() {
   return (
     <div className="block">
-      <Card className="overflow-hidden border">
+      <Card className="overflow-hidden border py-0">
         <CardContent className="p-0">
           <div className="relative overflow-hidden">
             <Skeleton className="aspect-square w-full" />

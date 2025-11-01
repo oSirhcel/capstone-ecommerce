@@ -206,7 +206,7 @@ export default function Home() {
                   key={category.id}
                   name={category.name}
                   count={category.count}
-                  image={category.image}
+                  imageUrl={category.imageUrl}
                 />
               ))
             )}
@@ -261,7 +261,7 @@ export default function Home() {
                   productCount={store.productCount}
                   averageRating={store.averageRating}
                   slug={store.slug}
-                  image={"/placeholder.svg"}
+                  imageUrl={store.imageUrl || "/placeholder.svg"}
                 />
               ))
             ) : (

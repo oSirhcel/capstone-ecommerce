@@ -8,7 +8,6 @@ import type { InferInsertModel } from "drizzle-orm";
 import type { SeededStore } from "./stores";
 import type { SeededCategory } from "./categories";
 import type { SeededTag } from "./tags";
-import type { ProductSeed } from "./product-data";
 import { daysAgo, randomInt, cents, generateSKU, randomFloat } from "./utils";
 import { readFileSync } from "fs";
 import { join } from "path";
@@ -16,6 +15,35 @@ import { join } from "path";
 type NewProduct = InferInsertModel<typeof products>;
 type NewProductImage = InferInsertModel<typeof productImages>;
 type NewProductTag = InferInsertModel<typeof productTags>;
+
+export interface ProductSeed {
+  name: string;
+  sku: string;
+  description: string;
+  price: number;
+  compareAtPrice?: number;
+  costPerItem: number;
+  stock: number;
+  trackQuantity: boolean;
+  allowBackorders: boolean;
+  weight: string;
+  length: string;
+  width: string;
+  height: string;
+  seoTitle: string;
+  seoDescription: string;
+  slug: string;
+  status: "Active" | "Draft" | "Archived";
+  featured: boolean;
+  categoryName: string;
+  tags: string[];
+  images: Array<{
+    imageUrl: string;
+    altText: string;
+    isPrimary: boolean;
+    displayOrder: number;
+  }>;
+}
 
 export interface SeededProduct {
   id: number;
@@ -81,7 +109,8 @@ function transformProduct(
   let seoDescription = description.substring(0, 200);
   if (seoDescription.length === 200) {
     const lastSpace = seoDescription.lastIndexOf(" ");
-    seoDescription = lastSpace > 0 ? seoDescription.substring(0, lastSpace) : seoDescription;
+    seoDescription =
+      lastSpace > 0 ? seoDescription.substring(0, lastSpace) : seoDescription;
   }
 
   // Generate tags based on product name

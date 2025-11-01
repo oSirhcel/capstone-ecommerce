@@ -42,6 +42,7 @@ export async function GET(
       id: store.id,
       name: store.name,
       slug: store.slug,
+      imageUrl: store.imageUrl,
       description: store.description,
       ownerId: store.ownerId,
       createdAt: store.createdAt,

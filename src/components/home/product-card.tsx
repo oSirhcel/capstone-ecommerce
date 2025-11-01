@@ -38,7 +38,7 @@ export function ProductCard({
 
   return (
     <Link href={productUrl} className="group block">
-      <Card className="hover:border-primary/50 overflow-hidden border transition-all duration-300 hover:shadow-lg">
+      <Card className="hover:border-primary/50 overflow-hidden border py-0 transition-all duration-300 hover:shadow-lg">
         <CardContent className="p-0">
           <div className="relative overflow-hidden">
             <Image
@@ -78,7 +78,7 @@ export function ProductCard({
 
 export function ProductCardSkeleton() {
   return (
-    <Card className="overflow-hidden border">
+    <Card className="overflow-hidden border py-0">
       <CardContent className="p-0">
         <div className="relative overflow-hidden">
           <Skeleton className="aspect-square w-full" />

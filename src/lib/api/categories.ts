@@ -3,7 +3,7 @@ export interface Category {
   name: string;
   description: string | null;
   count: number;
-  image: string;
+  imageUrl: string;
 }
 
 export interface CategoriesResponse {

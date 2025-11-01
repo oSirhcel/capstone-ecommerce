@@ -26,7 +26,13 @@ export function Header() {
       <div className="container mx-auto flex h-16 items-center justify-between">
         <div className="flex items-center gap-2">
           <Link href="/" className="flex items-center gap-2">
-            <Image src="/logo-text.svg" alt="Logo" width={80} height={16} />
+            <Image
+              src="/logo-text.svg"
+              alt="Logo"
+              width={100}
+              height={100}
+              sizes="100vw"
+            />
             <span className="sr-only">buyio</span>
           </Link>
           <nav className="hidden gap-1 md:flex">

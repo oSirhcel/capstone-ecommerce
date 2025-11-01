@@ -11,7 +11,7 @@ export async function GET() {
         id: categories.id,
         name: categories.name,
         description: categories.description,
-        image: categories.image,
+        imageUrl: categories.imageUrl,
         count: sql<number>`COUNT(${products.id})`.mapWith(Number).as("count"),
       })
       .from(categories)

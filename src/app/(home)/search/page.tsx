@@ -236,7 +236,7 @@ export default function SearchPage() {
                               }
                               alt={product.images[0]?.altText ?? product.name}
                               fill
-                              className="object-cover"
+                              className="object-contain"
                             />
                           </div>
                           <h3 className="mb-2 line-clamp-2 text-sm font-semibold">
@@ -294,7 +294,7 @@ export default function SearchPage() {
                             }
                             alt={product.images[0]?.altText ?? product.name}
                             fill
-                            className="object-cover"
+                            className="object-contain"
                           />
                         </div>
                         <h3 className="mb-2 line-clamp-2 text-sm font-semibold">

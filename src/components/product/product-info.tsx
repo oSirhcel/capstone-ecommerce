@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import {
+  CheckIcon,
   HeartIcon,
   MinusIcon,
   PlusIcon,
@@ -11,17 +12,11 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { parseAsStringLiteral, useQueryStates } from "nuqs";
+
 import { useCart } from "@/contexts/cart-context";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 interface ProductInfoProps {
   product: {
@@ -33,11 +28,6 @@ interface ProductInfoProps {
     reviewCount: number;
     stock: number;
     sku: string;
-    options: {
-      id: string;
-      name: string;
-      values: string[];
-    }[];
     tags: string[];
     store?: {
       id: string;
@@ -47,10 +37,21 @@ interface ProductInfoProps {
 }
 
 export function ProductInfo({ product }: ProductInfoProps) {
+  const [isCopied, setIsCopied] = useState(false);
   const [quantity, setQuantity] = useState(1);
   const { addItem } = useCart();
   const { data: session } = useSession();
   const router = useRouter();
+
+  const handleShare = async () => {
+    const url = window.location.href;
+    await navigator.clipboard.writeText(url);
+    toast.success("Product link copied to clipboard");
+    setIsCopied(true);
+    setTimeout(() => {
+      setIsCopied(false);
+    }, 2000);
+  };
 
   const handleAddToCart = () => {
     const price =
@@ -79,23 +80,6 @@ export function ProductInfo({ product }: ProductInfoProps) {
       stock: product.stock,
     });
   };
-
-  const optionsQueryConfig = product.options.reduce(
-    (acc, option) => {
-      // For each option, define a parser.
-      // parseAsStringLiteral takes an array of allowed values and a default value.
-      // We'll use the first value of the option as its default.
-      acc[option.name] = parseAsStringLiteral(option.values).withDefault(
-        option.values[0],
-      );
-      return acc;
-    },
-    {} as Record<string, ReturnType<typeof parseAsStringLiteral>>, // Type assertion for the accumulator
-  );
-
-  // selectedOptions will be an object like: { Color: "Red", Size: "M" }
-  const [selectedOptions, setSelectedOptions] =
-    useQueryStates(optionsQueryConfig);
 
   const increaseQuantity = () => {
     if (quantity < product.stock) {
@@ -171,34 +155,6 @@ export function ProductInfo({ product }: ProductInfoProps) {
       </div>
 
       <div className="space-y-4 border-t border-b py-4">
-        {product.options.map((option) => (
-          <div key={option.id} className="flex items-center justify-between">
-            <span className="font-medium">{option.name}</span>
-            <Select
-              // The value for this select is determined by the option's name in the selectedOptions object.
-              // nuqs ensures this value is either from the URL or the default specified in parseAsStringLiteral.
-              value={selectedOptions[option.name] ?? ""} // Fallback to empty string if somehow undefined, though nuqs should provide a default.
-              onValueChange={(value) => {
-                // Update only the specific option that changed.
-                // e.g., if Color changes, call setSelectedOptions({ Color: "NewColor" })
-                void setSelectedOptions({ [option.name]: value });
-              }}
-            >
-              <SelectTrigger className="w-[180px]">
-                <SelectValue
-                  placeholder={`Select ${option.name.toLowerCase()}`}
-                />
-              </SelectTrigger>
-              <SelectContent>
-                {option.values.map((value) => (
-                  <SelectItem key={value} value={value}>
-                    {value}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        ))}
         <div className="flex items-center justify-between">
           <span className="font-medium">Quantity</span>
           <div className="flex items-center">
@@ -245,7 +201,7 @@ export function ProductInfo({ product }: ProductInfoProps) {
         </div>
       </div>
 
-      <div className="flex flex-col gap-4 sm:flex-row">
+      <div className="flex flex-col items-center gap-4 sm:flex-row">
         <Button
           className="flex-1"
           size="lg"
@@ -254,12 +210,19 @@ export function ProductInfo({ product }: ProductInfoProps) {
         >
           Add to Cart
         </Button>
-        <Button variant="outline" size="icon" className="h-11 w-11">
-          <HeartIcon className="h-5 w-5" />
-          <span className="sr-only">Add to wishlist</span>
-        </Button>
-        <Button variant="outline" size="icon" className="h-11 w-11">
-          <Share2Icon className="h-5 w-5" />
+
+        <Button
+          variant="outline"
+          size="icon"
+          className="size-11"
+          onClick={handleShare}
+          disabled={isCopied}
+        >
+          {isCopied ? (
+            <CheckIcon className="size-5" />
+          ) : (
+            <Share2Icon className="size-5" />
+          )}
           <span className="sr-only">Share product</span>
         </Button>
       </div>

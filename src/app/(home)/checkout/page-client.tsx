@@ -616,7 +616,7 @@ export function CheckoutClient() {
         />
 
         {/* Header */}
-        <div className="mb-8 mt-6">
+        <div className="mt-6 mb-8">
           <div className="mb-4 flex items-center gap-4">
             <Button variant="ghost" size="sm" asChild>
               <Link href="/cart" className="flex items-center gap-2">
@@ -1038,7 +1038,7 @@ export function CheckoutClient() {
                                 src={item.image || "/placeholder.svg"}
                                 alt={item.name}
                                 fill
-                                className="object-cover"
+                                className="object-contain"
                                 sizes="48px"
                               />
                             </div>

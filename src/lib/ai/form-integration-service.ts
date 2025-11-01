@@ -52,9 +52,6 @@ export function mapDraftToFormValues(
     formValues.costPerItem = draft.costPerItem;
   if (draft.weight !== undefined) formValues.weight = draft.weight;
 
-  // Category mapping
-  if (draft.categoryId) formValues.category = draft.categoryId.toString();
-
   // Tags mapping (keep as array)
   if (draft.tags && draft.tags.length > 0) {
     formValues.tags = draft.tags;

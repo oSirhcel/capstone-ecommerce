@@ -3,13 +3,12 @@
 import { useState, useEffect } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { ProductCard, ProductCardSkeleton } from "@/components/product-card";
-import { Pagination } from "@/components/pagination";
 import {
-  fetchProducts,
-  type Product,
-  getPrimaryImageUrl,
-} from "@/lib/api/products";
+  ProductCard,
+  ProductCardSkeleton,
+} from "@/components/home/product-card";
+import { Pagination } from "@/components/home/pagination";
+import { fetchProducts, transformProductToCardProps } from "@/lib/api/products";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SearchIcon, TagIcon, ArrowLeftIcon } from "lucide-react";
@@ -20,21 +19,6 @@ import {
 } from "@/lib/utils/category-slug";
 
 const PRODUCTS_PER_PAGE = 20;
-
-// Transform API Product to ProductCard props
-function transformProductToCardProps(product: Product) {
-  return {
-    id: product.id,
-    slug: product.slug,
-    name: product.name,
-    price: (product.price ?? 0) / 100, // Convert from cents to dollars
-    image: getPrimaryImageUrl(product),
-    rating: product.rating, // Use actual rating from reviews
-    reviewCount: product.reviewCount, // Include review count
-    store: product.store?.name ?? "Unknown Store",
-    category: product.category?.name ?? "Uncategorized",
-  };
-}
 
 interface CategoryPageProps {
   params: Promise<{

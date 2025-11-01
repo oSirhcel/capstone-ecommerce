@@ -9,7 +9,7 @@ import {
   productTags,
   tags,
 } from "@/server/db/schema";
-import { eq, desc, asc, and, ilike, sql, count } from "drizzle-orm";
+import { eq, desc, asc, and, ilike, sql, count, inArray } from "drizzle-orm";
 
 // GET /api/products - Get all products with optional filtering
 export async function GET(request: NextRequest) {
@@ -17,36 +17,58 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get("page") ?? "1");
     const limit = parseInt(searchParams.get("limit") ?? "20");
-    const category = searchParams.get("category");
-    const store = searchParams.get("store");
+    const categoryId = searchParams.get("category")
+      ? parseInt(searchParams.get("category")!)
+      : null;
+    const storeId = searchParams.get("store");
     const search = searchParams.get("search");
+    const isFeatured = searchParams.get("featured") === "true";
     const sort = searchParams.get("sort") ?? "release-newest";
 
     const offset = (page - 1) * limit;
 
-    // Build WHERE conditions
-    const whereConditions = [];
+    // Build orderBy clause
+    const orderByClause =
+      sort === "price-low"
+        ? asc(products.price)
+        : sort === "price-high"
+          ? desc(products.price)
+          : sort === "name-asc"
+            ? asc(products.name)
+            : sort === "name-desc"
+              ? desc(products.name)
+              : sort === "release-oldest"
+                ? asc(products.createdAt)
+                : desc(products.createdAt);
 
-    if (category) {
-      whereConditions.push(eq(products.categoryId, parseInt(category)));
-    }
+    // Build WHERE conditions using drizzle pattern
+    const whereCondition = and(
+      eq(products.status, "Active"),
+      categoryId ? eq(products.categoryId, categoryId) : undefined,
+      storeId ? eq(products.storeId, storeId) : undefined,
+      search ? ilike(products.name, `%${search}%`) : undefined,
+      isFeatured ? eq(products.featured, true) : undefined,
+    );
 
-    if (store) {
-      whereConditions.push(eq(products.storeId, store));
-    }
+    // Get total count
+    const [{ totalCount }] = await db
+      .select({
+        totalCount: count().mapWith(Number),
+      })
+      .from(products)
+      .leftJoin(stores, eq(products.storeId, stores.id))
+      .leftJoin(categories, eq(products.categoryId, categories.id))
+      .where(whereCondition);
 
-    if (search) {
-      whereConditions.push(ilike(products.name, `%${search}%`));
-    }
-
-    // Build the main query
-    const query = db
+    // Get paginated products
+    const productsData = await db
       .select({
         id: products.id,
         name: products.name,
         sku: products.sku,
         description: products.description,
         price: products.price,
+        compareAtPrice: products.compareAtPrice,
         slug: products.slug,
         stock: products.stock,
         status: products.status,
@@ -68,90 +90,86 @@ export async function GET(request: NextRequest) {
       .from(products)
       .leftJoin(stores, eq(products.storeId, stores.id))
       .leftJoin(categories, eq(products.categoryId, categories.id))
-      // Apply WHERE conditions if any
-      .where(
-        whereConditions.length === 0
-          ? undefined
-          : whereConditions.length === 1
-            ? whereConditions[0]
-            : and(...whereConditions),
-      );
-
-    // Build sorting for fields directly available
-    let orderByClause;
-    switch (sort) {
-      case "price-low":
-        orderByClause = asc(products.price);
-        break;
-      case "price-high":
-        orderByClause = desc(products.price);
-        break;
-      case "name-asc":
-        orderByClause = asc(products.name);
-        break;
-      case "name-desc":
-        orderByClause = desc(products.name);
-        break;
-      case "release-oldest":
-        orderByClause = asc(products.createdAt);
-        break;
-      case "release-newest":
-      default:
-        orderByClause = desc(products.createdAt);
-        break;
-    }
-
-    const productsData = await query
-      .orderBy(orderByClause as Parameters<typeof query.orderBy>[0])
+      .where(whereCondition)
+      .orderBy(orderByClause)
       .limit(limit)
       .offset(offset);
 
-    // Get product images and review statistics for each product
-    let productsWithImages = await Promise.all(
-      productsData.map(async (product) => {
-        const images = await db
-          .select({
-            id: productImages.id,
-            imageUrl: productImages.imageUrl,
-            altText: productImages.altText,
-            isPrimary: productImages.isPrimary,
-            displayOrder: productImages.displayOrder,
-          })
-          .from(productImages)
-          .where(eq(productImages.productId, product.id))
-          .orderBy(asc(productImages.displayOrder));
+    // Batch fetch all images for these products
+    const allImages = await db
+      .select({
+        productId: productImages.productId,
+        id: productImages.id,
+        imageUrl: productImages.imageUrl,
+        altText: productImages.altText,
+        isPrimary: productImages.isPrimary,
+        displayOrder: productImages.displayOrder,
+      })
+      .from(productImages)
+      .where(
+        inArray(
+          productImages.productId,
+          productsData.map((p) => p.id),
+        ),
+      )
+      .orderBy(asc(productImages.displayOrder));
 
-        // Get review statistics for this product
-        const [reviewStats] = await db
-          .select({
-            averageRating:
-              sql<number>`ROUND(AVG(${reviews.rating})::numeric, 2)`.mapWith(
-                Number,
-              ),
-            reviewCount: count().mapWith(Number),
-          })
-          .from(reviews)
-          .where(eq(reviews.productId, product.id));
+    // Batch fetch all review stats for these products
+    const allReviewStats = await db
+      .select({
+        productId: reviews.productId,
+        averageRating:
+          sql<number>`ROUND(AVG(${reviews.rating})::numeric, 2)`.mapWith(
+            Number,
+          ),
+        reviewCount: count().mapWith(Number),
+      })
+      .from(reviews)
+      .where(
+        inArray(
+          reviews.productId,
+          productsData.map((p) => p.id),
+        ),
+      )
+      .groupBy(reviews.productId);
 
-        return {
-          ...product,
-          rating: reviewStats?.averageRating ?? 0,
-          reviewCount: reviewStats?.reviewCount ?? 0,
-          images:
-            images.length > 0
-              ? images
-              : [
-                  {
-                    id: 0,
-                    imageUrl: "/placeholder.svg",
-                    altText: "Product image",
-                    isPrimary: true,
-                    displayOrder: 0,
-                  },
-                ],
-        };
-      }),
-    );
+    // Index data by productId for efficient lookup
+    const imagesByProductId = new Map<number, typeof allImages>();
+    allImages.forEach((img) => {
+      if (!imagesByProductId.has(img.productId)) {
+        imagesByProductId.set(img.productId, []);
+      }
+      imagesByProductId.get(img.productId)!.push(img);
+    });
+
+    const reviewsByProductId = new Map<number, (typeof allReviewStats)[0]>();
+    allReviewStats.forEach((review) => {
+      reviewsByProductId.set(review.productId, review);
+    });
+
+    // Combine results
+    let productsWithImages = productsData.map((product) => {
+      const images = imagesByProductId.get(product.id) ?? [];
+      const reviewStats = reviewsByProductId.get(product.id);
+
+      return {
+        ...product,
+        rating: reviewStats?.averageRating ?? 0,
+        reviewCount: reviewStats?.reviewCount ?? 0,
+        images:
+          images.length > 0
+            ? images
+            : [
+                {
+                  id: 0,
+                  imageUrl: "/placeholder.svg",
+                  altText: "Product image",
+                  isPrimary: true,
+                  displayOrder: 0,
+                },
+              ],
+      };
+    });
 
     // Apply rating-based sorting client-side after enrichment
     if (sort === "rating-low" || sort === "rating-high") {
@@ -165,8 +183,8 @@ export async function GET(request: NextRequest) {
       pagination: {
         page,
         limit,
-        total: productsData.length,
-        totalPages: Math.ceil(productsData.length / limit),
+        total: totalCount,
+        totalPages: Math.ceil(totalCount / limit),
       },
     });
   } catch (error) {
@@ -196,7 +214,7 @@ export async function POST(request: NextRequest) {
       seoTitle?: string;
       seoDescription?: string;
       slug?: string;
-      status?: "Active" | "Inactive" | "Draft" | "Archived";
+      status?: "Active" | "Draft" | "Archived";
       featured?: boolean;
       tagIds?: number[];
       storeId: string;
@@ -289,9 +307,7 @@ export async function POST(request: NextRequest) {
         ? "Active"
         : status === "Archived"
           ? "Archived"
-          : status === "Inactive"
-            ? "Inactive"
-            : "Draft";
+          : "Draft";
 
     // Create the product
     const [newProduct] = await db

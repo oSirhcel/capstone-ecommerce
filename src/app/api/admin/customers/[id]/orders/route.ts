@@ -10,6 +10,7 @@ import { eq, desc, count, and } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { ordersQuerySchema } from "@/lib/api/admin/customers";
 import { formatOrderNumber } from "@/lib/utils/order-number";
+import { OrderStatus } from "@/lib/api/admin/orders";
 
 /**
  * GET /api/admin/customers/[id]/orders
@@ -92,7 +93,9 @@ export async function GET(
         and(
           eq(orders.userId, id),
           eq(orders.storeId, storeId),
-          query.status ? eq(orders.status, query.status) : undefined,
+          query.status
+            ? eq(orders.status, query.status as OrderStatus)
+            : undefined,
         ),
       )
       .groupBy(orders.id)
@@ -129,7 +132,9 @@ export async function GET(
         and(
           eq(orders.userId, id),
           eq(orders.storeId, storeId),
-          query.status ? eq(orders.status, query.status) : undefined,
+          query.status
+            ? eq(orders.status, query.status as OrderStatus)
+            : undefined,
         ),
       );
 

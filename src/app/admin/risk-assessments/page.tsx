@@ -38,7 +38,7 @@ const columns = [
       const d = row.original.decision;
       const variant =
         d === "deny" ? "destructive" : d === "warn" ? "secondary" : "default";
-      return <Badge variant={variant as any}>{d.toUpperCase()}</Badge>;
+      return <Badge variant={variant}>{d.toUpperCase()}</Badge>;
     },
   },
   {
@@ -53,7 +53,7 @@ const columns = [
       const fullName = [user.userName, user.userLastName]
         .filter(Boolean)
         .join(" ");
-      const displayName = fullName || user.username || "Unknown";
+      const displayName = fullName ?? user.username ?? "Unknown";
       return (
         <div className="flex flex-col">
           <span className="font-medium">{displayName}</span>
@@ -120,11 +120,11 @@ export default function RiskAssessmentsPage() {
   const [sortBy, setSortBy] = useState("createdAt");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
-  const decisions = useMemo(() => {
-    const arr: Array<"warn" | "deny"> = [];
+  const decisions: Array<"allow" | "warn" | "deny"> = useMemo(() => {
+    const arr: Array<"allow" | "warn" | "deny"> = [];
     if (onlyWarn) arr.push("warn");
     if (onlyDeny) arr.push("deny");
-    return arr.length ? arr : ["warn", "deny"];
+    return arr.length ? arr : ["allow", "warn", "deny"];
   }, [onlyWarn, onlyDeny]);
 
   const handleSort = (column: string) => {

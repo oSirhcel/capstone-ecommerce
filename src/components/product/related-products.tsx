@@ -5,7 +5,10 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 
 import { Button } from "@/components/ui/button";
-import { ProductCard, ProductCardSkeleton } from "@/components/product-card";
+import {
+  ProductCard,
+  ProductCardSkeleton,
+} from "@/components/home/product-card";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
   fetchRelatedProducts,

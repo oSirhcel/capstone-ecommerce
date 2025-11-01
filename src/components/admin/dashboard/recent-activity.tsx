@@ -1,3 +1,5 @@
+"use client";
+
 import {
   Card,
   CardContent,
@@ -7,54 +9,8 @@ import {
 } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-
-const activities = [
-  {
-    id: 1,
-    user: "John Doe",
-    avatar: "/placeholder.svg?height=32&width=32",
-    action: "created a new product",
-    target: "Handcrafted Ceramic Mug",
-    time: "2 minutes ago",
-    type: "product",
-  },
-  {
-    id: 2,
-    user: "Sarah Johnson",
-    avatar: "/placeholder.svg?height=32&width=32",
-    action: "placed an order",
-    target: "#001",
-    time: "5 minutes ago",
-    type: "order",
-  },
-  {
-    id: 3,
-    user: "Mike Chen",
-    avatar: "/placeholder.svg?height=32&width=32",
-    action: "registered as a new seller",
-    target: "Digital Designs Store",
-    time: "10 minutes ago",
-    type: "user",
-  },
-  {
-    id: 4,
-    user: "Emily Rodriguez",
-    avatar: "/placeholder.svg?height=32&width=32",
-    action: "updated product inventory",
-    target: "Organic Skincare Set",
-    time: "15 minutes ago",
-    type: "product",
-  },
-  {
-    id: 5,
-    user: "David Wilson",
-    avatar: "/placeholder.svg?height=32&width=32",
-    action: "completed payment",
-    target: "$89.99",
-    time: "20 minutes ago",
-    type: "payment",
-  },
-];
+import { useSession } from "next-auth/react";
+import { useActivityQuery } from "@/hooks/admin/dashboard/use-dashboard-query";
 
 const getActivityBadge = (type: string) => {
   switch (type) {
@@ -76,6 +32,71 @@ const getActivityBadge = (type: string) => {
 };
 
 export function RecentActivity() {
+  const session = useSession();
+  const storeId = session?.data?.store?.id;
+
+  const { data: activityData, isLoading, error } = useActivityQuery(storeId, 5);
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Recent Activity</CardTitle>
+          <CardDescription>
+            Latest actions across your marketplace
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="flex items-start gap-3">
+                <div className="h-8 w-8 animate-pulse rounded-full bg-gray-200" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 w-3/4 animate-pulse rounded bg-gray-200" />
+                  <div className="h-3 w-1/2 animate-pulse rounded bg-gray-200" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (error || !activityData || !("activities" in activityData)) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Recent Activity</CardTitle>
+          <CardDescription>
+            Latest actions across your marketplace
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p className="text-muted-foreground text-sm">No recent activity</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const activities = activityData.activities;
+
+  if (activities.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Recent Activity</CardTitle>
+          <CardDescription>
+            Latest actions across your marketplace
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p className="text-muted-foreground text-sm">No recent activity</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -87,10 +108,13 @@ export function RecentActivity() {
       <CardContent>
         <div className="space-y-4">
           {activities.map((activity) => (
-            <div key={activity.id} className="flex items-start gap-3">
+            <div
+              key={`${activity.type}-${activity.id}`}
+              className="flex items-start gap-3"
+            >
               <Avatar className="h-8 w-8">
                 <AvatarImage
-                  src={activity.avatar || "/placeholder.svg"}
+                  src={activity.avatar ?? "/placeholder.svg"}
                   alt={activity.user}
                 />
                 <AvatarFallback>{activity.user.charAt(0)}</AvatarFallback>

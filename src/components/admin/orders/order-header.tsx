@@ -70,36 +70,34 @@ export function OrderHeader({ order }: OrderHeaderProps) {
   };
 
   return (
-    <div className="flex items-center justify-between">
-      <div className="flex items-center gap-4">
-        <div className="flex items-center justify-between">
-          <div className="space-y-1">
-            <div className="text-muted-foreground flex items-center gap-2 text-sm">
-              <Link
-                href={`/admin/orders`}
-                className="hover:text-foreground flex items-center gap-1"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back to order
-              </Link>
+    <div className="flex min-w-0 flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <div className="min-w-0 flex-1">
+        <div className="space-y-1">
+          <div className="text-muted-foreground flex items-center gap-2 text-sm">
+            <Link
+              href={`/admin/orders`}
+              className="hover:text-foreground flex items-center gap-1"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to orders
+            </Link>
+          </div>
+          <div className="min-w-0">
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <h1 className="text-2xl font-bold lg:text-3xl">
+                Order {formatOrderNumber(order.id)}
+              </h1>
+              {getStatusBadge(order.status)}
             </div>
-            <div>
-              <div className="justify flex items-center gap-2">
-                <h1 className="text-3xl font-bold">
-                  Order {formatOrderNumber(order.id)}
-                </h1>
-                {getStatusBadge(order.status)}
-              </div>
 
-              <span className="text-muted-foreground text-xs">
-                {format(new Date(order.date), "MMM d, yyyy hh:mm a")}
-              </span>
-            </div>
+            <span className="text-muted-foreground text-xs">
+              {format(new Date(order.date), "MMM d, yyyy hh:mm a")}
+            </span>
           </div>
         </div>
       </div>
 
-      <div className="flex gap-2">
+      <div className="flex flex-shrink-0 flex-wrap gap-2">
         <Button
           variant="outline"
           size="sm"

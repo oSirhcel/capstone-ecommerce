@@ -9,6 +9,7 @@ import {
   orderItems,
   products,
   orderAddresses,
+  productImages,
 } from "@/server/db/schema";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
@@ -104,9 +105,17 @@ export async function GET(
         quantity: orderItems.quantity,
         priceAtTime: orderItems.priceAtTime,
         productName: products.name,
+        imageUrl: productImages.imageUrl,
       })
       .from(orderItems)
       .leftJoin(products, eq(products.id, orderItems.productId))
+      .leftJoin(
+        productImages,
+        and(
+          eq(productImages.productId, products.id),
+          eq(productImages.isPrimary, true),
+        ),
+      )
       .where(eq(orderItems.orderId, Number(id)));
 
     const addresses = await db
@@ -146,6 +155,7 @@ export async function GET(
         productName: i.productName,
         quantity: i.quantity,
         priceAtTime: i.priceAtTime,
+        imageUrl: i.imageUrl ?? null,
       })),
       addresses,
       payment: {
@@ -334,9 +344,17 @@ export async function PATCH(
           quantity: orderItems.quantity,
           priceAtTime: orderItems.priceAtTime,
           productName: products.name,
+          imageUrl: productImages.imageUrl,
         })
         .from(orderItems)
         .leftJoin(products, eq(products.id, orderItems.productId))
+        .leftJoin(
+          productImages,
+          and(
+            eq(productImages.productId, products.id),
+            eq(productImages.isPrimary, true),
+          ),
+        )
         .where(eq(orderItems.orderId, Number(id)));
 
       const addresses = await db
@@ -378,6 +396,7 @@ export async function PATCH(
             productName: i.productName,
             quantity: i.quantity,
             priceAtTime: i.priceAtTime,
+            imageUrl: i.imageUrl ?? null,
           })),
           addresses,
           payment: {

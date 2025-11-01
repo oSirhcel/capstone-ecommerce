@@ -39,7 +39,7 @@ export function ProductGallery({ images }: ProductGalleryProps) {
                 `Product image ${currentImage + 1}`
               }
               fill
-              className="object-cover"
+              className="object-contain"
             />
             {images.length > 1 && (
               <>
@@ -80,7 +80,7 @@ export function ProductGallery({ images }: ProductGalleryProps) {
                     alt={image.altText ?? `Thumbnail ${index + 1}`}
                     width={48}
                     height={48}
-                    className="h-full w-full object-cover"
+                    className="h-full w-full object-contain"
                   />
                 </button>
               ))}

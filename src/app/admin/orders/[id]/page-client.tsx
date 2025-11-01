@@ -31,7 +31,6 @@ export default function OrderViewPageClient({ orderId }: { orderId: string }) {
         name: order.customer.name,
         email: order.customer.email,
         phone: "",
-        avatar: "/placeholder.svg?height=40&width=40",
       },
     };
   }, [order]);
@@ -41,20 +40,20 @@ export default function OrderViewPageClient({ orderId }: { orderId: string }) {
       return [] as Array<{
         id: string;
         name: string;
-        image: string;
         price: number;
         quantity: number;
         total: number;
         store: string;
+        image: string;
       }>;
     return order.items.map((i) => ({
       id: String(i.id),
       name: i.productName ?? `Product #${i.productId}`,
-      image: "/placeholder.svg?height=60&width=60",
       price: i.priceAtTime / 100,
       quantity: i.quantity,
       total: (i.priceAtTime * i.quantity) / 100,
       store: "",
+      image: i.imageUrl ?? "",
     }));
   }, [order]);
 
@@ -121,15 +120,17 @@ export default function OrderViewPageClient({ orderId }: { orderId: string }) {
   }
 
   return (
-    <div className="mx-4 space-y-6 xl:mx-64">
-      <OrderHeader order={orderHeader} />
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_380px]">
-        <div className="space-y-6">
+    <div className="mx-auto w-full max-w-5xl space-y-6 px-4 md:px-0">
+      <div className="min-w-0">
+        <OrderHeader order={orderHeader} />
+      </div>
+      <div className="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-[1fr_380px]">
+        <div className="min-w-0 space-y-6">
           <OrderItems items={items} />
           <OrderPayment payment={payment} total={order.totalAmount / 100} />
         </div>
 
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
           <OrderCustomer
             customer={orderHeader.customer}
             shippingAddress={shipping.address}

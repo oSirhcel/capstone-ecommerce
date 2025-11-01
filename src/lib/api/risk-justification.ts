@@ -29,7 +29,12 @@ export interface RiskAssessmentListItem {
 
 export interface RiskAssessmentsResponse {
   assessments: RiskAssessmentListItem[];
-  pagination: { page: number; limit: number; total: number; totalPages: number };
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
 }
 
 export async function fetchRiskAssessments(params?: {
@@ -50,18 +55,25 @@ export async function fetchRiskAssessments(params?: {
   if (params?.sortBy) qs.set("sortBy", params.sortBy);
   if (params?.sortOrder) qs.set("sortOrder", params.sortOrder);
 
-  const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL ?? ""}/api/risk-assessments?${qs.toString()}`);
+  const res = await fetch(
+    `${process.env.NEXT_PUBLIC_BASE_URL ?? ""}/api/risk-assessments?${qs.toString()}`,
+  );
   if (!res.ok) {
     throw new Error("Failed to fetch risk assessments");
   }
   return res.json() as Promise<RiskAssessmentsResponse>;
 }
 
-export async function regenerateJustification(assessmentId: number): Promise<{ justification: string }> {
-  const res = await fetch(`/api/risk-assessment/${assessmentId}/justification`, { method: "POST" });
+export async function regenerateJustification(
+  assessmentId: number,
+): Promise<{ justification: string }> {
+  const res = await fetch(
+    `/api/risk-assessment/${assessmentId}/justification`,
+    { method: "POST" },
+  );
   if (!res.ok) {
     throw new Error("Failed to regenerate justification");
   }
-  const data = await res.json();
-  return { justification: data.justification as string };
+  const data = (await res.json()) as { justification: string };
+  return { justification: data.justification };
 }

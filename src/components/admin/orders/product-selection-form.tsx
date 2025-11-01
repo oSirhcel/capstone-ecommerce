@@ -184,7 +184,7 @@ export function ProductSelectionForm({ storeId }: ProductSelectionFormProps) {
                           alt={product.name}
                           width={40}
                           height={40}
-                          className="rounded-md object-cover"
+                          className="rounded-md object-contain"
                         />
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
@@ -241,7 +241,7 @@ export function ProductSelectionForm({ storeId }: ProductSelectionFormProps) {
                     alt={item.name}
                     width={60}
                     height={60}
-                    className="rounded-md object-cover"
+                    className="rounded-md object-contain"
                   />
                   <div className="flex-1">
                     <p className="font-medium">{item.name}</p>

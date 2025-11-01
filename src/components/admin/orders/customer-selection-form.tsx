@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, startTransition } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useFormContext } from "react-hook-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -79,6 +79,56 @@ export function CustomerSelectionForm({
     () => addressesData?.addresses ?? [],
     [addressesData],
   );
+
+  const defaultAddress = useMemo(
+    () => addresses.find((addr) => addr.isDefault) ?? null,
+    [addresses],
+  );
+
+  const hasAutoSelectedRef = useRef(false);
+  const previousCustomerIdRef = useRef<string | null>(null);
+
+  // Reset auto-selection tracking when customer changes
+  if (customer?.id !== previousCustomerIdRef.current) {
+    hasAutoSelectedRef.current = false;
+    previousCustomerIdRef.current = customer?.id ?? null;
+  }
+
+  // Auto-select default address when addresses are loaded and no address is selected
+  // Use startTransition to defer setValue call until after render
+  if (
+    defaultAddress &&
+    !selectedAddressId &&
+    addressMode === "select" &&
+    !hasAutoSelectedRef.current &&
+    addresses.length > 0
+  ) {
+    hasAutoSelectedRef.current = true;
+    startTransition(() => {
+      setValue("selectedAddressId", defaultAddress.id, { shouldDirty: false });
+      setValue(
+        "shippingAddress",
+        {
+          firstName: defaultAddress.firstName,
+          lastName: defaultAddress.lastName,
+          company: "",
+          address1: defaultAddress.addressLine1,
+          address2: defaultAddress.addressLine2 ?? "",
+          city: defaultAddress.city,
+          state: defaultAddress.state,
+          postcode: defaultAddress.postcode,
+          country: defaultAddress.country,
+          phone: "",
+        },
+        { shouldDirty: false },
+      );
+    });
+  }
+
+  // Compute the selected address ID for display
+  const effectiveAddressId = useMemo(() => {
+    return selectedAddressId ?? null;
+  }, [selectedAddressId]);
 
   const handleCustomerSelect = (selectedCustomer: {
     id: string;
@@ -260,18 +310,20 @@ export function CustomerSelectionForm({
             ) : (
               <Select
                 value={
-                  selectedAddressId
-                    ? String(selectedAddressId)
+                  effectiveAddressId
+                    ? String(effectiveAddressId)
                     : addressMode === "manual"
                       ? "manual"
-                      : ""
+                      : undefined
                 }
                 onValueChange={handleAddressSelect}
               >
-                <SelectTrigger>
+                <SelectTrigger className="w-full min-w-0">
                   <SelectValue placeholder="Select or enter address" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent
+                  style={{ width: "var(--radix-select-trigger-width)" }}
+                >
                   {addresses.map((addr) => (
                     <SelectItem key={addr.id} value={String(addr.id)}>
                       {addr.firstName} {addr.lastName} - {addr.addressLine1},{" "}

@@ -15,6 +15,7 @@ import { formatOrderNumber } from "@/lib/utils/order-number";
 import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { useShippingMethodsQuery } from "@/hooks/admin/settings/use-shipping-methods";
 
 export type OrderItem = {
   id: string;
@@ -92,6 +93,7 @@ const orderFormSchema = z.object({
     status: z.enum(["paid", "pending", "failed"]),
     notes: z.string().optional(),
   }),
+  shippingMethodId: z.number().nullable().optional(),
   orderNotes: z.string().optional(),
 });
 
@@ -102,6 +104,7 @@ export default function CreateOrderPage() {
   const session = useSession();
   const storeId = session?.data?.store?.id ?? "";
   const { create } = useOrderMutations(storeId);
+  const { data: shippingMethods = [] } = useShippingMethodsQuery();
 
   const form = useForm<OrderFormValues>({
     resolver: zodResolver(orderFormSchema),
@@ -126,24 +129,30 @@ export default function CreateOrderPage() {
         status: "pending",
         notes: "",
       },
+      shippingMethodId: null,
       orderNotes: "",
     },
   });
 
-  const { watch, handleSubmit: createHandleSubmit } = form;
-
-  // Calculations - still needed for submit handler
-  const orderItems = watch("orderItems");
-  const subtotal = orderItems.reduce(
-    (sum, item) => sum + item.price * item.quantity,
-    0,
-  );
-  const shipping = subtotal > 100 ? 0 : 9.99;
-  const tax = subtotal * 0.1; // 10% GST for Australia
-  const total = subtotal + shipping + tax;
+  const { handleSubmit: createHandleSubmit } = form;
 
   const onSubmit = async (data: OrderFormValues) => {
     try {
+      // Calculate totals
+      const subtotal = data.orderItems.reduce(
+        (sum, item) => sum + item.price * item.quantity,
+        0,
+      );
+
+      const selectedShippingMethod = shippingMethods.find(
+        (m) => m.id === data.shippingMethodId,
+      );
+      const shippingCost = selectedShippingMethod
+        ? selectedShippingMethod.basePrice / 100
+        : 0;
+      const tax = subtotal * 0.1; // 10% GST for Australia
+      const total = subtotal + shippingCost + tax;
+
       const payload: {
         storeId: string;
         customerId: string;
@@ -153,6 +162,7 @@ export default function CreateOrderPage() {
           priceAtTime: number;
         }>;
         totalAmount: number;
+        shippingMethodId?: number;
         addressId?: number;
         shippingAddress?: {
           firstName: string;
@@ -174,6 +184,7 @@ export default function CreateOrderPage() {
           priceAtTime: Math.round(i.price * 100),
         })),
         totalAmount: Math.round(total * 100),
+        shippingMethodId: data.shippingMethodId ?? undefined,
         notes: data.orderNotes ?? undefined,
       };
 

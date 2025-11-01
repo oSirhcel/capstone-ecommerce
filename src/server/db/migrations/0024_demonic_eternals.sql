@@ -1,0 +1,1 @@
+ALTER TABLE "products" ALTER COLUMN "seoDescription" SET DATA TYPE varchar(200);

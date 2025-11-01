@@ -12,13 +12,16 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Search, Plus, Filter, Eye, Edit, Trash2, Package } from "lucide-react";
+import { Search, Plus, Filter, Trash2, Package } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useProductsQuery } from "@/hooks/products/use-products-query";
+
 import { Skeleton } from "@/components/ui/skeleton";
+
 import { type Product } from "@/lib/api/products";
 import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 
 const columns = [
   {
@@ -47,13 +50,6 @@ const columns = [
         </div>
       );
     },
-  },
-  {
-    header: "Store",
-    accessorKey: "store",
-    cell: ({ row }: { row: { original: Product } }) => (
-      <span>{row.original.store?.name ?? "Unknown Store"}</span>
-    ),
   },
   {
     header: "Price",
@@ -92,7 +88,7 @@ const columns = [
       } else if (stock < 20) {
         displayStatus = "Low Stock";
         variant = "secondary";
-      } else if (status === "active") {
+      } else if (status === "Active") {
         displayStatus = "Active";
         variant = "default";
       }
@@ -100,34 +96,11 @@ const columns = [
       return <Badge variant={variant}>{displayStatus}</Badge>;
     },
   },
-  {
-    header: "Actions",
-    cell: ({ row }: { row: { original: Product } }) => (
-      <div className="flex gap-1">
-        <Link href={`/admin/products/${row.original.id}`}>
-          <Button variant="ghost" size="sm">
-            <Eye className="h-4 w-4" />
-          </Button>
-        </Link>
-        <Link href={`/admin/products/${row.original.id}/edit`}>
-          <Button variant="ghost" size="sm">
-            <Edit className="h-4 w-4" />
-          </Button>
-        </Link>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-red-600 hover:text-red-700"
-        >
-          <Trash2 className="h-4 w-4" />
-        </Button>
-      </div>
-    ),
-  },
 ];
 
 export default function ProductsPage() {
   const session = useSession();
+  const router = useRouter();
   const storeId = session?.data?.store?.id ?? "";
   const [searchTerm, setSearchTerm] = useState("");
   const {
@@ -141,11 +114,15 @@ export default function ProductsPage() {
 
   const products = productsData?.products ?? [];
   const totalProducts = productsData?.pagination?.total ?? 0;
-  const activeProducts = products.filter((p) => p.status === "active").length;
+  const activeProducts = products.filter((p) => p.status === "Active").length;
   const lowStockProducts = products.filter(
     (p) => p.stock > 0 && p.stock < 20,
   ).length;
   const outOfStockProducts = products.filter((p) => p.stock === 0).length;
+
+  const handleRowClick = (product: Product) => {
+    router.push(`/admin/products/${product.id}/edit`);
+  };
 
   if (error) {
     return (
@@ -291,6 +268,7 @@ export default function ProductsPage() {
             isLoading={isLoading}
             emptyMessage="No products found. Add your first product to get started."
             emptyIcon={<Package className="h-12 w-12 opacity-20" />}
+            onRowClick={handleRowClick}
           />
         </CardContent>
       </Card>

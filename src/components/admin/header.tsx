@@ -1,66 +1,88 @@
 "use client";
 
-import { BellIcon, SearchIcon, UserIcon } from "lucide-react";
+import { BotIcon, StoreIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-} from "../ui/input-group";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Badge } from "@/components/ui/badge";
-import { SidebarTrigger } from "@/components/ui/sidebar";
 import { signOut } from "next-auth/react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { SidebarTrigger } from "@/components/ui/sidebar";
+import Link from "next/link";
+import { useProfileQuery } from "@/hooks/admin/use-profile-query";
+import { useRightSidebar } from "@/contexts/right-sidebar-context";
 
 export function AdminHeader() {
+  const { data: profile, isLoading } = useProfileQuery();
+  const { toggle: toggleRightSidebar } = useRightSidebar();
+
+  if (isLoading) {
+    return (
+      <header className="border-b bg-white px-4 py-3 md:px-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <SidebarTrigger disabled />
+          </div>
+          <div className="flex items-center gap-4">
+            <Skeleton className="h-9 w-9 rounded-md" />
+            <Skeleton className="h-12 w-40 rounded-md" />
+          </div>
+        </div>
+      </header>
+    );
+  }
+
   return (
     <header className="border-b bg-white px-4 py-3 md:px-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <SidebarTrigger />
         </div>
-        <div className="flex items-center gap-4">
-          {/* Search */}
-          <div className="relative hidden md:block">
-            <InputGroup>
-              <InputGroupInput placeholder="Search..." className="w-[400px]" />
-              <InputGroupAddon>
-                <SearchIcon />
-              </InputGroupAddon>
-            </InputGroup>
-          </div>
-        </div>
 
-        <div className="flex items-center gap-4">
-          {/* Notifications */}
-          <Button variant="ghost" size="icon" className="relative">
-            <BellIcon className="h-5 w-5" />
-            <Badge className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 text-xs">
-              3
-            </Badge>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="relative"
+            onClick={toggleRightSidebar}
+          >
+            <BotIcon className="size-6" />
           </Button>
-
-          {/* User menu */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon">
-                <UserIcon className="h-5 w-5" />
+              <Button size="default" variant="ghost" className="py-6">
+                <div className="text-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg bg-blue-950">
+                  <StoreIcon className="size-4" />
+                </div>
+                <div className="grid flex-1 text-left text-sm leading-tight">
+                  <span className="truncate font-semibold">
+                    {profile?.store?.name}
+                  </span>
+                </div>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>My Account</DropdownMenuLabel>
+            <DropdownMenuContent className="w-56" align="end">
+              {profile?.store?.slug && (
+                <>
+                  <DropdownMenuItem asChild>
+                    <Link href={`/stores/${profile.store.slug}`}>
+                      Storefront
+                    </Link>
+                  </DropdownMenuItem>
+                </>
+              )}
+
               <DropdownMenuSeparator />
-              <DropdownMenuItem>Profile</DropdownMenuItem>
-              <DropdownMenuItem>Settings</DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href={`/account`}>My Account</Link>
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
+
               <DropdownMenuItem onClick={() => signOut()}>
                 Log out
               </DropdownMenuItem>

@@ -7,6 +7,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
+import { categoryNameToSlug } from "@/lib/utils/category-slug";
 
 interface ProductEditPageClientProps {
   id: number;
@@ -19,7 +20,7 @@ export function ProductEditPageClient({ id }: ProductEditPageClientProps) {
   // Loading state
   if (isLoading) {
     return (
-      <div className="container mx-auto max-w-7xl space-y-6 py-8">
+      <div>
         <div className="flex items-center justify-between">
           <div className="space-y-2">
             <Skeleton className="h-8 w-48" />
@@ -27,7 +28,7 @@ export function ProductEditPageClient({ id }: ProductEditPageClientProps) {
           </div>
           <Skeleton className="h-10 w-32" />
         </div>
-        <div className="space-y-6">
+        <div className="mx-auto space-y-6 lg:max-w-6xl">
           <Skeleton className="h-[600px] w-full" />
         </div>
       </div>
@@ -37,7 +38,7 @@ export function ProductEditPageClient({ id }: ProductEditPageClientProps) {
   // Error state
   if (isError || !product) {
     return (
-      <div className="container mx-auto max-w-7xl py-8">
+      <div>
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Error</AlertTitle>
@@ -64,8 +65,10 @@ export function ProductEditPageClient({ id }: ProductEditPageClientProps) {
     price: product.price ? product.price / 100 : 0, // Convert from cents to dollars
     compareAtPrice: product.compareAtPrice ? product.compareAtPrice / 100 : 0,
     costPerItem: product.costPerItem ? product.costPerItem / 100 : 0,
-    category: product.categoryId?.toString() ?? "",
-    tags: product.tags ?? "",
+    category: product.category?.name
+      ? categoryNameToSlug(product.category.name)
+      : undefined,
+    tags: product.tags?.map((t) => t.name) ?? [],
     trackQuantity: product.trackQuantity,
     quantity: product.stock,
     allowBackorders: product.allowBackorders,
@@ -78,13 +81,13 @@ export function ProductEditPageClient({ id }: ProductEditPageClientProps) {
     seoTitle: product.seoTitle ?? "",
     seoDescription: product.seoDescription ?? "",
     slug: product.slug ?? "",
-    status: product.status as "active" | "draft" | "archived",
+    status: product.status as "Active" | "Draft" | "Archived",
     featured: product.featured,
     images: product.images.map((img) => img.imageUrl),
   };
 
   return (
-    <div className="container mx-auto max-w-7xl py-8">
+    <div className="space-y-6">
       <ProductForm initialData={initialData} isEditing={true} productId={id} />
     </div>
   );

@@ -43,14 +43,14 @@ export function OrderShipping({ shipping }: OrderShippingProps) {
 
         <div className="border-t pt-4">
           <div className="flex items-start gap-2">
-            <MapPin className="text-muted-foreground mt-0.5 h-4 w-4" />
-            <div className="text-sm">
-              <p>{shipping.address.street}</p>
-              <p>
+            <MapPin className="text-muted-foreground mt-0.5 h-4 w-4 shrink-0" />
+            <div className="min-w-0 flex-1 text-sm break-words">
+              <p className="break-words">{shipping.address.street}</p>
+              <p className="break-words">
                 {shipping.address.city}, {shipping.address.state}{" "}
                 {shipping.address.zip}
               </p>
-              <p>{shipping.address.country}</p>
+              <p className="break-words">{shipping.address.country}</p>
             </div>
           </div>
         </div>

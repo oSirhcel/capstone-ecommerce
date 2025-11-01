@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef, useLayoutEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -41,7 +41,14 @@ import {
   Link2,
   FileText,
   CheckCircle2,
+  Sparkles,
 } from "lucide-react";
+import {
+  DEFAULT_SHIPPING_POLICY,
+  DEFAULT_RETURN_POLICY,
+  DEFAULT_PRIVACY_POLICY,
+  DEFAULT_TERMS_OF_SERVICE,
+} from "@/lib/default-policies";
 
 const storeSchema = z.object({
   name: z
@@ -74,6 +81,7 @@ export default function StoreManagementPage() {
   const { data: session } = useSession();
   const storeId = session?.store?.id;
   const [activePolicyTab, setActivePolicyTab] = useState("shipping");
+  const initializedStoreRef = useRef<string | null>(null);
 
   const {
     data: storeById,
@@ -93,19 +101,47 @@ export default function StoreManagementPage() {
 
   const { updateStore, isUpdating } = useStoreMutations();
 
+  // Only initialize form when store data is available
   const form = useForm<StoreFormData>({
     resolver: zodResolver(storeSchema),
-    defaultValues: {
-      name: store?.name ?? "",
-      description: store?.description ?? "",
-      contactEmail: store?.settings?.contactEmail ?? "",
-      slug: store?.slug ?? "",
-      shippingPolicy: store?.settings?.shippingPolicy ?? "",
-      returnPolicy: store?.settings?.returnPolicy ?? "",
-      privacyPolicy: store?.settings?.privacyPolicy ?? "",
-      termsOfService: store?.settings?.termsOfService ?? "",
-    },
+    defaultValues: store
+      ? {
+          name: store.name ?? "",
+          description: store.description ?? "",
+          contactEmail: store.settings?.contactEmail ?? "",
+          slug: store.slug ?? "",
+          shippingPolicy: store.settings?.shippingPolicy ?? "",
+          returnPolicy: store.settings?.returnPolicy ?? "",
+          privacyPolicy: store.settings?.privacyPolicy ?? "",
+          termsOfService: store.settings?.termsOfService ?? "",
+        }
+      : {
+          name: "",
+          description: "",
+          contactEmail: "",
+          slug: "",
+          shippingPolicy: "",
+          returnPolicy: "",
+          privacyPolicy: "",
+          termsOfService: "",
+        },
   });
+
+  useLayoutEffect(() => {
+    if (store && initializedStoreRef.current !== store.id) {
+      initializedStoreRef.current = store.id;
+      form.reset({
+        name: store.name ?? "",
+        description: store.description ?? "",
+        contactEmail: store.settings?.contactEmail ?? "",
+        slug: store.slug ?? "",
+        shippingPolicy: store.settings?.shippingPolicy ?? "",
+        returnPolicy: store.settings?.returnPolicy ?? "",
+        privacyPolicy: store.settings?.privacyPolicy ?? "",
+        termsOfService: store.settings?.termsOfService ?? "",
+      });
+    }
+  }, [store, form]);
 
   const onSubmit = async (data: StoreFormData) => {
     try {
@@ -120,6 +156,8 @@ export default function StoreManagementPage() {
         privacyPolicy: data.privacyPolicy,
         termsOfService: data.termsOfService,
       });
+      // Reset the initialized ref so form refreshes with new data after query invalidation
+      initializedStoreRef.current = null;
     } catch (error) {
       console.error("Failed to update store:", error);
     }
@@ -452,24 +490,46 @@ export default function StoreManagementPage() {
                     isRequired={true}
                     isFilled={!!form.watch("shippingPolicy")}
                   >
-                    <FormField
-                      control={form.control}
-                      name="shippingPolicy"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormControl>
-                            <Textarea
-                              {...field}
-                              placeholder="Enter your shipping policy..."
-                              disabled={isUpdating}
-                              rows={12}
-                              className="resize-none text-base"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
+                    <div className="space-y-3">
+                      {!form.watch("shippingPolicy") && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const contactEmail = form.getValues("contactEmail");
+                            const defaultPolicy =
+                              DEFAULT_SHIPPING_POLICY.replace(
+                                "[Your Contact Email]",
+                                contactEmail ?? "[Your Contact Email]",
+                              );
+                            form.setValue("shippingPolicy", defaultPolicy);
+                          }}
+                          className="gap-2"
+                        >
+                          <Sparkles className="h-4 w-4" />
+                          Use Default Template
+                        </Button>
                       )}
-                    />
+                      <FormField
+                        control={form.control}
+                        name="shippingPolicy"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormControl>
+                              <Textarea
+                                {...field}
+                                placeholder="Enter your shipping policy..."
+                                disabled={isUpdating}
+                                rows={12}
+                                className="resize-none text-base"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
                   </CollapsiblePolicySection>
                 </TabsContent>
 
@@ -481,24 +541,45 @@ export default function StoreManagementPage() {
                     isFilled={!!form.watch("returnPolicy")}
                     onAdd={() => setActivePolicyTab("return")}
                   >
-                    <FormField
-                      control={form.control}
-                      name="returnPolicy"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormControl>
-                            <Textarea
-                              {...field}
-                              placeholder="Enter your return policy..."
-                              disabled={isUpdating}
-                              rows={12}
-                              className="resize-none text-base"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
+                    <div className="space-y-3">
+                      {!form.watch("returnPolicy") && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const contactEmail = form.getValues("contactEmail");
+                            const defaultPolicy = DEFAULT_RETURN_POLICY.replace(
+                              "[Your Contact Email]",
+                              contactEmail ?? "[Your Contact Email]",
+                            );
+                            form.setValue("returnPolicy", defaultPolicy);
+                          }}
+                          className="gap-2"
+                        >
+                          <Sparkles className="h-4 w-4" />
+                          Use Default Template
+                        </Button>
                       )}
-                    />
+                      <FormField
+                        control={form.control}
+                        name="returnPolicy"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormControl>
+                              <Textarea
+                                {...field}
+                                placeholder="Enter your return policy..."
+                                disabled={isUpdating}
+                                rows={12}
+                                className="resize-none text-base"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
                   </CollapsiblePolicySection>
                 </TabsContent>
 
@@ -510,24 +591,46 @@ export default function StoreManagementPage() {
                     isFilled={!!form.watch("privacyPolicy")}
                     onAdd={() => setActivePolicyTab("privacy")}
                   >
-                    <FormField
-                      control={form.control}
-                      name="privacyPolicy"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormControl>
-                            <Textarea
-                              {...field}
-                              placeholder="Enter your privacy policy..."
-                              disabled={isUpdating}
-                              rows={12}
-                              className="resize-none text-base"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
+                    <div className="space-y-3">
+                      {!form.watch("privacyPolicy") && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const contactEmail = form.getValues("contactEmail");
+                            const defaultPolicy =
+                              DEFAULT_PRIVACY_POLICY.replace(
+                                "[Your Contact Email]",
+                                contactEmail ?? "[Your Contact Email]",
+                              );
+                            form.setValue("privacyPolicy", defaultPolicy);
+                          }}
+                          className="gap-2"
+                        >
+                          <Sparkles className="h-4 w-4" />
+                          Use Default Template
+                        </Button>
                       )}
-                    />
+                      <FormField
+                        control={form.control}
+                        name="privacyPolicy"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormControl>
+                              <Textarea
+                                {...field}
+                                placeholder="Enter your privacy policy..."
+                                disabled={isUpdating}
+                                rows={12}
+                                className="resize-none text-base"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
                   </CollapsiblePolicySection>
                 </TabsContent>
 
@@ -539,24 +642,50 @@ export default function StoreManagementPage() {
                     isFilled={!!form.watch("termsOfService")}
                     onAdd={() => setActivePolicyTab("terms")}
                   >
-                    <FormField
-                      control={form.control}
-                      name="termsOfService"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormControl>
-                            <Textarea
-                              {...field}
-                              placeholder="Enter your terms of service..."
-                              disabled={isUpdating}
-                              rows={12}
-                              className="resize-none text-base"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
+                    <div className="space-y-3">
+                      {!form.watch("termsOfService") && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const storeName = form.getValues("name");
+                            const contactEmail = form.getValues("contactEmail");
+                            const defaultPolicy =
+                              DEFAULT_TERMS_OF_SERVICE.replace(
+                                "[Store Name]",
+                                storeName || "[Store Name]",
+                              ).replace(
+                                "[Your Contact Email]",
+                                contactEmail ?? "[Your Contact Email]",
+                              );
+                            form.setValue("termsOfService", defaultPolicy);
+                          }}
+                          className="gap-2"
+                        >
+                          <Sparkles className="h-4 w-4" />
+                          Use Default Template
+                        </Button>
                       )}
-                    />
+                      <FormField
+                        control={form.control}
+                        name="termsOfService"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormControl>
+                              <Textarea
+                                {...field}
+                                placeholder="Enter your terms of service..."
+                                disabled={isUpdating}
+                                rows={12}
+                                className="resize-none text-base"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
                   </CollapsiblePolicySection>
                 </TabsContent>
               </Tabs>

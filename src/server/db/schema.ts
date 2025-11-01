@@ -61,11 +61,10 @@ export const products = pgTable("products", {
   width: decimal({ precision: 8, scale: 2 }), // Width in cm
   height: decimal({ precision: 8, scale: 2 }), // Height in cm
   seoTitle: varchar({ length: 60 }),
-  seoDescription: varchar({ length: 160 }),
+  seoDescription: varchar({ length: 200 }),
   slug: varchar({ length: 255 }).unique(),
   status: productStatusEnum().notNull().default("Draft"),
   featured: boolean().notNull().default(false),
-  tags: text(), // JSON string of tags array
   storeId: varchar("storeId", { length: 255 })
     .references(() => stores.id)
     .notNull(),
@@ -73,6 +72,32 @@ export const products = pgTable("products", {
   createdAt: timestamp().defaultNow().notNull(),
   updatedAt: timestamp().defaultNow().notNull(),
 });
+
+export const tags = pgTable("tags", {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  name: varchar({ length: 100 }).notNull().unique(),
+  slug: varchar({ length: 100 }).notNull().unique(),
+  createdAt: timestamp().defaultNow().notNull(),
+});
+
+export const productTags = pgTable(
+  "product_tags",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    productId: integer()
+      .references(() => products.id, { onDelete: "cascade" })
+      .notNull(),
+    tagId: integer()
+      .references(() => tags.id, { onDelete: "cascade" })
+      .notNull(),
+    createdAt: timestamp().defaultNow().notNull(),
+  },
+  (table) => [
+    unique("product_tags_product_tag_unique").on(table.productId, table.tagId),
+    index("product_tags_product_idx").on(table.productId),
+    index("product_tags_tag_idx").on(table.tagId),
+  ],
+);
 
 export const carts = pgTable("carts", {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),
@@ -118,8 +143,7 @@ export const orders = pgTable("orders", {
   userId: varchar("userId", { length: 255 })
     .references(() => users.id)
     .notNull(),
-  storeId: varchar("storeId", { length: 255 })
-    .references(() => stores.id), // Orders belong to a specific store
+  storeId: varchar("storeId", { length: 255 }).references(() => stores.id), // Orders belong to a specific store
   status: orderStatusEnum().notNull().default("Pending"),
   paymentStatus: paymentStatusEnum().notNull().default("Pending"),
   totalAmount: integer().notNull(), // Total in cents
@@ -281,15 +305,24 @@ export const orderAddresses = pgTable("order_addresses", {
 });
 
 // Shipping methods and rates
-export const shippingMethods = pgTable("shipping_methods", {
-  id: integer().primaryKey().generatedAlwaysAsIdentity(),
-  name: varchar({ length: 100 }).notNull(),
-  description: varchar({ length: 500 }),
-  basePrice: integer().notNull(), // Price in cents
-  estimatedDays: integer().notNull(),
-  isActive: boolean().notNull().default(true),
-  createdAt: timestamp().defaultNow().notNull(),
-});
+export const shippingMethods = pgTable(
+  "shipping_methods",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    name: varchar({ length: 100 }).notNull(),
+    description: varchar({ length: 500 }),
+    basePrice: integer().notNull(), // Price in cents
+    estimatedDays: integer().notNull(),
+    isActive: boolean().notNull().default(true),
+    // Scope shipping methods to a specific store
+    storeId: varchar("storeId", { length: 255 }).references(() => stores.id),
+    createdAt: timestamp().defaultNow().notNull(),
+  },
+  (table) => [
+    // Index for store-level queries
+    index("shipping_methods_store_idx").on(table.storeId),
+  ],
+);
 
 // Payment methods
 export const paymentMethods = pgTable("payment_methods", {
@@ -306,6 +339,32 @@ export const paymentMethods = pgTable("payment_methods", {
   isActive: boolean().notNull().default(true),
   createdAt: timestamp().defaultNow().notNull(),
 });
+
+// Store payment provider configuration (e.g., Stripe Connect)
+export const storePaymentProviders = pgTable(
+  "store_payment_providers",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    storeId: varchar("storeId", { length: 255 })
+      .references(() => stores.id)
+      .notNull(),
+    provider: varchar({ length: 50 }).notNull(), // 'stripe', 'paypal'
+    stripeAccountId: varchar({ length: 255 }), // Stripe Connect account ID
+    stripeAccountStatus: varchar({ length: 50 }), // 'pending', 'active', 'restricted'
+    isActive: boolean().notNull().default(false),
+    connectedAt: timestamp(),
+    createdAt: timestamp().defaultNow().notNull(),
+    updatedAt: timestamp().defaultNow().notNull(),
+  },
+  (table) => [
+    unique("store_payment_provider_store_provider_unique").on(
+      table.storeId,
+      table.provider,
+    ),
+    index("store_payment_providers_store_idx").on(table.storeId),
+    index("store_payment_providers_provider_idx").on(table.provider),
+  ],
+);
 
 // Discounts and coupons
 export const discounts = pgTable("discounts", {
@@ -341,39 +400,37 @@ export const orderDiscounts = pgTable("order_discounts", {
 // Zero Trust Risk Assessments
 export const zeroTrustAssessments = pgTable("zero_trust_assessments", {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),
-  userId: varchar("userId", { length: 255 })
-    .references(() => users.id),
-  orderId: integer()
-    .references(() => orders.id),
+  userId: varchar("userId", { length: 255 }).references(() => users.id),
+  orderId: integer().references(() => orders.id),
   paymentIntentId: varchar({ length: 255 }), // Stripe payment intent ID
-  
+
   // Risk assessment results
   riskScore: integer().notNull(), // 0-100
   decision: varchar({ length: 10 }).notNull(), // 'allow', 'warn', 'deny'
   confidence: integer().notNull(), // 0-100 (confidence percentage)
-  
+
   // Transaction details at time of assessment
   transactionAmount: integer().notNull(), // Amount in cents
-  currency: varchar({ length: 3 }).notNull().default('aud'),
+  currency: varchar({ length: 3 }).notNull().default("aud"),
   itemCount: integer().notNull().default(0),
   storeCount: integer().notNull().default(0),
-  
+
   // Risk factors (JSON array)
   riskFactors: text(), // JSON string of risk factors
-  
+
   // AI-generated justification (NEW)
   aiJustification: text(), // AI-generated explanation of the risk assessment
   justificationGeneratedAt: timestamp(), // When the AI justification was generated
-  
+
   // Request metadata
   userAgent: text(),
   ipAddress: varchar({ length: 45 }), // IPv6 compatible
-  
+
   // Geographic data
   shippingCountry: varchar({ length: 2 }),
   shippingState: varchar({ length: 100 }),
   shippingCity: varchar({ length: 100 }),
-  
+
   createdAt: timestamp({ withTimezone: true }).defaultNow().notNull(),
 });
 
@@ -436,25 +493,25 @@ export const zeroTrustVerifications = pgTable("zero_trust_verifications", {
   userId: varchar("userId", { length: 255 })
     .references(() => users.id)
     .notNull(),
-  
+
   // OTP code for verification
   otpHash: varchar({ length: 255 }), // Hashed OTP code
-  
+
   // Transaction details to resume after verification
   paymentData: text().notNull(), // JSON string of original payment request
   riskScore: integer().notNull(),
   riskFactors: text(), // JSON string of risk factors
-  
+
   // Verification status
-  status: varchar({ length: 20 }).notNull().default('pending'), // 'pending', 'verified', 'expired'
+  status: varchar({ length: 20 }).notNull().default("pending"), // 'pending', 'verified', 'expired'
   verifiedAt: timestamp(),
   expiresAt: timestamp().notNull(), // Tokens expire after 10 minutes
-  
+
   // Email details
   userEmail: varchar({ length: 255 }).notNull(),
   emailSent: boolean().notNull().default(false),
   emailSentAt: timestamp(),
-  
+
   createdAt: timestamp().defaultNow().notNull(),
   updatedAt: timestamp().defaultNow().notNull(),
 });

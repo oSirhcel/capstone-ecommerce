@@ -52,6 +52,8 @@ export interface StoreProduct {
   categoryId: number | null;
   createdAt: Date;
   updatedAt: Date;
+  rating: number;
+  reviewCount: number;
   store: {
     id: string;
     name: string;

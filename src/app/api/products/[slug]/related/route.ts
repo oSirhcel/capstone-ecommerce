@@ -6,6 +6,8 @@ import {
   categories,
   productImages,
   reviews,
+  productTags,
+  tags,
 } from "@/server/db/schema";
 import { eq, asc, sql, count, ne, and } from "drizzle-orm";
 
@@ -32,9 +34,7 @@ export async function GET(
       })
       .from(products)
       .where(
-        isNumericId 
-          ? eq(products.id, productId!)
-          : eq(products.slug, slug)
+        isNumericId ? eq(products.id, productId!) : eq(products.slug, slug),
       )
       .limit(1);
 
@@ -52,7 +52,9 @@ export async function GET(
 
     // If the product has a category, prioritize products from the same category
     if (currentProductData.categoryId) {
-      whereConditions.push(eq(products.categoryId, currentProductData.categoryId));
+      whereConditions.push(
+        eq(products.categoryId, currentProductData.categoryId),
+      );
     }
 
     // Get related products with store and category information
@@ -77,7 +79,6 @@ export async function GET(
         slug: products.slug,
         status: products.status,
         featured: products.featured,
-        tags: products.tags,
         storeId: products.storeId,
         categoryId: products.categoryId,
         createdAt: products.createdAt,
@@ -97,13 +98,15 @@ export async function GET(
       .leftJoin(stores, eq(products.storeId, stores.id))
       .leftJoin(categories, eq(products.categoryId, categories.id))
       .where(and(...whereConditions))
-      .orderBy(sql`CASE WHEN ${products.categoryId} = ${currentProductData.categoryId} THEN 0 ELSE 1 END, ${products.featured} DESC, ${products.createdAt} DESC`)
+      .orderBy(
+        sql`CASE WHEN ${products.categoryId} = ${currentProductData.categoryId} THEN 0 ELSE 1 END, ${products.featured} DESC, ${products.createdAt} DESC`,
+      )
       .limit(limit);
 
     // If we don't have enough products from the same category, get more from other categories
     if (relatedProductsData.length < limit && currentProductData.categoryId) {
       const additionalLimit = limit - relatedProductsData.length;
-      
+
       const additionalProducts = await db
         .select({
           id: products.id,
@@ -125,7 +128,6 @@ export async function GET(
           slug: products.slug,
           status: products.status,
           featured: products.featured,
-          tags: products.tags,
           storeId: products.storeId,
           categoryId: products.categoryId,
           createdAt: products.createdAt,
@@ -144,11 +146,13 @@ export async function GET(
         .from(products)
         .leftJoin(stores, eq(products.storeId, stores.id))
         .leftJoin(categories, eq(products.categoryId, categories.id))
-        .where(and(
-          ne(products.id, currentProductData.id),
-          ne(products.categoryId, currentProductData.categoryId),
-          eq(products.status, "Active")
-        ))
+        .where(
+          and(
+            ne(products.id, currentProductData.id),
+            ne(products.categoryId, currentProductData.categoryId),
+            eq(products.status, "Active"),
+          ),
+        )
         .orderBy(sql`${products.featured} DESC, ${products.createdAt} DESC`)
         .limit(additionalLimit);
 
@@ -157,46 +161,65 @@ export async function GET(
 
     // Get product images and review statistics for each related product
     const relatedProductsWithImages = await Promise.all(
-      relatedProductsData.map(async (product) => {
-        const images = await db
-          .select({
-            id: productImages.id,
-            imageUrl: productImages.imageUrl,
-            altText: productImages.altText,
-            isPrimary: productImages.isPrimary,
-            displayOrder: productImages.displayOrder,
-          })
-          .from(productImages)
-          .where(eq(productImages.productId, product.id))
-          .orderBy(asc(productImages.displayOrder));
+      relatedProductsData
+        .filter((product) => product != null)
+        .map(async (product) => {
+          const images = await db
+            .select({
+              id: productImages.id,
+              imageUrl: productImages.imageUrl,
+              altText: productImages.altText,
+              isPrimary: productImages.isPrimary,
+              displayOrder: productImages.displayOrder,
+            })
+            .from(productImages)
+            .where(eq(productImages.productId, product.id))
+            .orderBy(asc(productImages.displayOrder));
 
-        // Get review statistics for this product
-        const [reviewStats] = await db
-          .select({
-            averageRating: sql<number>`ROUND(AVG(${reviews.rating})::numeric, 2)`.mapWith(Number),
-            reviewCount: count().mapWith(Number),
-          })
-          .from(reviews)
-          .where(eq(reviews.productId, product.id));
+          // Get product tags
+          const productTagsData = await db
+            .select({
+              id: tags.id,
+              name: tags.name,
+              slug: tags.slug,
+            })
+            .from(productTags)
+            .innerJoin(tags, eq(productTags.tagId, tags.id))
+            .where(eq(productTags.productId, product.id));
 
-        return {
-          ...product,
-          rating: reviewStats?.averageRating ?? 0,
-          reviewCount: reviewStats?.reviewCount ?? 0,
-          images:
-            images.length > 0
-              ? images
-              : [
-                  {
-                    id: 0,
-                    imageUrl: "/placeholder.svg",
-                    altText: "Product image",
-                    isPrimary: true,
-                    displayOrder: 0,
-                  },
-                ],
-        };
-      }),
+          // Get review statistics for this product
+          const [reviewStats] = await db
+            .select({
+              averageRating:
+                sql<number>`ROUND(AVG(${reviews.rating})::numeric, 2)`.mapWith(
+                  Number,
+                ),
+              reviewCount: count().mapWith(Number),
+            })
+            .from(reviews)
+            .where(eq(reviews.productId, product.id));
+
+          return {
+            ...product,
+            store: product.store?.id ? product.store : null,
+            category: product.category?.id ? product.category : null,
+            tags: productTagsData,
+            rating: reviewStats?.averageRating ?? 0,
+            reviewCount: reviewStats?.reviewCount ?? 0,
+            images:
+              images.length > 0
+                ? images
+                : [
+                    {
+                      id: 0,
+                      imageUrl: "/placeholder.svg",
+                      altText: "Product image",
+                      isPrimary: true,
+                      displayOrder: 0,
+                    },
+                  ],
+          };
+        }),
     );
 
     return NextResponse.json({

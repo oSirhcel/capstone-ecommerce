@@ -33,7 +33,7 @@ export function OrderItems({ items }: OrderItemsProps) {
                 alt={item.name}
                 width={48}
                 height={48}
-                className="rounded-md object-cover"
+                className="aspect-square rounded-md object-contain"
               />
               <div className="min-w-0 flex-1">
                 <h4 className="truncate text-sm font-medium">{item.name}</h4>

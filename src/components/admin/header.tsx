@@ -7,6 +7,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -56,28 +57,33 @@ export function AdminHeader() {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button size="default" variant="ghost" className="py-6">
-                <div className="text-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg bg-blue-950">
-                  <StoreIcon className="size-4" />
-                </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-semibold">
                     {profile?.store?.name}
                   </span>
                 </div>
+                <div className="text-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg bg-blue-950">
+                  <StoreIcon className="size-4" />
+                </div>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-56" align="end">
+              <DropdownMenuLabel className="font-normal">
+                <div className="flex flex-col space-y-1">
+                  <p className="text-sm leading-none font-medium">
+                    {profile?.user.username}
+                  </p>
+                </div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
               {profile?.store?.slug && (
                 <>
                   <DropdownMenuItem asChild>
-                    <Link href={`/stores/${profile.store.slug}`}>
-                      Storefront
-                    </Link>
+                    <Link href={`/stores/${profile.store.slug}`}>Store</Link>
                   </DropdownMenuItem>
                 </>
               )}
 
-              <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
                 <Link href={`/account`}>My Account</Link>
               </DropdownMenuItem>

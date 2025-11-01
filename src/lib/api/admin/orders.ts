@@ -116,6 +116,7 @@ export interface OrderDetailItem {
   productName: string | null;
   quantity: number;
   priceAtTime: number; // cents
+  imageUrl: string | null;
 }
 
 export interface OrderDetail {
@@ -125,6 +126,7 @@ export interface OrderDetail {
   createdAt: string;
   updatedAt: string;
   customer: { id: string; name: string; email: string };
+
   items: OrderDetailItem[];
   addresses: Array<{
     id: number;

@@ -26,7 +26,7 @@ function transform(product: Product) {
     rating: product.rating,
     reviewCount: product.reviewCount,
     stock: product.stock,
-    sku: `${product.id.toString().padStart(6, "0")}`,
+    sku: product.sku ?? `${product.id.toString().padStart(6, "0")}`,
     description: product.description ?? "No description available",
     features: [
       "High quality product",
@@ -35,32 +35,35 @@ function transform(product: Product) {
     ],
     specifications: [
       { name: "Product ID", value: product.id.toString() },
+      { name: "SKU", value: product.sku ?? "N/A" },
       { name: "Category", value: product.category?.name ?? "Uncategorized" },
       { name: "Store", value: product.store?.name ?? "Unknown Store" },
       { name: "Stock", value: product.stock.toString() },
-      { name: "Added", value: product.createdAt.toLocaleString() },
-    ],
-    images: product.images.map((img) => img.imageUrl),
-    options: [
       {
-        id: "size",
-        name: "Size",
-        values: ["S", "M", "L", "XL"],
+        name: "Added",
+        value: new Date(product.createdAt).toLocaleDateString(),
       },
     ],
+    images: product.images.map((img) => img.imageUrl),
     category: product.category?.name ?? "Uncategorized",
-    tags: [
-      "product",
-      product.category?.name?.toLowerCase() ?? "general",
-    ].filter(Boolean),
+    tags:
+      product.tags?.map((tag) => tag.name) ??
+      ["product", product.category?.name?.toLowerCase() ?? "general"].filter(
+        Boolean,
+      ),
     store: {
       id: product.store?.id ?? "unknown",
       name: product.store?.name ?? "Unknown Store",
       slug: product.store?.slug ?? "unknown-store",
       logo: "/placeholder.svg",
-      rating: 4.0,
-      productCount: 0,
-      joinedDate: "Unknown",
+      rating: product.store?.averageRating ?? 0,
+      productCount: product.store?.productCount ?? 0,
+      joinedDate:
+        product.store?.createdAt instanceof Date
+          ? product.store.createdAt.toISOString()
+          : product.store?.createdAt
+            ? new Date(product.store.createdAt).toISOString()
+            : new Date().toISOString(),
     },
   };
 }
@@ -123,7 +126,11 @@ export function ProductPageClient({ productSlug }: ProductPageClientProps) {
               label: transformedProduct.category,
               href: categoryHref,
             },
-            { label: transformedProduct.name, href: `#`, current: true },
+            {
+              label: "",
+              href: `#`,
+              current: true,
+            },
           ]}
         />
 

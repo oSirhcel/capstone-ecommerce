@@ -11,7 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { ProductCard } from "@/components/product-card";
+import { ProductCard } from "@/components/home/product-card";
 import { Search } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchStoreProducts, type StoreProduct } from "@/lib/api/stores";
@@ -109,8 +109,8 @@ export function StoreProducts({ slug }: StoreProductsProps) {
             />
           </div>
 
-          {/* Category Tabs */}
-          {categories.length > 0 && (
+          {/* Category Tabs - Only show if more than 1 category */}
+          {categories.length > 1 && (
             <Tabs
               value={selectedCategory}
               onValueChange={setSelectedCategory}

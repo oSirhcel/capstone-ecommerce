@@ -10,11 +10,9 @@ import {
   cartItems,
   orderItems,
   reviews,
-  wishlists,
   inventoryLogs,
-  productVariants,
 } from "@/server/db/schema";
-import { eq, asc, sql, count, notInArray } from "drizzle-orm";
+import { eq, asc, sql, count, notInArray, and, inArray } from "drizzle-orm";
 
 // GET /api/products/[slug] - Get a specific product by slug or ID
 export async function GET(
@@ -59,6 +57,7 @@ export async function GET(
           name: stores.name,
           slug: stores.slug,
           description: stores.description,
+          createdAt: stores.createdAt,
         },
         category: {
           id: categories.id,
@@ -69,7 +68,10 @@ export async function GET(
       .leftJoin(stores, eq(products.storeId, stores.id))
       .leftJoin(categories, eq(products.categoryId, categories.id))
       .where(
-        isNumericId ? eq(products.id, productId!) : eq(products.slug, slug),
+        and(
+          isNumericId ? eq(products.id, productId!) : eq(products.slug, slug),
+          eq(products.status, "Active"),
+        ),
       )
       .limit(1);
 
@@ -115,6 +117,38 @@ export async function GET(
       .from(reviews)
       .where(eq(reviews.productId, product.id));
 
+    // Get store statistics
+    const [storeProductCount] = await db
+      .select({ count: count() })
+      .from(products)
+      .where(
+        and(
+          eq(products.storeId, product.storeId),
+          eq(products.status, "Active"),
+        ),
+      );
+
+    const storeProducts = await db
+      .select({ id: products.id })
+      .from(products)
+      .where(eq(products.storeId, product.storeId));
+
+    const storeProductIds = storeProducts.map((p) => p.id);
+    let storeAverageRating = 0;
+
+    if (storeProductIds.length > 0) {
+      const [storeReviewStats] = await db
+        .select({
+          avgRating: sql<string>`avg(${reviews.rating})`,
+        })
+        .from(reviews)
+        .where(inArray(reviews.productId, storeProductIds));
+
+      storeAverageRating = storeReviewStats?.avgRating
+        ? Math.round(parseFloat(storeReviewStats.avgRating) * 10) / 10
+        : 0;
+    }
+
     return NextResponse.json({
       ...product,
       tags: productTagsData,
@@ -132,6 +166,13 @@ export async function GET(
                 displayOrder: 0,
               },
             ],
+      store: product.store
+        ? {
+            ...product.store,
+            productCount: storeProductCount?.count ?? 0,
+            averageRating: storeAverageRating,
+          }
+        : null,
     });
   } catch (error) {
     console.error("Error fetching product:", error);
@@ -530,16 +571,8 @@ export async function DELETE(
     // Delete cart items
     await db.delete(cartItems).where(eq(cartItems.productId, productId));
 
-    // Delete wishlist items
-    await db.delete(wishlists).where(eq(wishlists.productId, productId));
-
     // Delete reviews
     await db.delete(reviews).where(eq(reviews.productId, productId));
-
-    // Delete product variants
-    await db
-      .delete(productVariants)
-      .where(eq(productVariants.productId, productId));
 
     // Delete inventory logs (historical data - consider archiving in production)
     await db

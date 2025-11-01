@@ -5,7 +5,7 @@ import { StoreHeader } from "@/components/store/store-header";
 import { StoreInfo } from "@/components/store/store-info";
 import { StoreProducts } from "@/components/store/store-products";
 import { StoreReviews } from "@/components/store/store-reviews";
-import { useStoreQuery } from "@/hooks/stores/use-store-query";
+import { useStoreQueryBySlug } from "@/hooks/stores/use-store-query-by-slug";
 import { useStoreStats } from "@/hooks/stores/use-store-stats";
 
 interface StorePageClientProps {
@@ -17,34 +17,15 @@ export const StorePageClient = ({ slug }: StorePageClientProps) => {
     data: store,
     isLoading: storeLoading,
     error: storeError,
-  } = useStoreQuery(slug);
+  } = useStoreQueryBySlug(slug);
 
   const { data: stats, isLoading: statsLoading } = useStoreStats(slug);
 
   if (storeLoading) {
     return (
       <div className="bg-background min-h-screen">
-        {/* Header Skeleton */}
-        <div className="relative">
-          <div className="relative h-[300px] w-full overflow-hidden bg-gradient-to-br from-blue-50 to-indigo-100">
-            <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
-          </div>
-          <div className="container mx-auto px-4">
-            <div className="relative -mt-20 flex flex-col gap-4 sm:flex-row sm:items-end sm:gap-6">
-              <div className="border-background bg-background relative h-32 w-32 overflow-hidden rounded-xl border-4 shadow-lg">
-                <Skeleton className="h-full w-full" />
-              </div>
-              <div className="flex-1 space-y-2 pb-4">
-                <Skeleton className="h-8 w-64" />
-                <div className="flex flex-wrap items-center gap-4">
-                  <Skeleton className="h-4 w-32" />
-                  <Skeleton className="h-4 w-24" />
-                  <Skeleton className="h-4 w-20" />
-                </div>
-                <Skeleton className="h-4 w-full max-w-3xl" />
-              </div>
-            </div>
-          </div>
+        <div className="container mx-auto px-4 py-6">
+          <Skeleton className="h-10 w-64" />
         </div>
 
         <div className="container mx-auto px-4 py-8">
@@ -54,7 +35,7 @@ export const StorePageClient = ({ slug }: StorePageClientProps) => {
               <Skeleton className="h-64 w-full" />
             </div>
             <div className="space-y-6">
-              <Skeleton className="h-48 w-full" />
+              <Skeleton className="h-[600px] w-full" />
             </div>
           </div>
         </div>

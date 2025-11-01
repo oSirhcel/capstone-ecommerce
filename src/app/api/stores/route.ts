@@ -1,7 +1,16 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
-import { stores, products } from "@/server/db/schema";
-import { eq, desc, asc, count, ilike } from "drizzle-orm";
+import { stores, products, reviews } from "@/server/db/schema";
+import {
+  eq,
+  asc,
+  desc,
+  ilike,
+  sql,
+  inArray,
+  and,
+  isNotNull,
+} from "drizzle-orm";
 import { auth } from "@/lib/auth";
 
 interface SessionUser {
@@ -17,64 +26,117 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get("page") ?? "1");
-    const limit = parseInt(searchParams.get("limit") ?? "20");
-    const search = searchParams.get("search");
+    const limit = parseInt(searchParams.get("limit") ?? "6");
+    const search = searchParams.get("search")?.trim();
+    const categoryId = searchParams.get("category")
+      ? parseInt(searchParams.get("category")!)
+      : null;
+    const sort = searchParams.get("sort") ?? "name";
 
     const offset = (page - 1) * limit;
+    const shouldSortByRating = sort === "rating-high";
+    const shouldSortByProducts = sort === "products-high";
 
-    // Build the base query with conditional WHERE
-    const whereCondition = search?.trim()
-      ? ilike(stores.name, `%${search.trim()}%`)
-      : undefined;
+    // Get category store IDs if category filter is applied
+    let categoryStoreIds: string[] | undefined;
+    if (categoryId) {
+      const categoryStoreIdsResult = await db
+        .selectDistinct({ storeId: products.storeId })
+        .from(products)
+        .where(
+          and(
+            eq(products.categoryId, categoryId),
+            isNotNull(products.categoryId),
+          ),
+        );
 
-    // Get stores with pagination
-    const baseStoresQuery = db
+      categoryStoreIds = categoryStoreIdsResult.map((p) => p.storeId);
+      if (categoryStoreIds.length === 0) {
+        return NextResponse.json({
+          stores: [],
+          pagination: {
+            page,
+            limit,
+            total: 0,
+            totalPages: 0,
+          },
+        });
+      }
+    }
+
+    // Build query with conditional WHERE using drizzle pattern
+    const storesWithStats = await db
       .select({
         id: stores.id,
         name: stores.name,
-        slug: stores.slug, // NEW
+        slug: stores.slug,
+        imageUrl: stores.imageUrl,
         description: stores.description,
         ownerId: stores.ownerId,
         createdAt: stores.createdAt,
+        productCount: sql<number>`COUNT(DISTINCT ${products.id})`.mapWith(
+          Number,
+        ),
+        averageRating:
+          sql<number>`COALESCE(ROUND(AVG(${reviews.rating})::numeric, 1), 0)`.mapWith(
+            Number,
+          ),
       })
-      .from(stores);
+      .from(stores)
+      .leftJoin(products, eq(products.storeId, stores.id))
+      .leftJoin(reviews, eq(reviews.productId, products.id))
+      .where(
+        and(
+          search ? ilike(stores.name, `%${search}%`) : undefined,
+          categoryStoreIds ? inArray(stores.id, categoryStoreIds) : undefined,
+        ),
+      )
+      .groupBy(stores.id)
+      .orderBy(
+        sort === "name"
+          ? asc(stores.name)
+          : sort === "newest"
+            ? desc(stores.createdAt)
+            : shouldSortByRating
+              ? desc(
+                  sql`COALESCE(ROUND(AVG(${reviews.rating})::numeric, 1), 0)`,
+                )
+              : shouldSortByProducts
+                ? desc(sql`COUNT(DISTINCT ${products.id})`)
+                : asc(stores.name),
+      )
+      .limit(shouldSortByRating || shouldSortByProducts ? 5000 : limit)
+      .offset(shouldSortByRating || shouldSortByProducts ? 0 : offset);
 
-    const storesData = whereCondition
-      ? await baseStoresQuery
-          .where(whereCondition)
-          .orderBy(asc(stores.name))
-          .limit(limit)
-          .offset(offset)
-      : await baseStoresQuery
-          .orderBy(asc(stores.name))
-          .limit(limit)
-          .offset(offset);
+    // Sort in memory if needed (for rating/product sorting)
+    let sortedStores = storesWithStats;
+    if (shouldSortByRating) {
+      sortedStores = storesWithStats.sort(
+        (a, b) => b.averageRating - a.averageRating,
+      );
+      sortedStores = sortedStores.slice(offset, offset + limit);
+    } else if (shouldSortByProducts) {
+      sortedStores = storesWithStats.sort(
+        (a, b) => b.productCount - a.productCount,
+      );
+      sortedStores = sortedStores.slice(offset, offset + limit);
+    }
 
-    // Get product count for each store
-    const storesWithProductCount = await Promise.all(
-      storesData.map(async (store) => {
-        const [productCountResult] = await db
-          .select({ count: count() })
-          .from(products)
-          .where(eq(products.storeId, store.id));
+    // Get total count for pagination
+    const [totalResult] = await db
+      .select({ count: sql<number>`COUNT(*)`.mapWith(Number) })
+      .from(stores)
+      .where(
+        and(
+          search ? ilike(stores.name, `%${search}%`) : undefined,
+          categoryStoreIds ? inArray(stores.id, categoryStoreIds) : undefined,
+        ),
+      );
 
-        return {
-          ...store,
-          productCount: productCountResult?.count || 0,
-        };
-      }),
-    );
-
-    // Get total count for pagination (with search filter if applied)
-    const baseTotalQuery = db.select({ count: count() }).from(stores);
-
-    const [totalResult] = whereCondition
-      ? await baseTotalQuery.where(whereCondition)
-      : await baseTotalQuery;
     const total = totalResult?.count || 0;
 
     return NextResponse.json({
-      stores: storesWithProductCount,
+      stores: sortedStores,
       pagination: {
         page,
         limit,
@@ -153,6 +215,7 @@ export async function POST(request: NextRequest) {
         slug: slug.trim(),
         description: description?.trim() || null,
         ownerId: userId!,
+        imageUrl: "",
       })
       .returning();
 

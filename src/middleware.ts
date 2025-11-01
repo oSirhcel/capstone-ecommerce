@@ -39,7 +39,8 @@ export default auth(async (req) => {
     "base-uri 'self'",
     "form-action 'self'",
     "frame-ancestors 'self'",
-    "upgrade-insecure-requests",
+    // Only enforce HTTPS upgrade in production
+    ...(process.env.NODE_ENV === "production" ? ["upgrade-insecure-requests"] : []),
   ].join("; ");
 
   // Security headers to prevent vulnerabilities

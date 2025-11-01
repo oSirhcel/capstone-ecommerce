@@ -180,6 +180,16 @@ function transformProduct(
   };
 }
 
+// Fisher-Yates shuffle algorithm
+function shuffle<T>(array: T[]): T[] {
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
+
 export async function seedProducts(
   db: NodePgDatabase<Record<string, never>>,
   stores: SeededStore[],
@@ -198,6 +208,10 @@ export async function seedProducts(
 
   console.log(`  Loaded ${outputData.length} products from products.jsonl`);
 
+  // Shuffle products
+  const shuffledProducts = shuffle(outputData);
+  console.log(`  Shuffled ${shuffledProducts.length} products`);
+
   const seededProducts: SeededProduct[] = [];
   const categoryMap = new Map(categories.map((c) => [c.name, c.id]));
   const tagMap = new Map(tags.map((t) => [t.name, t.id]));
@@ -205,41 +219,75 @@ export async function seedProducts(
   // Global product index counter
   const globalProductIndex = { current: 1 };
 
-  // Distribute products across stores
-  const productsPerStore = Math.floor(outputData.length / stores.length);
-  const remainder = outputData.length % stores.length;
+  // Group products by category with indices
+  const productsByCategory = new Map<
+    string,
+    Array<{ product: OutputProduct; index: number }>
+  >();
+  for (let i = 0; i < shuffledProducts.length; i++) {
+    const product = shuffledProducts[i];
+    const category = product.category;
+    if (!productsByCategory.has(category)) {
+      productsByCategory.set(category, []);
+    }
+    productsByCategory.get(category)!.push({ product, index: i });
+  }
+
+  // Track which products have been assigned (by index)
+  const assignedProductIndices = new Set<number>();
 
   let totalProductsCreated = 0;
-  let productDataIndex = 0;
 
-  for (let storeIndex = 0; storeIndex < stores.length; storeIndex++) {
-    const store = stores[storeIndex];
-    const productsForStore =
-      productsPerStore + (storeIndex < remainder ? 1 : 0);
+  for (const store of stores) {
+    // Collect products that match store's category focuses
+    const matchingProducts: Array<{ product: OutputProduct; index: number }> =
+      [];
+
+    for (const focusCategory of store.categoryFocus) {
+      const categoryProducts = productsByCategory.get(focusCategory) ?? [];
+      for (const { product, index } of categoryProducts) {
+        if (!assignedProductIndices.has(index)) {
+          matchingProducts.push({ product, index });
+        }
+      }
+    }
+
+    // Shuffle matching products
+    const shuffledMatching = shuffle(matchingProducts);
+
+    // Determine number of products for this store (10-40, randomly distributed)
+    const minProducts = 10;
+    const maxProducts = 40;
+    const productsForStore = Math.min(
+      randomInt(minProducts, maxProducts),
+      shuffledMatching.length,
+    );
+
+    // Ensure minimum products if we have enough matching products
+    const finalProductsForStore =
+      shuffledMatching.length >= minProducts
+        ? productsForStore
+        : shuffledMatching.length;
 
     console.log(
-      `  Processing ${productsForStore} products for ${store.name}...`,
+      `  Processing ${finalProductsForStore} products for ${store.name} (focus: ${store.categoryFocus.join(", ")})...`,
     );
 
     // Transform products for this store
     const storePrefix = store.slug.split("-")[0].substring(0, 3).toUpperCase();
     const productSeeds: ProductSeed[] = [];
 
-    for (
-      let i = 0;
-      i < productsForStore && productDataIndex < outputData.length;
-      i++
-    ) {
-      const outputProduct = outputData[productDataIndex];
+    for (let i = 0; i < finalProductsForStore; i++) {
+      const { product: outputProduct, index } = shuffledMatching[i];
       const transformed = transformProduct(
         outputProduct,
         storePrefix,
         globalProductIndex.current++,
       );
 
-      // Add all products regardless of category
       productSeeds.push(transformed);
-      productDataIndex++;
+      // Mark this product as assigned
+      assignedProductIndices.add(index);
     }
 
     // Batch insert products

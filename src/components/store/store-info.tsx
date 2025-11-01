@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -6,6 +7,9 @@ import {
   RotateCcw,
   Truck,
   ExternalLink,
+  Star,
+  Package,
+  Calendar,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +20,14 @@ interface StoreInfoProps {
     id: string;
     slug: string;
     name: string;
+    description: string | null;
+    imageUrl: string;
+    createdAt: Date;
+    stats?: {
+      totalProducts: number;
+      averageRating: number;
+      totalReviews: number;
+    };
     settings?: {
       contactEmail?: string | null;
       shippingPolicy?: string | null;
@@ -33,13 +45,71 @@ export function StoreInfo({ store }: StoreInfoProps) {
     store.settings?.returnPolicy ??
     store.settings?.privacyPolicy ??
     store.settings?.termsOfService;
+  const joinedYear = new Date(store.createdAt).getFullYear();
 
   return (
-    <Card className="sticky top-4">
+    <Card className="sticky top-20">
       <CardHeader>
         <CardTitle>Store Information</CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-6">
+        {/* Store Image */}
+        <div className="relative aspect-square w-full overflow-hidden rounded-lg">
+          <Image
+            src={store.imageUrl || "/placeholder.svg"}
+            alt={store.name}
+            fill
+            className="object-cover"
+          />
+        </div>
+
+        {/* Description */}
+        {store.description && (
+          <div className="space-y-2">
+            <h3 className="font-semibold">About</h3>
+            <p className="text-muted-foreground text-sm">{store.description}</p>
+          </div>
+        )}
+
+        {/* Stats */}
+        <div className="space-y-3 border-t pt-4">
+          {/* Reviews */}
+          {store.stats?.averageRating && (
+            <div className="flex items-center gap-3">
+              <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
+              <div className="flex-1">
+                <p className="font-medium">
+                  {store.stats.averageRating.toFixed(1)} out of 5
+                </p>
+                <p className="text-muted-foreground text-sm">
+                  {store.stats.totalReviews.toLocaleString()} reviews
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Products */}
+          {store.stats?.totalProducts && (
+            <div className="flex items-center gap-3">
+              <Package className="text-muted-foreground h-5 w-5" />
+              <div className="flex-1">
+                <p className="font-medium">
+                  {store.stats.totalProducts} products
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Join Date */}
+          <div className="flex items-center gap-3">
+            <Calendar className="text-muted-foreground h-5 w-5" />
+            <div className="flex-1">
+              <p className="font-medium">Joined {joinedYear}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Contact & Policies */}
         <Tabs
           defaultValue={hasContactInfo ? "contact" : "policies"}
           className="w-full"
@@ -52,7 +122,6 @@ export function StoreInfo({ store }: StoreInfoProps) {
           <TabsContent value="contact" className="mt-4 space-y-4">
             {hasContactInfo ? (
               <>
-                {/* Email */}
                 <div className="space-y-2">
                   <div className="flex items-start gap-3">
                     <Mail className="text-muted-foreground mt-0.5 h-5 w-5" />
@@ -83,7 +152,6 @@ export function StoreInfo({ store }: StoreInfoProps) {
           <TabsContent value="policies" className="mt-4 space-y-4">
             {hasPolicies ? (
               <>
-                {/* Shipping Policy */}
                 {store.settings?.shippingPolicy && (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
@@ -106,7 +174,6 @@ export function StoreInfo({ store }: StoreInfoProps) {
                   </div>
                 )}
 
-                {/* Returns Policy */}
                 {store.settings?.returnPolicy && (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
@@ -129,7 +196,6 @@ export function StoreInfo({ store }: StoreInfoProps) {
                   </div>
                 )}
 
-                {/* Privacy Policy */}
                 {store.settings?.privacyPolicy && (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
@@ -152,7 +218,6 @@ export function StoreInfo({ store }: StoreInfoProps) {
                   </div>
                 )}
 
-                {/* Terms of Service */}
                 {store.settings?.termsOfService && (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
@@ -175,7 +240,6 @@ export function StoreInfo({ store }: StoreInfoProps) {
                   </div>
                 )}
 
-                {/* Trust Badges */}
                 <div className="space-y-2 border-t pt-4">
                   <p className="font-medium">Trust & Safety</p>
                   <div className="flex flex-wrap gap-2">

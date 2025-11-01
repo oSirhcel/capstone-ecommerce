@@ -109,8 +109,8 @@ export function StoreProducts({ slug }: StoreProductsProps) {
             />
           </div>
 
-          {/* Category Tabs */}
-          {categories.length > 0 && (
+          {/* Category Tabs - Only show if more than 1 category */}
+          {categories.length > 1 && (
             <Tabs
               value={selectedCategory}
               onValueChange={setSelectedCategory}

@@ -1,4 +1,3 @@
-import Image from "next/image";
 import Link from "next/link";
 import { Star, Store, Calendar } from "lucide-react";
 
@@ -10,9 +9,8 @@ interface StoreCardProps {
   name: string;
   slug: string;
   description: string | null;
-  image: string;
   productCount: number;
-  rating: number;
+  rating?: number;
   createdAt: string;
 }
 
@@ -20,7 +18,6 @@ export function StoreCard({
   name,
   slug,
   description,
-  image,
   productCount,
   rating,
   createdAt,
@@ -32,13 +29,14 @@ export function StoreCard({
       <Card className="overflow-hidden transition-all hover:shadow-md">
         <CardContent className="p-0">
           <div className="relative">
-            <Image
-              src={image ?? "/placeholder.svg"}
-              alt={name}
-              width={300}
-              height={200}
-              className="aspect-[3/2] w-full object-cover"
-            />
+            {/* Gradient placeholder similar to store header */}
+            <div className="aspect-[3/2] w-full bg-gradient-to-br from-blue-50 to-indigo-100">
+              <div className="flex h-full w-full items-center justify-center">
+                <span className="text-4xl font-bold text-blue-600">
+                  {name.charAt(0).toUpperCase()}
+                </span>
+              </div>
+            </div>
             <Badge className="absolute top-2 right-2" variant="secondary">
               <Store className="mr-1 h-3 w-3" />
               Store
@@ -67,10 +65,12 @@ export function StoreCard({
                 </span>
               </div>
             </div>
-            <div className="flex items-center gap-1">
-              <Star className="fill-primary text-primary h-3.5 w-3.5" />
-              <span className="font-medium">{rating}</span>
-            </div>
+            {rating !== undefined && rating > 0 && (
+              <div className="flex items-center gap-1">
+                <Star className="fill-primary text-primary h-3.5 w-3.5" />
+                <span className="font-medium">{rating}</span>
+              </div>
+            )}
           </div>
         </CardFooter>
       </Card>

@@ -106,12 +106,11 @@ export default function Home() {
               featuredStores.map((store) => (
                 <StoreCard
                   key={store.id}
-                  id={store.id}
+                  slug={store.slug}
                   name={store.name}
                   description={store.description}
                   productCount={store.productCount ?? 0}
                   createdAt={store.createdAt.toString()}
-                  ownerId={store.ownerId}
                 />
               ))
             ) : (

@@ -11,6 +11,7 @@ import { seedProducts } from "./products";
 import { seedAddresses } from "./addresses";
 import { seedReviews } from "./reviews";
 import { seedOrders } from "./orders";
+import { seedRiskAssessments } from "./risk-assessments";
 import { seedAnalytics } from "./analytics";
 
 async function main() {
@@ -89,20 +90,24 @@ async function main() {
     const orders = await seedOrders(db, users, stores, products, addresses);
     console.log();
 
+    const riskAssessmentsCount = await seedRiskAssessments(db, users, stores, orders);
+    console.log();
+
     await seedAnalytics(db, users, stores, products);
     console.log();
 
     console.log("🎉 Seed complete!");
     console.log("\n📊 Summary:");
-    console.log(`   Users:      ${users.length}`);
-    console.log(`   Stores:     ${stores.length}`);
-    console.log(`   Categories: ${categories.length}`);
-    console.log(`   Tags:       ${tags.length}`);
-    console.log(`   Products:   ${products.length}`);
-    console.log(`   Addresses:  ${addresses.length}`);
-    console.log(`   Reviews:    ${reviews.length}`);
-    console.log(`   Orders:     ${orders.length}`);
-    console.log(`   Analytics:  Page views & cart events`);
+    console.log(`   Users:       ${users.length}`);
+    console.log(`   Stores:      ${stores.length}`);
+    console.log(`   Categories:  ${categories.length}`);
+    console.log(`   Tags:        ${tags.length}`);
+    console.log(`   Products:    ${products.length}`);
+    console.log(`   Addresses:   ${addresses.length}`);
+    console.log(`   Reviews:     ${reviews.length}`);
+    console.log(`   Orders:      ${orders.length}`);
+    console.log(`   Risk Assess: ${riskAssessmentsCount}`);
+    console.log(`   Analytics:   Page views & cart events`);
   } catch (error) {
     console.error("❌ Seed failed:", error);
     process.exit(1);

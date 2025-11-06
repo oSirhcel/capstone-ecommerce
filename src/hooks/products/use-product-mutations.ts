@@ -12,12 +12,6 @@ interface GenerateProductShotData {
   image: string;
   productName: string;
   description: string;
-  preset: string;
-  includeHands: boolean;
-  size: string;
-  variations: number;
-  replaceBackground: boolean;
-  highDetail: boolean;
 }
 
 interface GenerateProductShotResponse {

@@ -4,14 +4,36 @@ import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
 import rehypeSanitize from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
-import type { ChatMessage as ChatMessageType } from "@/types/ai-assistant";
+import type { UIMessage } from "ai";
 
 interface ChatMessageProps {
-  message: ChatMessageType;
+  message: UIMessage;
 }
 
 export function ChatMessage({ message }: ChatMessageProps) {
   const isUser = message.role === "user";
+
+  // Extract text content from message parts or fallback to content
+  const getTextContent = () => {
+    if (message.parts && message.parts.length > 0) {
+      return message.parts
+        .filter((part) => part.type === "text")
+        .map((part) => (part.type === "text" ? part.text : ""))
+        .join("");
+    }
+    // Fallback: try to get content from message if it exists
+    if ("content" in message && typeof message.content === "string") {
+      return message.content;
+    }
+    return "";
+  };
+
+  const textContent = getTextContent();
+
+  // Don't render empty messages (e.g., during tool calls)
+  if (!textContent.trim()) {
+    return null;
+  }
 
   return (
     <div
@@ -120,17 +142,9 @@ export function ChatMessage({ message }: ChatMessageProps) {
               em: ({ children }) => <em className="italic">{children}</em>,
             }}
           >
-            {message.content}
+            {textContent}
           </ReactMarkdown>
         </div>
-        {message.timestamp && (
-          <p className="mt-2 text-xs opacity-70">
-            {new Date(message.timestamp).toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
-          </p>
-        )}
       </div>
     </div>
   );

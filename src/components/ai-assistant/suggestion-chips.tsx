@@ -1,7 +1,11 @@
 "use client";
 
-import type { SuggestionChip } from "@/lib/ai/suggestions-generator";
 import { Button } from "@/components/ui/button";
+
+interface SuggestionChip {
+  label: string;
+  actionType: "chat" | "navigate" | "action";
+}
 
 interface SuggestionChipsProps {
   suggestions: SuggestionChip[];

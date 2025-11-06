@@ -47,7 +47,7 @@ const columns = [
             alt={primaryImage?.altText ?? product.name}
             width={40}
             height={40}
-            className="rounded-md object-contain"
+            className="aspect-square rounded-md object-contain"
           />
           <div>
             <div className="font-medium">{product.name}</div>

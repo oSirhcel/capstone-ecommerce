@@ -1,4 +1,8 @@
 import { z } from "zod";
+import type { UIMessage } from "ai";
+
+// Re-export AI SDK types
+export type { UIMessage };
 
 // Widget types
 export type WidgetState = "minimized" | "expanded" | "maximized";
@@ -17,11 +21,12 @@ export interface WidgetPreferences {
   };
 }
 
-// Message types
+// Message types (deprecated - use AI SDK types instead)
 export type MessageRole = "user" | "assistant" | "system";
 
 export type MessageType = "text" | "action" | "form-fill" | "suggestion";
 
+// Legacy ChatMessage type (deprecated - use UIMessage from AI SDK)
 export interface ChatMessage {
   id: string;
   role: MessageRole;

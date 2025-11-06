@@ -2,7 +2,7 @@
 
 import type React from "react";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Dialog,
   DialogContent,
@@ -13,20 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import { Upload, Wand2, ChevronDown, SparklesIcon } from "lucide-react";
+import { Upload, Wand2, SparklesIcon } from "lucide-react";
 import Image from "next/image";
 import { toast } from "sonner";
 import { useGenerateProductShot } from "@/hooks/products/use-product-mutations";
@@ -36,12 +23,6 @@ interface GenerateProductShotData {
   image: string;
   productName: string;
   description: string;
-  preset: string;
-  includeHands: boolean;
-  size: string;
-  variations: number;
-  replaceBackground: boolean;
-  highDetail: boolean;
 }
 
 interface GenerateProductShotResponse {
@@ -56,18 +37,27 @@ interface ProductShotModalProps {
   onImagesGenerated?: (images: string[]) => void;
   productName?: string;
   productDescription?: string;
+  productImages?: string[];
 }
 
 export function ProductShotModal({
   onImagesGenerated,
   productName = "",
   productDescription = "",
+  productImages = [],
 }: ProductShotModalProps) {
   const [open, setOpen] = useState(false);
-  const [showAdvanced, setShowAdvanced] = useState(false);
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
+  const [imageSource, setImageSource] = useState<"upload" | "existing">(
+    "upload",
+  );
+
+  // Filter out placeholder images
+  const validProductImages = productImages.filter(
+    (img) => img !== "/placeholder.svg",
+  );
 
   const generateProductShotMutation: UseMutationResult<
     GenerateProductShotResponse,
@@ -75,25 +65,25 @@ export function ProductShotModal({
     GenerateProductShotData
   > = useGenerateProductShot();
 
-  // Form state
+  // Form state - sync with props when dialog opens or props change
   const [formData, setFormData] = useState({
     productName: productName,
     description: productDescription,
-    preset: "",
-    includeHands: false,
-    size: "1024px",
-    variations: 2,
-    replaceBackground: false,
-    highDetail: false,
   });
 
-  const presets = [
-    { value: "clean-pack-shot", label: "Clean pack shot" },
-    { value: "lifestyle-home", label: "Lifestyle home" },
-    { value: "lifestyle-desk", label: "Lifestyle desk" },
-    { value: "lifestyle-cafe", label: "Lifestyle cafe" },
-    { value: "outdoor-natural", label: "Outdoor natural" },
-  ];
+  const prevOpenRef = useRef(open);
+
+  // Sync formData with props when dialog opens (preserves manual edits while dialog is open)
+  useEffect(() => {
+    // Only sync when dialog transitions from closed to open
+    if (open && !prevOpenRef.current) {
+      setFormData({
+        productName: productName || "",
+        description: productDescription || "",
+      });
+    }
+    prevOpenRef.current = open;
+  }, [open, productName, productDescription]);
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -113,6 +103,7 @@ export function ProductShotModal({
       const reader = new FileReader();
       reader.onload = (e) => {
         setUploadedImage(e.target?.result as string);
+        setImageSource("upload");
       };
       reader.onerror = () => {
         toast.error("Error reading file");
@@ -121,22 +112,37 @@ export function ProductShotModal({
     }
   };
 
+  const handleSelectExistingImage = async (imageUrl: string) => {
+    try {
+      // Fetch the image and convert to base64
+      const response = await fetch(imageUrl);
+      if (!response.ok) {
+        throw new Error("Failed to fetch image");
+      }
+      const blob = await response.blob();
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setUploadedImage(e.target?.result as string);
+        setImageSource("existing");
+      };
+      reader.onerror = () => {
+        toast.error("Error reading image");
+      };
+      reader.readAsDataURL(blob);
+    } catch (error) {
+      console.error("Error loading existing image:", error);
+      toast.error("Failed to load image");
+    }
+  };
+
   const handleGenerate = async () => {
-    if (!uploadedImage || !formData.preset) return;
+    if (!uploadedImage) return;
 
     const payload: GenerateProductShotData = {
       image: uploadedImage,
       productName: formData.productName,
       description: formData.description,
-      preset: formData.preset,
-      includeHands: formData.includeHands,
-      size: formData.size,
-      variations: 1,
-      replaceBackground: formData.replaceBackground,
-      highDetail: formData.highDetail,
     };
-
-    console.log("Product Shot Generator Payload:", payload);
 
     generateProductShotMutation.mutate(payload, {
       onSuccess: (data: GenerateProductShotResponse) => {
@@ -165,16 +171,11 @@ export function ProductShotModal({
     setFormData({
       productName: productName,
       description: productDescription,
-      preset: "",
-      includeHands: false,
-      size: "1024px",
-      variations: 2,
-      replaceBackground: false,
-      highDetail: false,
     });
     setUploadedImage(null);
     setGeneratedImage(null);
     setShowPreview(false);
+    setImageSource("upload");
   };
 
   return (
@@ -211,26 +212,76 @@ export function ProductShotModal({
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
+                {validProductImages.length > 0 && !uploadedImage && (
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">
+                      Choose from product images
+                    </Label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {validProductImages.map((imgUrl, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => handleSelectExistingImage(imgUrl)}
+                          className="group border-muted hover:border-primary relative aspect-square overflow-hidden rounded-lg border-2 transition-all"
+                        >
+                          <Image
+                            src={imgUrl}
+                            alt={`Product image ${idx + 1}`}
+                            fill
+                            className="object-cover"
+                          />
+                          <div className="absolute inset-0 bg-black/0 transition-colors group-hover:bg-black/10" />
+                        </button>
+                      ))}
+                    </div>
+                    <div className="relative flex items-center gap-2 py-2">
+                      <div className="flex-1 border-t" />
+                      <span className="text-muted-foreground text-xs">OR</span>
+                      <div className="flex-1 border-t" />
+                    </div>
+                  </div>
+                )}
                 <div className="border-muted-foreground/25 hover:border-muted-foreground/50 flex min-h-[200px] items-center justify-center rounded-lg border-2 border-dashed p-4 text-center transition-colors sm:p-6 lg:p-8">
                   {uploadedImage ? (
                     <div className="w-full space-y-4">
                       <div className="relative mx-auto max-w-xs">
                         <Image
                           src={uploadedImage || "/placeholder.svg"}
-                          alt="Uploaded product"
+                          alt="Selected product"
                           width={200}
                           height={200}
                           className="mx-auto max-h-48 w-full rounded-lg object-contain"
                         />
                       </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setUploadedImage(null)}
-                        className="w-full sm:w-auto"
-                      >
-                        Remove Image
-                      </Button>
+                      <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setUploadedImage(null);
+                            setImageSource("upload");
+                          }}
+                          className="w-full sm:w-auto"
+                        >
+                          {imageSource === "existing"
+                            ? "Choose Different Image"
+                            : "Remove Image"}
+                        </Button>
+                        {imageSource === "existing" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setUploadedImage(null);
+                              setImageSource("upload");
+                            }}
+                            className="w-full sm:w-auto"
+                          >
+                            Upload New Image
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   ) : (
                     <div className="w-full space-y-4">
@@ -258,142 +309,57 @@ export function ProductShotModal({
             </CardContent>
           </Card>
 
-          {/* Shot Settings */}
+          {/* Product Info */}
           <Card className="lg:col-span-1">
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-lg">
                 <Wand2 className="h-5 w-5" />
-                Shot Settings
+                Product Information
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="preset" className="text-sm font-medium">
-                  Preset Style
+                <Label htmlFor="productName" className="text-sm font-medium">
+                  Product Name
                 </Label>
-                <Select
-                  value={formData.preset}
-                  onValueChange={(value) =>
-                    setFormData((prev) => ({ ...prev, preset: value }))
+                <input
+                  id="productName"
+                  type="text"
+                  value={formData.productName}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      productName: e.target.value,
+                    }))
                   }
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Choose a preset style" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {presets.map((preset) => (
-                      <SelectItem key={preset.value} value={preset.value}>
-                        {preset.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex h-10 w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                  placeholder="Enter product name"
+                />
               </div>
-
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div className="flex items-center justify-between rounded-lg border p-3">
-                  <Label htmlFor="includeHands" className="text-sm font-medium">
-                    Include hands
-                  </Label>
-                  <Switch
-                    id="includeHands"
-                    checked={formData.includeHands}
-                    onCheckedChange={(checked) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        includeHands: checked,
-                      }))
-                    }
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Image Size</Label>
-                  <div className="flex gap-2">
-                    <Button
-                      variant={
-                        formData.size === "1024px" ? "default" : "outline"
-                      }
-                      size="sm"
-                      onClick={() =>
-                        setFormData((prev) => ({ ...prev, size: "1024px" }))
-                      }
-                      className="flex-1 text-xs"
-                    >
-                      1024px
-                    </Button>
-                    <Button
-                      variant={
-                        formData.size === "2048px" ? "default" : "outline"
-                      }
-                      size="sm"
-                      onClick={() =>
-                        setFormData((prev) => ({ ...prev, size: "2048px" }))
-                      }
-                      className="flex-1 text-xs"
-                    >
-                      2048px
-                    </Button>
-                  </div>
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="description" className="text-sm font-medium">
+                  Description
+                </Label>
+                <textarea
+                  id="description"
+                  value={formData.description}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      description: e.target.value,
+                    }))
+                  }
+                  className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex min-h-[80px] w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                  placeholder="Enter product description"
+                />
               </div>
-
-              {/* Advanced Options */}
-              <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
-                <CollapsibleTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    className="hover:bg-muted/50 h-auto w-full justify-between p-2"
-                  >
-                    <span className="flex items-center gap-2 text-sm font-medium">
-                      <ChevronDown
-                        className={`h-4 w-4 transition-transform ${showAdvanced ? "rotate-180" : ""}`}
-                      />
-                      Advanced Options
-                    </span>
-                  </Button>
-                </CollapsibleTrigger>
-                <CollapsibleContent className="space-y-4 pt-2">
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div className="flex items-center justify-between rounded-lg border p-3">
-                      <Label
-                        htmlFor="replaceBackground"
-                        className="text-sm font-medium"
-                      >
-                        Replace background
-                      </Label>
-                      <Switch
-                        id="replaceBackground"
-                        checked={formData.replaceBackground}
-                        onCheckedChange={(checked) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            replaceBackground: checked,
-                          }))
-                        }
-                      />
-                    </div>
-                    <div className="flex items-center justify-between rounded-lg border p-3">
-                      <Label
-                        htmlFor="highDetail"
-                        className="text-sm font-medium"
-                      >
-                        High detail
-                      </Label>
-                      <Switch
-                        id="highDetail"
-                        checked={formData.highDetail}
-                        onCheckedChange={(checked) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            highDetail: checked,
-                          }))
-                        }
-                      />
-                    </div>
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+                <p className="font-medium">AI Product Shot Settings</p>
+                <p className="text-blue-700">
+                  Images will be generated with a lifestyle setting, realistic
+                  background, product in use or natural environment.
+                </p>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -451,11 +417,7 @@ export function ProductShotModal({
             </Button>
             <Button
               onClick={handleGenerate}
-              disabled={
-                !uploadedImage ||
-                !formData.preset ||
-                generateProductShotMutation.isPending
-              }
+              disabled={!uploadedImage || generateProductShotMutation.isPending}
               className="w-full gap-2 sm:w-auto"
               size="lg"
             >

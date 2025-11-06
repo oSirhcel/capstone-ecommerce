@@ -8,12 +8,6 @@ interface GenerateProductShotRequest {
   image: string;
   productName: string;
   description: string;
-  preset: string;
-  includeHands: boolean;
-  size: string;
-  variations: number;
-  replaceBackground: boolean;
-  highDetail: boolean;
 }
 
 export async function POST(request: NextRequest) {
@@ -32,15 +26,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = (await request.json()) as GenerateProductShotRequest;
-    const {
-      image,
-      productName,
-      description,
-      preset,
-      includeHands,
-      replaceBackground,
-      highDetail,
-    } = body;
+    const { image, productName, description } = body;
 
     if (!image) {
       return NextResponse.json({ error: "Image is required" }, { status: 400 });
@@ -56,14 +42,10 @@ export async function POST(request: NextRequest) {
     }
     const imageBuffer = Buffer.from(base64Data, "base64");
 
-    // Create prompt based on preset and options
+    // Create prompt with fixed AI product shot settings
     const prompt = createPrompt({
       productName,
       description,
-      preset,
-      includeHands,
-      replaceBackground,
-      highDetail,
     });
 
     const model = google("gemini-2.5-flash-image-preview");
@@ -103,16 +85,57 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Convert images to base64 for frontend
-    const generatedImages = imageFiles.map((file) => {
-      const base64 = Buffer.from(file.uint8Array).toString("base64");
-      const mimeType = file.mediaType || "image/png";
-      return `data:${mimeType};base64,${base64}`;
-    });
+    // Upload generated images to UploadThing
+    const baseUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
+    const uploadedImageUrls = await Promise.all(
+      imageFiles.map(async (file) => {
+        const mimeType = file.mediaType || "image/png";
+        const extension = mimeType.split("/")[1] || "png";
+        const fileName = `ai-generated-${Date.now()}.${extension}`;
+
+        // Convert to base64 for upload endpoint
+        const base64 = Buffer.from(file.uint8Array).toString("base64");
+        const base64DataUrl = `data:${mimeType};base64,${base64}`;
+
+        try {
+          // Upload via our upload endpoint
+          const uploadResponse = await fetch(`${baseUrl}/api/upload-image`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Cookie: request.headers.get("cookie") ?? "",
+            },
+            body: JSON.stringify({
+              image: base64DataUrl,
+              fileName,
+            }),
+          });
+
+          if (!uploadResponse.ok) {
+            throw new Error("Upload failed");
+          }
+
+          const uploadData = (await uploadResponse.json()) as {
+            success: boolean;
+            url: string;
+          };
+
+          if (!uploadData.success || !uploadData.url) {
+            throw new Error("Upload failed");
+          }
+
+          return uploadData.url;
+        } catch (error) {
+          console.error("Error uploading generated image:", error);
+          // Fallback to base64 if upload fails
+          return base64DataUrl;
+        }
+      }),
+    );
 
     return NextResponse.json({
       success: true,
-      images: generatedImages,
+      images: uploadedImageUrls,
       text: result.text,
       usage: result.usage,
     });
@@ -128,65 +151,17 @@ export async function POST(request: NextRequest) {
 interface PromptOptions {
   productName: string;
   description: string;
-  preset: string;
-  includeHands: boolean;
-  replaceBackground: boolean;
-  highDetail: boolean;
 }
 
-function createPrompt({
-  productName,
-  description,
-  preset,
-  includeHands,
-  replaceBackground,
-  highDetail,
-}: PromptOptions): string {
+function createPrompt({ productName, description }: PromptOptions): string {
   let prompt = `Create a professional product shot for ${productName}`;
 
   if (description) {
     prompt += ` - ${description}`;
   }
 
-  // Add preset-specific instructions
-  switch (preset) {
-    case "clean-pack-shot":
-      prompt +=
-        ". Clean white background, professional product photography style, minimal and elegant";
-      break;
-    case "lifestyle-home":
-      prompt +=
-        ". Lifestyle shot in a modern home setting, warm lighting, cozy atmosphere";
-      break;
-    case "lifestyle-desk":
-      prompt +=
-        ". Lifestyle shot on a modern desk workspace, professional environment";
-      break;
-    case "lifestyle-cafe":
-      prompt +=
-        ". Lifestyle shot in a cafe setting, natural lighting, relaxed atmosphere";
-      break;
-    case "outdoor-natural":
-      prompt +=
-        ". Outdoor lifestyle shot with natural lighting and environment";
-      break;
-    default:
-      prompt += ". Professional product photography";
-  }
-
-  if (includeHands) {
-    prompt += ". Include human hands interacting with the product naturally";
-  }
-
-  if (replaceBackground) {
-    prompt += ". Replace the background with a clean, professional setting";
-  }
-
-  if (highDetail) {
-    prompt += ". High detail, sharp focus, professional quality";
-  }
-
-  prompt += ". Ensure the product is the main focus and well-lit.";
+  prompt +=
+    ". Lifestyle setting, realistic background, product in use or natural environment. Capture authentic moments, warm lighting, candid composition. High detail, sharp focus, professional quality. Ensure product remains prominent in a relatable scene.";
 
   return prompt;
 }

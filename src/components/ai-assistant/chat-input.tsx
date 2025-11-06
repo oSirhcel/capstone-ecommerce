@@ -1,24 +1,29 @@
 "use client";
 
-import { useState, type KeyboardEvent } from "react";
+import { type KeyboardEvent } from "react";
 import { Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
 interface ChatInputProps {
-  onSend: (message: string) => void;
+  value: string;
+  onChange: (value: string) => void;
+  onSubmit: () => void;
   disabled?: boolean;
   placeholder?: string;
 }
 
-export function ChatInput({ onSend, disabled, placeholder }: ChatInputProps) {
-  const [message, setMessage] = useState("");
-
+export function ChatInput({
+  value,
+  onChange,
+  onSubmit,
+  disabled,
+  placeholder,
+}: ChatInputProps) {
   const handleSend = () => {
-    if (message.trim() && !disabled) {
-      onSend(message.trim());
-      setMessage("");
+    if (value.trim() && !disabled) {
+      onSubmit();
     }
   };
 
@@ -32,8 +37,8 @@ export function ChatInput({ onSend, disabled, placeholder }: ChatInputProps) {
   return (
     <div className="flex items-center gap-2 border-t p-4">
       <Textarea
-        value={message}
-        onChange={(e) => setMessage(e.target.value)}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
         onKeyDown={handleKeyDown}
         placeholder={placeholder ?? "Type your message..."}
         disabled={disabled}
@@ -45,7 +50,7 @@ export function ChatInput({ onSend, disabled, placeholder }: ChatInputProps) {
       />
       <Button
         onClick={handleSend}
-        disabled={disabled ?? !message.trim()}
+        disabled={disabled ?? !value.trim()}
         size="icon"
         className="shrink-0"
       >

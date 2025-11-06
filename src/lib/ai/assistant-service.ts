@@ -198,7 +198,7 @@ export async function streamChatResponse(
 /**
  * Build system prompt for the AI assistant
  */
-function buildSystemPrompt(context?: EnhancedChatContext): string {
+export function buildSystemPrompt(context?: EnhancedChatContext): string {
   const contextInfo = context ? formatContextForPrompt(context) : "";
   const setupStatus = context?.setupStatus;
   const isOnboardingIncomplete = setupStatus && setupStatus.progress < 100;

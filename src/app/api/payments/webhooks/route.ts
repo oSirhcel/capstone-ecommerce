@@ -85,39 +85,92 @@ async function handlePaymentIntentSucceeded(
         : null;
     const receiptUrl = charges?.data?.[0]?.receipt_url ?? null;
 
-    // Update transaction status
-    await db
-      .update(paymentTransactions)
-      .set({
-        status: "completed",
-        gatewayResponse: JSON.stringify({
-          paymentIntentId: paymentIntent.id,
-          status: paymentIntent.status,
-          paymentMethod: paymentIntent.payment_method,
-          receiptUrl,
-        }),
-        updatedAt: new Date(),
-      })
-      .where(eq(paymentTransactions.transactionId, paymentIntent.id));
+    // Check if transaction exists (idempotency check)
+    const [existingTransaction] = await db
+      .select()
+      .from(paymentTransactions)
+      .where(eq(paymentTransactions.transactionId, paymentIntent.id))
+      .limit(1);
+
+    if (existingTransaction) {
+      // If transaction already exists and is completed, skip update (idempotency)
+      if (existingTransaction.status === "completed") {
+        console.log(
+          `Transaction ${paymentIntent.id} already processed, skipping duplicate webhook`,
+        );
+        return;
+      }
+
+      // Update transaction status
+      try {
+        await db
+          .update(paymentTransactions)
+          .set({
+            status: "completed",
+            gatewayResponse: JSON.stringify({
+              paymentIntentId: paymentIntent.id,
+              status: paymentIntent.status,
+              paymentMethod: paymentIntent.payment_method,
+              receiptUrl,
+            }),
+            updatedAt: new Date(),
+          })
+          .where(eq(paymentTransactions.transactionId, paymentIntent.id));
+      } catch (dbError) {
+        console.error(
+          "Failed to update transaction status in webhook:",
+          dbError,
+        );
+        // Don't throw - continue to order update
+      }
+    } else {
+      // Transaction doesn't exist - might be a webhook before transaction record was created
+      // This can happen in edge cases, log but don't fail
+      console.warn(
+        `Transaction ${paymentIntent.id} not found in database, skipping transaction update`,
+      );
+    }
 
     // Update order status if orderId exists in metadata
     if (paymentIntent.metadata?.orderId) {
       const orderId = parseInt(paymentIntent.metadata.orderId);
 
-      await db
-        .update(orders)
-        .set({
-          status: "Processing",
-          paymentStatus: "Paid",
-          updatedAt: new Date(),
-        })
-        .where(eq(orders.id, orderId));
+      // Check if order exists before updating
+      const [existingOrder] = await db
+        .select({ id: orders.id })
+        .from(orders)
+        .where(eq(orders.id, orderId))
+        .limit(1);
 
-      console.log(`Order ${orderId} status updated to Processing`);
+      if (existingOrder) {
+        try {
+          await db
+            .update(orders)
+            .set({
+              status: "Processing",
+              paymentStatus: "Paid",
+              updatedAt: new Date(),
+            })
+            .where(eq(orders.id, orderId));
+
+          console.log(`Order ${orderId} status updated to Processing`);
+        } catch (dbError) {
+          console.error(
+            `Failed to update order ${orderId} status in webhook:`,
+            dbError,
+          );
+          // Don't throw - webhook was processed, order update can be retried
+        }
+      } else {
+        console.warn(
+          `Order ${orderId} not found in database for payment intent ${paymentIntent.id}`,
+        );
+      }
     }
   } catch (error) {
     console.error("Error handling payment_intent.succeeded:", error);
-    throw error;
+    // Don't throw - webhook processing should be idempotent
+    // Stripe will retry if we return an error, but we've already logged it
   }
 }
 
@@ -126,48 +179,90 @@ async function handlePaymentIntentFailed(paymentIntent: Stripe.PaymentIntent) {
   try {
     console.log("Processing payment_intent.payment_failed:", paymentIntent.id);
 
-    // Update transaction status
-    await db
-      .update(paymentTransactions)
-      .set({
-        status: "Failed",
-        gatewayResponse: JSON.stringify({
-          paymentIntentId: paymentIntent.id,
-          status: paymentIntent.status,
-          lastPaymentError: paymentIntent.last_payment_error,
-        }),
-        updatedAt: new Date(),
-      })
-      .where(eq(paymentTransactions.transactionId, paymentIntent.id));
+    // Check if transaction exists (idempotency check)
+    const [existingTransaction] = await db
+      .select()
+      .from(paymentTransactions)
+      .where(eq(paymentTransactions.transactionId, paymentIntent.id))
+      .limit(1);
+
+    if (existingTransaction) {
+      // Update transaction status
+      try {
+        await db
+          .update(paymentTransactions)
+          .set({
+            status: "Failed",
+            gatewayResponse: JSON.stringify({
+              paymentIntentId: paymentIntent.id,
+              status: paymentIntent.status,
+              lastPaymentError: paymentIntent.last_payment_error,
+            }),
+            updatedAt: new Date(),
+          })
+          .where(eq(paymentTransactions.transactionId, paymentIntent.id));
+      } catch (dbError) {
+        console.error(
+          "Failed to update transaction status in webhook:",
+          dbError,
+        );
+        // Continue to order update
+      }
+    } else {
+      console.warn(
+        `Transaction ${paymentIntent.id} not found in database, skipping transaction update`,
+      );
+    }
 
     // Update order status if orderId exists in metadata
     if (paymentIntent.metadata?.orderId) {
       const orderId = parseInt(paymentIntent.metadata.orderId);
 
-      // Check if this is a denial (card declined, insufficient funds, etc.)
-      const isDenied =
-        paymentIntent.last_payment_error?.code === "card_declined" ||
-        paymentIntent.last_payment_error?.code === "insufficient_funds" ||
-        paymentIntent.last_payment_error?.code === "expired_card" ||
-        paymentIntent.last_payment_error?.code === "incorrect_cvc" ||
-        paymentIntent.last_payment_error?.code === "processing_error";
+      // Check if order exists before updating
+      const [existingOrder] = await db
+        .select({ id: orders.id })
+        .from(orders)
+        .where(eq(orders.id, orderId))
+        .limit(1);
 
-      await db
-        .update(orders)
-        .set({
-          status: isDenied ? "Denied" : "Failed",
-          paymentStatus: "Failed",
-          updatedAt: new Date(),
-        })
-        .where(eq(orders.id, orderId));
+      if (existingOrder) {
+        // Check if this is a denial (card declined, insufficient funds, etc.)
+        const isDenied =
+          paymentIntent.last_payment_error?.code === "card_declined" ||
+          paymentIntent.last_payment_error?.code === "insufficient_funds" ||
+          paymentIntent.last_payment_error?.code === "expired_card" ||
+          paymentIntent.last_payment_error?.code === "incorrect_cvc" ||
+          paymentIntent.last_payment_error?.code === "processing_error";
 
-      console.log(
-        `Order ${orderId} status updated to ${isDenied ? "Denied" : "Failed"}`,
-      );
+        try {
+          await db
+            .update(orders)
+            .set({
+              status: isDenied ? "Denied" : "Failed",
+              paymentStatus: "Failed",
+              updatedAt: new Date(),
+            })
+            .where(eq(orders.id, orderId));
+
+          console.log(
+            `Order ${orderId} status updated to ${isDenied ? "Denied" : "Failed"}`,
+          );
+        } catch (dbError) {
+          console.error(
+            `Failed to update order ${orderId} status in webhook:`,
+            dbError,
+          );
+          // Don't throw - webhook was processed
+        }
+      } else {
+        console.warn(
+          `Order ${orderId} not found in database for payment intent ${paymentIntent.id}`,
+        );
+      }
     }
   } catch (error) {
     console.error("Error handling payment_intent.payment_failed:", error);
-    throw error;
+    // Don't throw - webhook processing should be idempotent
   }
 }
 

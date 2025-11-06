@@ -70,7 +70,8 @@ export async function GET(
       .where(
         and(
           isNumericId ? eq(products.id, productId!) : eq(products.slug, slug),
-          eq(products.status, "Active"),
+          // Only filter by Active status for public slug access, allow all statuses for admin ID access
+          isNumericId ? undefined : eq(products.status, "Active"),
         ),
       )
       .limit(1);

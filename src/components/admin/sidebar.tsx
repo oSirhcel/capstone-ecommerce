@@ -9,7 +9,6 @@ import {
   ShoppingCartIcon,
   StoreIcon,
   HomeIcon,
-  CreditCardIcon,
   ShieldAlertIcon,
   PercentIcon,
   SettingsIcon,
@@ -46,7 +45,6 @@ const navigation = [
   { name: "Orders", href: "/admin/orders", icon: ShoppingCartIcon },
   { name: "Products", href: "/admin/products", icon: PackageIcon },
   { name: "Customers", href: "/admin/customers", icon: UsersIcon },
-  { name: "Payments", href: "/admin/payments", icon: CreditCardIcon },
   {
     name: "Risk Assessments",
     href: "/admin/risk-assessments",

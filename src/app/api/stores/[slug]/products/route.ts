@@ -6,8 +6,19 @@ import {
   stores,
   categories,
   productImages,
+  reviews,
 } from "@/server/db/schema";
-import { eq, and, desc, asc, ilike, or, count } from "drizzle-orm";
+import {
+  eq,
+  and,
+  desc,
+  asc,
+  ilike,
+  or,
+  count,
+  inArray,
+  sql,
+} from "drizzle-orm";
 
 // GET /api/stores/[id]/products - Get products for a specific store
 export async function GET(
@@ -129,38 +140,81 @@ export async function GET(
       .limit(limit)
       .offset(offset);
 
-    // Get product images for each product
-    const productsWithImages = await Promise.all(
-      productsData.map(async (product) => {
-        const images = await db
-          .select({
-            id: productImages.id,
-            imageUrl: productImages.imageUrl,
-            altText: productImages.altText,
-            isPrimary: productImages.isPrimary,
-            displayOrder: productImages.displayOrder,
-          })
-          .from(productImages)
-          .where(eq(productImages.productId, product.id))
-          .orderBy(asc(productImages.displayOrder));
+    // Batch fetch all images for these products
+    const allImages = await db
+      .select({
+        productId: productImages.productId,
+        id: productImages.id,
+        imageUrl: productImages.imageUrl,
+        altText: productImages.altText,
+        isPrimary: productImages.isPrimary,
+        displayOrder: productImages.displayOrder,
+      })
+      .from(productImages)
+      .where(
+        inArray(
+          productImages.productId,
+          productsData.map((p) => p.id),
+        ),
+      )
+      .orderBy(asc(productImages.displayOrder));
 
-        return {
-          ...product,
-          images:
-            images.length > 0
-              ? images
-              : [
-                  {
-                    id: 0,
-                    imageUrl: "/placeholder.svg",
-                    altText: "Product image",
-                    isPrimary: true,
-                    displayOrder: 0,
-                  },
-                ],
-        };
-      }),
-    );
+    // Batch fetch all review stats for these products
+    const allReviewStats = await db
+      .select({
+        productId: reviews.productId,
+        averageRating:
+          sql<number>`ROUND(AVG(${reviews.rating})::numeric, 2)`.mapWith(
+            Number,
+          ),
+        reviewCount: count().mapWith(Number),
+      })
+      .from(reviews)
+      .where(
+        inArray(
+          reviews.productId,
+          productsData.map((p) => p.id),
+        ),
+      )
+      .groupBy(reviews.productId);
+
+    // Index data by productId for efficient lookup
+    const imagesByProductId = new Map<number, typeof allImages>();
+    allImages.forEach((img) => {
+      if (!imagesByProductId.has(img.productId)) {
+        imagesByProductId.set(img.productId, []);
+      }
+      imagesByProductId.get(img.productId)!.push(img);
+    });
+
+    const reviewsByProductId = new Map<number, (typeof allReviewStats)[0]>();
+    allReviewStats.forEach((review) => {
+      reviewsByProductId.set(review.productId, review);
+    });
+
+    // Combine results with images and ratings
+    const productsWithImages = productsData.map((product) => {
+      const images = imagesByProductId.get(product.id) ?? [];
+      const reviewStats = reviewsByProductId.get(product.id);
+
+      return {
+        ...product,
+        rating: reviewStats?.averageRating ?? 0,
+        reviewCount: reviewStats?.reviewCount ?? 0,
+        images:
+          images.length > 0
+            ? images
+            : [
+                {
+                  id: 0,
+                  imageUrl: "/placeholder.svg",
+                  altText: "Product image",
+                  isPrimary: true,
+                  displayOrder: 0,
+                },
+              ],
+      };
+    });
 
     // Get total count for pagination
     const [totalCountResult] = await db

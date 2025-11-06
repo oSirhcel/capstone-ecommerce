@@ -35,6 +35,7 @@ import {
   EmptyDescription,
   EmptyContent,
 } from "@/components/ui/empty";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface Props {
   customerId: string;
@@ -46,7 +47,7 @@ export function CustomerAddresses({ customerId, storeId }: Props) {
   const [selectedAddress, setSelectedAddress] =
     useState<CustomerAddress | null>(null);
 
-  const { data } = useCustomerAddresses(customerId, storeId);
+  const { data, isLoading } = useCustomerAddresses(customerId, storeId);
   const addresses = data?.addresses ?? [];
 
   const createMutation = useCreateCustomerAddress(customerId, storeId);
@@ -165,7 +166,34 @@ export function CustomerAddresses({ customerId, storeId }: Props) {
         </div>
       </CardHeader>
       <CardContent>
-        {addresses.length === 0 ? (
+        {isLoading ? (
+          <div className="grid gap-4 md:grid-cols-2">
+            {[1, 2].map((i) => (
+              <Card key={i}>
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 space-y-3">
+                      <div className="flex items-center gap-2">
+                        <Skeleton className="h-5 w-20" />
+                        <Skeleton className="h-5 w-16" />
+                      </div>
+                      <div className="space-y-2">
+                        <Skeleton className="h-4 w-32" />
+                        <Skeleton className="h-3 w-full" />
+                        <Skeleton className="h-3 w-3/4" />
+                        <Skeleton className="h-3 w-1/2" />
+                      </div>
+                    </div>
+                    <div className="flex gap-1">
+                      <Skeleton className="h-8 w-8 rounded" />
+                      <Skeleton className="h-8 w-8 rounded" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : addresses.length === 0 ? (
           <Empty>
             <EmptyHeader>
               <EmptyMedia variant="icon">

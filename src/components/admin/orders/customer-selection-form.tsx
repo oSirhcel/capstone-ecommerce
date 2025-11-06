@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useRef, startTransition } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useFormContext } from "react-hook-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -89,22 +89,24 @@ export function CustomerSelectionForm({
   const previousCustomerIdRef = useRef<string | null>(null);
 
   // Reset auto-selection tracking when customer changes
-  if (customer?.id !== previousCustomerIdRef.current) {
-    hasAutoSelectedRef.current = false;
-    previousCustomerIdRef.current = customer?.id ?? null;
-  }
+  useEffect(() => {
+    if (customer?.id !== previousCustomerIdRef.current) {
+      hasAutoSelectedRef.current = false;
+      previousCustomerIdRef.current = customer?.id ?? null;
+    }
+  }, [customer?.id]);
 
   // Auto-select default address when addresses are loaded and no address is selected
-  // Use startTransition to defer setValue call until after render
-  if (
-    defaultAddress &&
-    !selectedAddressId &&
-    addressMode === "select" &&
-    !hasAutoSelectedRef.current &&
-    addresses.length > 0
-  ) {
-    hasAutoSelectedRef.current = true;
-    startTransition(() => {
+  // Use useEffect to defer setValue call until after render
+  useEffect(() => {
+    if (
+      defaultAddress &&
+      !selectedAddressId &&
+      addressMode === "select" &&
+      !hasAutoSelectedRef.current &&
+      addresses.length > 0
+    ) {
+      hasAutoSelectedRef.current = true;
       setValue("selectedAddressId", defaultAddress.id, { shouldDirty: false });
       setValue(
         "shippingAddress",
@@ -122,8 +124,14 @@ export function CustomerSelectionForm({
         },
         { shouldDirty: false },
       );
-    });
-  }
+    }
+  }, [
+    defaultAddress,
+    selectedAddressId,
+    addressMode,
+    addresses.length,
+    setValue,
+  ]);
 
   // Compute the selected address ID for display
   const effectiveAddressId = useMemo(() => {

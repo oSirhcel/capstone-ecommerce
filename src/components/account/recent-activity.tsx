@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { fetchOrders } from "@/lib/api/orders";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   CheckCircle,
   Clock,
@@ -13,7 +14,7 @@ import {
 } from "lucide-react";
 
 export default function RecentActivity() {
-  const { data } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ["orders", { page: 1, limit: 5 }],
     queryFn: () => fetchOrders({ page: 1, limit: 5 }),
   });
@@ -62,13 +63,28 @@ export default function RecentActivity() {
         <CardTitle>Recent Activity</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="space-y-4">
-          {orders.length === 0 ? (
-            <div className="text-muted-foreground text-sm">
-              No recent orders.
-            </div>
-          ) : (
-            orders.map((o) => (
+        {isLoading ? (
+          <div className="space-y-4">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Skeleton className="h-8 w-8 rounded-full" />
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-48" />
+                    <Skeleton className="h-3 w-32" />
+                  </div>
+                </div>
+                <Skeleton className="h-5 w-20" />
+              </div>
+            ))}
+          </div>
+        ) : orders.length === 0 ? (
+          <div className="text-muted-foreground text-sm">
+            No recent orders.
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {orders.map((o) => (
               <div key={o.id} className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div
@@ -89,9 +105,9 @@ export default function RecentActivity() {
                   {new Date(o.createdAt).toLocaleDateString()}
                 </Badge>
               </div>
-            ))
-          )}
-        </div>
+            ))}
+          </div>
+        )}
       </CardContent>
     </Card>
   );

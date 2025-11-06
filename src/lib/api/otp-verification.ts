@@ -6,13 +6,26 @@
 import { db } from "@/server/db";
 import { zeroTrustVerifications } from "@/server/db/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
-import { generateOTP, sendOTPEmail } from "@/lib/smtp";
+import { generateOTP, sendOTPEmail, isSmtpConfigured } from "@/lib/smtp";
 import crypto from "crypto";
 import type { PaymentData } from "@/types/api-responses";
 import bcrypt from "bcryptjs";
 
 // OTP expires in 10 minutes
 const OTP_EXPIRY_MINUTES = 10;
+
+// Development OTP code (used when SMTP is not configured)
+const DEV_OTP = "123456";
+
+/**
+ * Generate OTP code - uses dev code if SMTP not configured
+ */
+function generateOTPCode(): string {
+  if (!isSmtpConfigured()) {
+    return DEV_OTP;
+  }
+  return generateOTP();
+}
 
 export interface OTPVerificationData {
   id: number;
@@ -32,7 +45,7 @@ export interface OTPVerificationData {
  * Generate a unique verification token
  */
 function generateVerificationToken(): string {
-  return crypto.randomBytes(32).toString('hex');
+  return crypto.randomBytes(32).toString("hex");
 }
 
 /**
@@ -50,34 +63,40 @@ export async function createOTPVerification(params: {
   try {
     // Check for existing pending verification for this user with same transaction amount
     // This prevents duplicate OTP emails during multi-store checkout flows
-    const paymentDataParsed = typeof params.paymentData === 'string' 
-      ? JSON.parse(params.paymentData as string) as Record<string, unknown>
-      : params.paymentData;
-    const transactionAmount = params.transactionAmount ?? (paymentDataParsed.amount as number | undefined) ?? 0;
-    
+    const paymentDataParsed =
+      typeof params.paymentData === "string"
+        ? (JSON.parse(params.paymentData as string) as Record<string, unknown>)
+        : params.paymentData;
+    const transactionAmount =
+      params.transactionAmount ??
+      (paymentDataParsed.amount as number | undefined) ??
+      0;
+
     // Look for recent pending verifications (within last 2 minutes) for same user and amount
     // Use a shorter window since checkout flows happen quickly
     const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
     const now = new Date();
-    
+
     const existingVerifications = await db
       .select()
       .from(zeroTrustVerifications)
       .where(
         and(
           eq(zeroTrustVerifications.userId, params.userId),
-          eq(zeroTrustVerifications.status, 'pending'),
-          sql`${zeroTrustVerifications.createdAt} >= ${twoMinutesAgo}`
-        )
+          eq(zeroTrustVerifications.status, "pending"),
+          sql`${zeroTrustVerifications.createdAt} >= ${twoMinutesAgo}`,
+        ),
       )
       .orderBy(desc(zeroTrustVerifications.createdAt))
       .limit(10);
-    
-    console.log(`Found ${existingVerifications.length} recent pending verifications for user ${params.userId}`);
-    
+
+    console.log(
+      `Found ${existingVerifications.length} recent pending verifications for user ${params.userId}`,
+    );
+
     // Check if any existing verification matches the transaction amount
     // Also check that it hasn't expired (manual check to avoid timezone issues)
-    const matchingVerification = existingVerifications.find(v => {
+    const matchingVerification = existingVerifications.find((v) => {
       try {
         // Check if expired (compare dates in JavaScript to avoid timezone issues)
         const isExpired = v.expiresAt < now;
@@ -85,35 +104,52 @@ export async function createOTPVerification(params: {
           console.log(`Verification ${v.token} is expired, skipping`);
           return false;
         }
-        
-        const storedPaymentData = JSON.parse(v.paymentData || '{}') as Record<string, unknown>;
-        const storedAmount = (storedPaymentData.amount as number | undefined) ?? 0;
+
+        const storedPaymentData = JSON.parse(v.paymentData || "{}") as Record<
+          string,
+          unknown
+        >;
+        const storedAmount =
+          (storedPaymentData.amount as number | undefined) ?? 0;
         // Match if amounts are within 1 cent (to handle floating point rounding)
         const amountsMatch = Math.abs(storedAmount - transactionAmount) < 0.01;
-        
-        console.log(`Checking verification ${v.id}: storedAmount=${storedAmount}, transactionAmount=${transactionAmount}, match=${amountsMatch}`);
-        
+
+        console.log(
+          `Checking verification ${v.id}: storedAmount=${storedAmount}, transactionAmount=${transactionAmount}, match=${amountsMatch}`,
+        );
+
         return amountsMatch;
       } catch (e) {
         console.error(`Error checking verification ${v.id}:`, e);
         return false;
       }
     });
-    
+
     if (matchingVerification?.otpHash) {
-      console.log(`✓ Reusing existing OTP verification ${matchingVerification.token} for user ${params.userId} (multi-store transaction)`);
-      
+      console.log(
+        `✓ Reusing existing OTP verification ${matchingVerification.token} for user ${params.userId} (multi-store transaction)`,
+      );
+
       // Update the stored paymentData with any new information (like orderId)
       // This ensures that after OTP verification, we have the complete payment data
       try {
-        const storedData = JSON.parse(matchingVerification.paymentData || '{}') as Record<string, unknown>;
-        const newData = typeof params.paymentData === 'string' 
-          ? JSON.parse(params.paymentData as string) as Record<string, unknown>
-          : params.paymentData;
-        
+        const storedData = JSON.parse(
+          matchingVerification.paymentData || "{}",
+        ) as Record<string, unknown>;
+        const newData =
+          typeof params.paymentData === "string"
+            ? (JSON.parse(params.paymentData as string) as Record<
+                string,
+                unknown
+              >)
+            : params.paymentData;
+
         // Merge the data, with new data taking precedence
-        const mergedData: Record<string, unknown> = { ...storedData, ...newData };
-        
+        const mergedData: Record<string, unknown> = {
+          ...storedData,
+          ...newData,
+        };
+
         // Update the verification record with merged payment data
         await db
           .update(zeroTrustVerifications)
@@ -121,27 +157,31 @@ export async function createOTPVerification(params: {
             paymentData: JSON.stringify(mergedData),
           })
           .where(eq(zeroTrustVerifications.token, matchingVerification.token));
-        
-        console.log(`Updated OTP verification ${matchingVerification.token} with new payment data (orderId: ${(newData.orderId as number | undefined) ?? 'none'})`);
+
+        console.log(
+          `Updated OTP verification ${matchingVerification.token} with new payment data (orderId: ${(newData.orderId as number | undefined) ?? "none"})`,
+        );
       } catch (error) {
-        console.error('Failed to update OTP verification payment data:', error);
+        console.error("Failed to update OTP verification payment data:", error);
         // Continue anyway - not critical
       }
-      
+
       // Return the existing verification token
       // Note: We can't return the original OTP since it's hashed, but the token is what matters
       // The client will use the same token and the user will use the OTP from the first email
       return {
         token: matchingVerification.token,
-        otp: '', // Can't retrieve original OTP (it's hashed), but not needed since email already sent
+        otp: "", // Can't retrieve original OTP (it's hashed), but not needed since email already sent
         expiresAt: matchingVerification.expiresAt,
       };
     }
-    
-    console.log(`No matching OTP verification found, creating new one for user ${params.userId}`);
-    
+
+    console.log(
+      `No matching OTP verification found, creating new one for user ${params.userId}`,
+    );
+
     // No existing verification found, create a new one
-    const otp = generateOTP();
+    const otp = generateOTPCode();
     const token = generateVerificationToken();
     const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
 
@@ -149,26 +189,29 @@ export async function createOTPVerification(params: {
     const otpHash = await bcrypt.hash(otp, 10);
 
     // Store OTP verification in database
-    await db.insert(zeroTrustVerifications).values({
-      token,
-      userId: params.userId,
-      userEmail: params.userEmail,
-      otpHash,
-      paymentData: JSON.stringify(params.paymentData),
-      riskScore: params.riskScore,
-      riskFactors: JSON.stringify(params.riskFactors),
-      status: 'pending',
-      expiresAt,
-      emailSent: false,
-    }).returning();
+    await db
+      .insert(zeroTrustVerifications)
+      .values({
+        token,
+        userId: params.userId,
+        userEmail: params.userEmail,
+        otpHash,
+        paymentData: JSON.stringify(params.paymentData),
+        riskScore: params.riskScore,
+        riskFactors: JSON.stringify(params.riskFactors),
+        status: "pending",
+        expiresAt,
+        emailSent: false,
+      })
+      .returning();
 
-    // Send OTP email
+    // Send OTP email (or log to console in development if SMTP not configured)
     await sendOTPEmail(params.userEmail, otp, {
       userName: params.userName,
       transactionAmount: params.transactionAmount,
     });
 
-    // Update email sent status
+    // Update email sent status (or logged status in development)
     await db
       .update(zeroTrustVerifications)
       .set({
@@ -177,12 +220,14 @@ export async function createOTPVerification(params: {
       })
       .where(eq(zeroTrustVerifications.token, token));
 
-    console.log(`OTP verification created for user ${params.userId}, token: ${token}`);
+    console.log(
+      `OTP verification created for user ${params.userId}, token: ${token}`,
+    );
 
     return { token, otp, expiresAt };
   } catch (error) {
-    console.error('Failed to create OTP verification:', error);
-    throw new Error('Failed to create verification. Please try again.');
+    console.error("Failed to create OTP verification:", error);
+    throw new Error("Failed to create verification. Please try again.");
   }
 }
 
@@ -201,15 +246,15 @@ export async function verifyOTP(params: {
       .where(
         and(
           eq(zeroTrustVerifications.token, params.token),
-          eq(zeroTrustVerifications.status, 'pending')
-        )
+          eq(zeroTrustVerifications.status, "pending"),
+        ),
       )
       .limit(1);
 
     if (!verification) {
       return {
         success: false,
-        message: 'Verification token not found or already used',
+        message: "Verification token not found or already used",
       };
     }
 
@@ -218,12 +263,12 @@ export async function verifyOTP(params: {
       // Mark as expired
       await db
         .update(zeroTrustVerifications)
-        .set({ status: 'expired' })
+        .set({ status: "expired" })
         .where(eq(zeroTrustVerifications.token, params.token));
 
       return {
         success: false,
-        message: 'Verification code has expired. Please request a new one.',
+        message: "Verification code has expired. Please request a new one.",
       };
     }
 
@@ -231,24 +276,24 @@ export async function verifyOTP(params: {
     if (!verification.otpHash) {
       return {
         success: false,
-        message: 'Invalid verification record',
+        message: "Invalid verification record",
       };
     }
 
     const isValidOTP = await bcrypt.compare(params.otp, verification.otpHash);
-    
+
     if (!isValidOTP) {
       return {
         success: false,
-        message: 'Invalid verification code. Please try again.',
+        message: "Invalid verification code. Please try again.",
       };
     }
-    
+
     // Mark as verified
     await db
       .update(zeroTrustVerifications)
       .set({
-        status: 'verified',
+        status: "verified",
         verifiedAt: new Date(),
       })
       .where(eq(zeroTrustVerifications.token, params.token));
@@ -261,15 +306,17 @@ export async function verifyOTP(params: {
       paymentData,
     };
   } catch (error) {
-    console.error('Failed to verify OTP:', error);
-    throw new Error('Verification failed. Please try again.');
+    console.error("Failed to verify OTP:", error);
+    throw new Error("Verification failed. Please try again.");
   }
 }
 
 /**
  * Get verification status
  */
-export async function getVerificationStatus(token: string): Promise<OTPVerificationData | null> {
+export async function getVerificationStatus(
+  token: string,
+): Promise<OTPVerificationData | null> {
   try {
     const [verification] = await db
       .select()
@@ -286,7 +333,7 @@ export async function getVerificationStatus(token: string): Promise<OTPVerificat
       token: verification.token,
       userId: verification.userId,
       userEmail: verification.userEmail,
-      otp: '', // Don't expose OTP
+      otp: "", // Don't expose OTP
       paymentData: verification.paymentData,
       riskScore: verification.riskScore,
       riskFactors: verification.riskFactors,
@@ -295,7 +342,7 @@ export async function getVerificationStatus(token: string): Promise<OTPVerificat
       createdAt: verification.createdAt,
     };
   } catch (error) {
-    console.error('Failed to get verification status:', error);
+    console.error("Failed to get verification status:", error);
     return null;
   }
 }
@@ -303,21 +350,23 @@ export async function getVerificationStatus(token: string): Promise<OTPVerificat
 /**
  * Resend OTP code
  */
-export async function resendOTP(token: string): Promise<{ success: boolean; message?: string }> {
+export async function resendOTP(
+  token: string,
+): Promise<{ success: boolean; message?: string }> {
   try {
     const verification = await getVerificationStatus(token);
 
     if (!verification) {
       return {
         success: false,
-        message: 'Verification not found',
+        message: "Verification not found",
       };
     }
 
-    if (verification.status !== 'pending') {
+    if (verification.status !== "pending") {
       return {
         success: false,
-        message: 'This verification has already been completed or expired',
+        message: "This verification has already been completed or expired",
       };
     }
 
@@ -325,12 +374,13 @@ export async function resendOTP(token: string): Promise<{ success: boolean; mess
     if (new Date() > verification.expiresAt) {
       return {
         success: false,
-        message: 'Verification has expired. Please restart the payment process.',
+        message:
+          "Verification has expired. Please restart the payment process.",
       };
     }
 
     // Generate new OTP
-    const newOtp = generateOTP();
+    const newOtp = generateOTPCode();
     const newOtpHash = await bcrypt.hash(newOtp, 10);
     const newExpiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
 
@@ -354,13 +404,13 @@ export async function resendOTP(token: string): Promise<{ success: boolean; mess
 
     return {
       success: true,
-      message: 'New verification code sent successfully',
+      message: "New verification code sent successfully",
     };
   } catch (error) {
-    console.error('Failed to resend OTP:', error);
+    console.error("Failed to resend OTP:", error);
     return {
       success: false,
-      message: 'Failed to resend code. Please try again.',
+      message: "Failed to resend code. Please try again.",
     };
   }
 }
@@ -372,19 +422,18 @@ export async function cleanupExpiredVerifications(): Promise<number> {
   try {
     await db
       .update(zeroTrustVerifications)
-      .set({ status: 'expired' })
+      .set({ status: "expired" })
       .where(
         and(
-          eq(zeroTrustVerifications.status, 'pending'),
+          eq(zeroTrustVerifications.status, "pending"),
           // expiresAt < now
-        )
+        ),
       );
 
     console.log(`Cleaned up expired verifications`);
     return 0; // Return count if needed
   } catch (error) {
-    console.error('Failed to cleanup expired verifications:', error);
+    console.error("Failed to cleanup expired verifications:", error);
     return 0;
   }
 }
-

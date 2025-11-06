@@ -1,23 +1,27 @@
-import { type NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
-import { db } from '@/server/db';
-import { zeroTrustVerifications } from '@/server/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { type NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
+import { db } from "@/server/db";
+import { zeroTrustVerifications } from "@/server/db/schema";
+import { eq, and } from "drizzle-orm";
+import { sendOTPEmail } from "@/lib/smtp";
 
 // POST /api/verification/send - Send verification email
 export async function POST(request: NextRequest) {
   try {
     const session = await auth();
-    
+
     if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const body = (await request.json()) as { token: string };
     const { token } = body;
-    
+
     if (!token) {
-      return NextResponse.json({ error: 'Verification token required' }, { status: 400 });
+      return NextResponse.json(
+        { error: "Verification token required" },
+        { status: 400 },
+      );
     }
 
     // Find the verification record
@@ -28,15 +32,18 @@ export async function POST(request: NextRequest) {
         and(
           eq(zeroTrustVerifications.token, String(token)),
           eq(zeroTrustVerifications.userId, session.user.id),
-          eq(zeroTrustVerifications.status, 'pending')
-        )
+          eq(zeroTrustVerifications.status, "pending"),
+        ),
       )
       .limit(1);
 
     if (!verification) {
-      return NextResponse.json({ 
-        error: 'Invalid or expired verification token' 
-      }, { status: 404 });
+      return NextResponse.json(
+        {
+          error: "Invalid or expired verification token",
+        },
+        { status: 404 },
+      );
     }
 
     // Check if token has expired
@@ -44,25 +51,30 @@ export async function POST(request: NextRequest) {
       // Update status to expired
       await db
         .update(zeroTrustVerifications)
-        .set({ status: 'expired' })
+        .set({ status: "expired" })
         .where(eq(zeroTrustVerifications.id, verification.id));
-        
-      return NextResponse.json({ 
-        error: 'Verification token has expired' 
-      }, { status: 410 });
+
+      return NextResponse.json(
+        {
+          error: "Verification token has expired",
+        },
+        { status: 410 },
+      );
     }
 
     // Generate 6-digit verification code
-    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-    
+    const verificationCode = Math.floor(
+      100000 + Math.random() * 900000,
+    ).toString();
+
     // Update verification record with code and email sent status
     await db
       .update(zeroTrustVerifications)
       .set({
         // Store the code temporarily (in production, you'd hash this)
         riskFactors: JSON.stringify({
-          ...JSON.parse(verification.riskFactors ?? '[]'),
-          verificationCode
+          ...JSON.parse(verification.riskFactors ?? "[]"),
+          verificationCode,
         }),
         emailSent: true,
         emailSentAt: new Date(),
@@ -70,29 +82,22 @@ export async function POST(request: NextRequest) {
       })
       .where(eq(zeroTrustVerifications.id, verification.id));
 
-    // TODO: Send actual email with verification code
-    // For now, we'll just log it (in development)
-    console.log(`Verification code for ${verification.userEmail}: ${verificationCode}`);
-    console.log(`Token: ${token}`);
-    
-    // In production, you would:
-    // await sendVerificationEmail(verification.userEmail, verificationCode);
+    // Send OTP email
+    await sendOTPEmail(verification.userEmail, verificationCode);
 
     return NextResponse.json({
       success: true,
-      message: 'Verification email sent successfully',
+      message: "Verification email sent successfully",
       // In development, return the code for testing
-      ...(process.env.NODE_ENV === 'development' && { 
-        developmentCode: verificationCode 
-      })
+      ...(process.env.NODE_ENV === "development" && {
+        developmentCode: verificationCode,
+      }),
     });
-
   } catch (error) {
-    console.error('Send verification error:', error);
+    console.error("Send verification error:", error);
     return NextResponse.json(
-      { error: 'Failed to send verification email' },
-      { status: 500 }
+      { error: "Failed to send verification email" },
+      { status: 500 },
     );
   }
 }
-

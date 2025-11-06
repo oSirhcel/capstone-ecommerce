@@ -188,8 +188,8 @@ export default function OrderPage() {
     (sum, item) => sum + item.priceAtTime * item.quantity,
     0,
   );
-  const tax = subtotal * 0.08;
-  const shipping = 0; // TODO: Get from order data when available
+  const tax = subtotal * 0.1;
+  const shipping = order.totalAmount - subtotal - tax;
 
   return (
     <div className="space-y-6">

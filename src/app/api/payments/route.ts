@@ -45,6 +45,7 @@ interface ZeroTrustAssessment {
 
 // POST /api/payments - Create payment intent
 export async function POST(request: NextRequest) {
+  let orderId: number | undefined;
   try {
     const session = await auth();
 
@@ -54,6 +55,7 @@ export async function POST(request: NextRequest) {
 
     const user = session.user as SessionUser;
     const body = (await request.json()) as CreatePaymentRequest;
+    orderId = body.orderId; // Extract early for use in catch block
 
     // Transform orderData to CheckoutSessionData format if needed
     // Extract items from storeGroups and map to CheckoutSessionItem format
@@ -258,7 +260,6 @@ export async function POST(request: NextRequest) {
     const {
       amount,
       currency = "aud",
-      orderId,
       paymentMethodId,
       savePaymentMethod = false,
     } = body;
@@ -270,42 +271,138 @@ export async function POST(request: NextRequest) {
 
     // Create or retrieve Stripe customer
     // Handle credentials users who have fake @local.com emails
-    const userEmail = user.email?.endsWith("@local.com") ? undefined : user.email;
+    const userEmail = user.email?.endsWith("@local.com")
+      ? undefined
+      : user.email;
 
-    const customer = await createOrRetrieveCustomer({
-      userId: user.id,
-      email: userEmail ?? undefined,
-      name: user.name ?? undefined,
-    });
+    let customer;
+    try {
+      customer = await createOrRetrieveCustomer({
+        userId: user.id,
+        email: userEmail ?? undefined,
+        name: user.name ?? undefined,
+      });
+    } catch (error) {
+      console.error("Failed to create/retrieve Stripe customer:", error);
+      return NextResponse.json(
+        {
+          error: "Failed to initialize payment customer",
+          errorCode: "CUSTOMER_CREATION_FAILED",
+        },
+        { status: 500 },
+      );
+    }
 
     // Create payment intent
-    const paymentIntent = await createPaymentIntent({
-      amount,
-      currency,
-      customerId: customer.id,
-      paymentMethodId,
-      metadata: {
-        userId: user.id,
-        orderId: orderId?.toString() ?? "",
-        savePaymentMethod: savePaymentMethod.toString(),
-      },
-    });
+    let paymentIntent;
+    try {
+      paymentIntent = await createPaymentIntent({
+        amount,
+        currency,
+        customerId: customer.id,
+        paymentMethodId,
+        metadata: {
+          userId: user.id,
+          orderId: orderId?.toString() ?? "",
+          savePaymentMethod: savePaymentMethod.toString(),
+        },
+      });
+    } catch (error) {
+      console.error("Failed to create Stripe payment intent:", error);
+
+      // If order was already created, mark it as failed
+      if (orderId) {
+        try {
+          await db
+            .update(orders)
+            .set({
+              status: "Failed",
+              paymentStatus: "Failed",
+              updatedAt: new Date(),
+            })
+            .where(eq(orders.id, orderId));
+        } catch (dbError) {
+          console.error(
+            "Failed to update order status after payment intent failure:",
+            dbError,
+          );
+        }
+      }
+
+      // Check if it's a Stripe error with more details
+      const stripeError = error as {
+        type?: string;
+        message?: string;
+        code?: string;
+      };
+      const errorMessage =
+        stripeError.message ?? "Failed to create payment intent";
+
+      return NextResponse.json(
+        {
+          error: errorMessage,
+          errorCode: stripeError.code ?? "PAYMENT_INTENT_CREATION_FAILED",
+        },
+        { status: 500 },
+      );
+    }
+
+    // Validate payment intent response
+    if (!paymentIntent.client_secret) {
+      console.error(
+        "Payment intent created but missing client_secret:",
+        paymentIntent.id,
+      );
+
+      // If order was already created, mark it as failed
+      if (orderId) {
+        try {
+          await db
+            .update(orders)
+            .set({
+              status: "Failed",
+              paymentStatus: "Failed",
+              updatedAt: new Date(),
+            })
+            .where(eq(orders.id, orderId));
+        } catch (dbError) {
+          console.error(
+            "Failed to update order status after invalid payment intent:",
+            dbError,
+          );
+        }
+      }
+
+      return NextResponse.json(
+        {
+          error: "Invalid payment intent response from payment provider",
+          errorCode: "INVALID_PAYMENT_INTENT",
+        },
+        { status: 500 },
+      );
+    }
 
     // Only create transaction record if orderId is provided
     // For warn results, order will be created after OTP verification
     if (orderId) {
-      await db.insert(paymentTransactions).values({
-        orderId: orderId,
-        amount: Math.round(amount * 100), // Convert dollars to cents for database storage
-        currency,
-        status: "pending",
-        transactionId: paymentIntent.id,
-        gatewayResponse: JSON.stringify({
-          paymentIntentId: paymentIntent.id,
-          customerId: customer.id,
-          status: paymentIntent.status,
-        }),
-      });
+      try {
+        await db.insert(paymentTransactions).values({
+          orderId: orderId,
+          amount: Math.round(amount * 100), // Convert dollars to cents for database storage
+          currency,
+          status: "pending",
+          transactionId: paymentIntent.id,
+          gatewayResponse: JSON.stringify({
+            paymentIntentId: paymentIntent.id,
+            customerId: customer.id,
+            status: paymentIntent.status,
+          }),
+        });
+      } catch (dbError) {
+        console.error("Failed to create transaction record:", dbError);
+        // Don't fail the request if transaction record creation fails
+        // Payment intent is already created and can be tracked via Stripe
+      }
     }
 
     return NextResponse.json({
@@ -315,8 +412,29 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Payment creation error:", error);
+
+    // If order was already created, try to mark it as failed
+    if (orderId) {
+      try {
+        await db
+          .update(orders)
+          .set({
+            status: "Failed",
+            paymentStatus: "Failed",
+            updatedAt: new Date(),
+          })
+          .where(eq(orders.id, orderId));
+      } catch (dbError) {
+        console.error("Failed to update order status after error:", dbError);
+      }
+    }
+
+    const errorMessage =
+      error instanceof Error
+        ? error.message
+        : "Failed to create payment intent";
     return NextResponse.json(
-      { error: "Failed to create payment intent" },
+      { error: errorMessage, errorCode: "UNEXPECTED_ERROR" },
       { status: 500 },
     );
   }

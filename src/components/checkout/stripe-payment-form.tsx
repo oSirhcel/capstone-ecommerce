@@ -14,11 +14,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, Shield } from "lucide-react";
-import {
-  getStripe,
-  processPayment,
-  type ProcessPaymentResponse,
-} from "@/lib/stripe-client";
+import { getStripe, type ProcessPaymentResponse } from "@/lib/stripe-client";
+import { useProcessPayment } from "@/hooks/use-payments";
 import { toast } from "sonner";
 
 interface StripePaymentFormProps {
@@ -46,6 +43,7 @@ function PaymentForm({
 }: StripePaymentFormProps) {
   const stripe = useStripe();
   const elements = useElements();
+  const processPaymentMutation = useProcessPayment();
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [savePaymentMethod, setSavePaymentMethod] = useState(false);
@@ -89,13 +87,24 @@ function PaymentForm({
       }
 
       // Create payment intent with order ID (includes zero trust assessment)
-      const paymentResponse: ProcessPaymentResponse = await processPayment({
-        amount: amount, // Amount will be converted to cents in the API
-        currency,
-        orderId: currentOrderId,
-        savePaymentMethod,
-        orderData, // Include order data for verification flow
-      });
+      // Note: amount is in dollars; it will be converted to cents in the API/stripe library
+      const paymentResponse: ProcessPaymentResponse =
+        await processPaymentMutation.mutateAsync({
+          amount: amount,
+          currency,
+          orderId: currentOrderId,
+          savePaymentMethod,
+          orderData, // Include order data for verification flow
+        });
+
+      // Validate payment response
+      if (!paymentResponse.clientSecret || !paymentResponse.paymentIntentId) {
+        const errorMsg = "Invalid payment response from server";
+        console.error(errorMsg, paymentResponse);
+        setPaymentError(errorMsg);
+        onError(new Error(errorMsg));
+        return;
+      }
 
       const clientSecret: string = paymentResponse.clientSecret;
       const paymentIntentId: string = paymentResponse.paymentIntentId;
@@ -112,23 +121,51 @@ function PaymentForm({
 
       if (confirmResult.error) {
         console.error("Payment confirmation error:", confirmResult.error);
-        setPaymentError(confirmResult.error.message ?? "Payment failed");
-        onError(confirmResult.error.message ?? "Payment failed");
-      } else if (
-        confirmResult.paymentIntent &&
-        confirmResult.paymentIntent.status === "succeeded"
-      ) {
-        console.log("Payment succeeded:", confirmResult.paymentIntent);
+        const errorMsg = confirmResult.error.message ?? "Payment failed";
+        setPaymentError(errorMsg);
+        onError(errorMsg);
+        return;
+      }
+
+      // Validate payment intent exists
+      if (!confirmResult.paymentIntent) {
+        const errorMsg =
+          "Payment confirmation completed but no payment intent returned";
+        console.error(errorMsg);
+        setPaymentError(errorMsg);
+        onError(new Error(errorMsg));
+        return;
+      }
+
+      const paymentIntent = confirmResult.paymentIntent;
+
+      // Handle different payment statuses
+      if (paymentIntent.status === "succeeded") {
+        console.log("Payment succeeded:", paymentIntent);
         toast.success("Payment successful!");
         onSuccess({
-          paymentIntent: confirmResult.paymentIntent,
+          paymentIntent,
           paymentIntentId,
           orderId: currentOrderId,
         });
+      } else if (
+        paymentIntent.status === "requires_action" ||
+        paymentIntent.status === "requires_payment_method" ||
+        paymentIntent.status === "requires_confirmation"
+      ) {
+        // Payment requires additional action (3D Secure, etc.)
+        // Stripe Elements will handle the redirect automatically
+        console.log(
+          "Payment requires additional action:",
+          paymentIntent.status,
+        );
+        // Don't show error - Stripe will redirect or show modal
       } else {
-        console.log("Payment status:", confirmResult.paymentIntent?.status);
-        setPaymentError("Payment requires additional action");
-        onError("Payment requires additional action");
+        // Other statuses (processing, canceled, etc.)
+        const statusMsg = `Payment status: ${paymentIntent.status}`;
+        console.log(statusMsg);
+        setPaymentError(`Payment ${paymentIntent.status}. Please try again.`);
+        onError(new Error(`Payment ${paymentIntent.status}`));
       }
     } catch (error) {
       console.error("Payment processing error:", error);
@@ -203,9 +240,14 @@ function PaymentForm({
         type="submit"
         className="w-full"
         size="lg"
-        disabled={!stripe || !elements || isProcessing}
+        disabled={
+          !stripe ||
+          !elements ||
+          isProcessing ||
+          processPaymentMutation.isPending
+        }
       >
-        {isProcessing ? (
+        {isProcessing || processPaymentMutation.isPending ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             Processing Payment...

@@ -31,7 +31,7 @@ function transformStoreProduct(product: StoreProduct) {
       product.images.find((img) => img.isPrimary)?.imageUrl ??
       product.images[0]?.imageUrl ??
       "/placeholder.svg",
-    rating: 0, // TODO: Calculate from reviews
+    rating: product.rating ?? 0,
     store: product.store.name,
     category: product.category?.name ?? "Uncategorized",
   };

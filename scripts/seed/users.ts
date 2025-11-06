@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import { v4 as uuidv4 } from "uuid";
-import type { NodePgDatabase } from "drizzle-orm/node-postgres";
+import type { NeonHttpDatabase } from "drizzle-orm/neon-http";
 import { users, userProfiles } from "../../src/server/db/schema";
 import type { InferInsertModel } from "drizzle-orm";
 import { daysAgo, randomInt } from "./utils";
@@ -100,7 +100,7 @@ function generatePhone(): string {
 }
 
 export async function seedUsers(
-  db: NodePgDatabase<Record<string, never>>,
+  db: NeonHttpDatabase<Record<string, never>>,
 ): Promise<SeededUser[]> {
   console.log("🌱 Seeding users...");
 

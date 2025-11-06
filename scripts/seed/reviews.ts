@@ -1,4 +1,4 @@
-import type { NodePgDatabase } from "drizzle-orm/node-postgres";
+import type { NeonHttpDatabase } from "drizzle-orm/neon-http";
 import { reviews } from "../../src/server/db/schema";
 import type { InferInsertModel } from "drizzle-orm";
 import type { SeededUser } from "./users";
@@ -57,7 +57,7 @@ function getCommentForRating(rating: number): string {
 }
 
 export async function seedReviews(
-  db: NodePgDatabase<Record<string, never>>,
+  db: NeonHttpDatabase<Record<string, never>>,
   users: SeededUser[],
   products: SeededProduct[],
 ): Promise<SeededReview[]> {

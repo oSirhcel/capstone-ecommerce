@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from "uuid";
-import type { NodePgDatabase } from "drizzle-orm/node-postgres";
+import type { NeonHttpDatabase } from "drizzle-orm/neon-http";
 import { stores, storeSettings } from "../../src/server/db/schema";
 import type { InferInsertModel } from "drizzle-orm";
 import { generateSlug, daysAgo } from "./utils";
@@ -269,7 +269,7 @@ const storeData = [
 ];
 
 export async function seedStores(
-  db: NodePgDatabase<Record<string, never>>,
+  db: NeonHttpDatabase<Record<string, never>>,
   users: SeededUser[],
 ): Promise<SeededStore[]> {
   console.log("🌱 Seeding stores...");

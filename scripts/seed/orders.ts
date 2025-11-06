@@ -1,4 +1,4 @@
-import type { NodePgDatabase } from "drizzle-orm/node-postgres";
+import type { NeonHttpDatabase } from "drizzle-orm/neon-http";
 import {
   orders,
   orderItems,
@@ -89,7 +89,7 @@ function getOrderStatus(createdDaysAgo: number): {
 }
 
 export async function seedOrders(
-  db: NodePgDatabase<Record<string, never>>,
+  db: NeonHttpDatabase<Record<string, never>>,
   users: SeededUser[],
   stores: SeededStore[],
   products: SeededProduct[],

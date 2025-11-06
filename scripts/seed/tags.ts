@@ -1,4 +1,4 @@
-import type { NodePgDatabase } from "drizzle-orm/node-postgres";
+import type { NeonHttpDatabase } from "drizzle-orm/neon-http";
 import { tags } from "../../src/server/db/schema";
 import type { InferInsertModel } from "drizzle-orm";
 import { generateSlug } from "./utils";
@@ -78,7 +78,7 @@ const tagNames = [
 ];
 
 export async function seedTags(
-  db: NodePgDatabase<Record<string, never>>,
+  db: NeonHttpDatabase<Record<string, never>>,
 ): Promise<SeededTag[]> {
   console.log("🌱 Seeding tags...");
 

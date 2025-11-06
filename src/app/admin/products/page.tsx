@@ -155,21 +155,24 @@ export default function ProductsPage() {
     sort: sortOption,
   });
 
-  const allProducts = productsData?.products ?? [];
+  const allProducts = useMemo(
+    () => productsData?.products ?? [],
+    [productsData?.products],
+  );
 
   // Apply stock filter client-side
   const products = useMemo(() => {
     if (stockFilter === "all") return allProducts;
     if (stockFilter === "low")
       return allProducts.filter((p) => p.stock > 0 && p.stock < 20);
-    if (stockFilter === "out")
-      return allProducts.filter((p) => p.stock === 0);
+    if (stockFilter === "out") return allProducts.filter((p) => p.stock === 0);
     return allProducts;
   }, [allProducts, stockFilter]);
 
   const totalProducts = productsData?.pagination?.total ?? 0;
-  const activeProducts = allProducts.filter((p) => p.status === "Active")
-    .length;
+  const activeProducts = allProducts.filter(
+    (p) => p.status === "Active",
+  ).length;
   const lowStockProducts = allProducts.filter(
     (p) => p.stock > 0 && p.stock < 20,
   ).length;
@@ -312,10 +315,7 @@ export default function ProductsPage() {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <Select
-              value={categoryFilter}
-              onValueChange={setCategoryFilter}
-            >
+            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Category" />
               </SelectTrigger>

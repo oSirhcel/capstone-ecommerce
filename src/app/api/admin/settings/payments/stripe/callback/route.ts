@@ -13,7 +13,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const { searchParams } = new URL(request.url);
     const code = searchParams.get("code");
-    const state = searchParams.get("state");
     const error = searchParams.get("error");
     const errorDescription = searchParams.get("error_description");
 
@@ -21,7 +20,7 @@ export async function GET(request: NextRequest) {
       console.error("Stripe OAuth error:", error, errorDescription);
       return NextResponse.redirect(
         new URL(
-          `/admin/settings/payments?error=${encodeURIComponent(errorDescription || error)}`,
+          `/admin/settings/payments?error=${encodeURIComponent(errorDescription ?? error)}`,
           request.url,
         ),
       );
@@ -32,7 +31,7 @@ export async function GET(request: NextRequest) {
 
     // Exchange authorization code for account ID
     let stripeAccountId: string;
-    let accountStatus: string = "pending";
+    let accountStatus = "pending";
 
     try {
       const response = await stripe.oauth.token({
@@ -40,7 +39,7 @@ export async function GET(request: NextRequest) {
         code: code,
       });
 
-      stripeAccountId = response.stripe_user_id;
+      stripeAccountId = response.stripe_user_id ?? "";
       // Check account status
       try {
         const account = await stripe.accounts.retrieve(stripeAccountId);

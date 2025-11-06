@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { validateStoresHaveProviders } from "@/lib/payment-providers";
 
 export async function GET(request: NextRequest) {

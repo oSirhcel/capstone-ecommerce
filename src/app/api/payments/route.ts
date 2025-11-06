@@ -6,7 +6,7 @@ import {
   orders,
   zeroTrustVerifications,
 } from "@/server/db/schema";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { zeroTrustCheck } from "@/lib/zeroTrustMiddleware";
 import {
   createPaymentIntent,

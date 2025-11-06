@@ -55,7 +55,7 @@ export default function AccountPreferences({
     try {
       await onDeleteAccount(deletePassword);
       toast.success("Account deleted");
-    } catch (error) {
+    } catch {
       toast.error("Failed to delete account. Please try again.");
     } finally {
       setIsLoading(false);

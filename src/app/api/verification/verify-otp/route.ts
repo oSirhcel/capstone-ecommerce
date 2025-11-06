@@ -3,28 +3,33 @@
  * Verify OTP code and return payment data if valid
  */
 
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { verifyOTP } from "@/lib/api/otp-verification";
+
+type VerifyOTPRequest = {
+  token: string;
+  otp: string;
+};
 
 export async function POST(req: NextRequest) {
   try {
     const session = await auth();
 
-    if (!session || !session.user) {
+    if (!session?.user) {
       return NextResponse.json(
         { error: "Unauthorized. Please sign in." },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
-    const body = await req.json();
+    const body = (await req.json()) as VerifyOTPRequest;
     const { token, otp } = body;
 
     if (!token || !otp) {
       return NextResponse.json(
         { error: "Token and OTP are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -33,11 +38,11 @@ export async function POST(req: NextRequest) {
 
     if (!result.success) {
       return NextResponse.json(
-        { 
+        {
           success: false,
-          error: result.message || "Verification failed" 
+          error: result.message ?? "Verification failed",
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -48,15 +53,10 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     console.error("Error verifying OTP:", error);
-    
-    const errorMessage = error instanceof Error 
-      ? error.message 
-      : "Verification failed";
 
-    return NextResponse.json(
-      { error: errorMessage },
-      { status: 500 }
-    );
+    const errorMessage =
+      error instanceof Error ? error.message : "Verification failed";
+
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
-

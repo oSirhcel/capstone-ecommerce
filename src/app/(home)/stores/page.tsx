@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -35,7 +35,7 @@ const reverseSortMap: Record<string, string> = {
   newest: "newest",
 };
 
-export default function StoresPage() {
+function StoresPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -437,5 +437,44 @@ export default function StoresPage() {
         </div>
       </section>
     </>
+  );
+}
+
+export default function StoresPage() {
+  return (
+    <Suspense
+      fallback={
+        <>
+          <section className="from-background to-muted/20 w-full border-b bg-gradient-to-b py-12 md:py-16">
+            <div className="container mx-auto max-w-5xl px-4 md:px-6">
+              <div className="mx-auto max-w-3xl space-y-6 text-center">
+                <Badge variant="secondary" className="px-4 py-1.5">
+                  <Store className="mr-1.5 inline h-3.5 w-3.5" />
+                  Discover Creators
+                </Badge>
+                <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl">
+                  Browse All Stores
+                </h1>
+                <p className="text-muted-foreground text-lg leading-relaxed">
+                  Explore thousands of independent creators and find your new
+                  favorite store
+                </p>
+              </div>
+            </div>
+          </section>
+          <section className="w-full py-4 md:py-8">
+            <div className="container mx-auto max-w-5xl px-4 md:px-6">
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                {Array.from({ length: STORES_PER_PAGE }).map((_, index) => (
+                  <StoreCardSkeleton key={index} />
+                ))}
+              </div>
+            </div>
+          </section>
+        </>
+      }
+    >
+      <StoresPageContent />
+    </Suspense>
   );
 }

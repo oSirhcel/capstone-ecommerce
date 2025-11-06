@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,7 +27,7 @@ interface PaymentDetails {
   };
 }
 
-export default function CheckoutSuccessPage() {
+function CheckoutSuccessPageContent() {
   const { data: session, status } = useSession();
   const searchParams = useSearchParams();
   const paymentIntentId = searchParams.get("payment_intent");
@@ -368,5 +368,25 @@ export default function CheckoutSuccessPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function CheckoutSuccessPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="bg-background min-h-screen">
+          <div className="container mx-auto px-4 py-12 md:px-6">
+            <div className="mx-auto max-w-2xl space-y-6">
+              <Skeleton className="mx-auto h-8 w-64" />
+              <Skeleton className="h-64 w-full" />
+              <Skeleton className="h-32 w-full" />
+            </div>
+          </div>
+        </div>
+      }
+    >
+      <CheckoutSuccessPageContent />
+    </Suspense>
   );
 }

@@ -3,13 +3,13 @@
  * Sends one-time password codes via email for transaction verification
  */
 
-import nodemailer from 'nodemailer';
+import nodemailer from "nodemailer";
 
 // SMTP Configuration - Read from environment variables
 const SMTP_CONFIG = {
-  host: process.env.SMTP_HOST || 'smtp.gmail.com',
-  port: parseInt(process.env.SMTP_PORT || '587', 10),
-  secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
+  host: process.env.SMTP_HOST ?? "smtp.gmail.com",
+  port: parseInt(process.env.SMTP_PORT ?? "587", 10),
+  secure: process.env.SMTP_SECURE === "true", // true for 465, false for other ports
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASSWORD,
@@ -17,15 +17,18 @@ const SMTP_CONFIG = {
 };
 
 // Email template configuration
-const EMAIL_FROM = process.env.SMTP_FROM || process.env.SMTP_USER || 'noreply@yourstore.com';
-const EMAIL_FROM_NAME = process.env.SMTP_FROM_NAME || 'Zero Trust Security';
+const EMAIL_FROM =
+  process.env.SMTP_FROM ?? process.env.SMTP_USER ?? "noreply@yourstore.com";
+const EMAIL_FROM_NAME = process.env.SMTP_FROM_NAME ?? "Zero Trust Security";
 
 /**
  * Create reusable transporter
  */
 export function createTransporter() {
   if (!SMTP_CONFIG.auth.user || !SMTP_CONFIG.auth.pass) {
-    throw new Error('SMTP credentials not configured. Please set SMTP_USER and SMTP_PASSWORD environment variables.');
+    throw new Error(
+      "SMTP credentials not configured. Please set SMTP_USER and SMTP_PASSWORD environment variables.",
+    );
   }
 
   return nodemailer.createTransport({
@@ -46,10 +49,14 @@ export function generateOTP(): string {
 /**
  * Email template for OTP verification
  */
-function getOTPEmailTemplate(otp: string, userName?: string, transactionAmount?: number): string {
-  const formattedAmount = transactionAmount 
-    ? `$${transactionAmount.toFixed(2)}` 
-    : 'your transaction';
+function getOTPEmailTemplate(
+  otp: string,
+  userName?: string,
+  transactionAmount?: number,
+): string {
+  const formattedAmount = transactionAmount
+    ? `$${transactionAmount.toFixed(2)}`
+    : "your transaction";
 
   return `
 <!DOCTYPE html>
@@ -128,7 +135,7 @@ function getOTPEmailTemplate(otp: string, userName?: string, transactionAmount?:
   </div>
   
   <div class="content">
-    ${userName ? `<p>Hello ${userName},</p>` : '<p>Hello,</p>'}
+    ${userName ? `<p>Hello ${userName},</p>` : "<p>Hello,</p>"}
     
     <p>We detected unusual activity with your recent transaction for <strong>${formattedAmount}</strong>. To ensure this transaction is legitimate, please verify your identity using the one-time password below.</p>
     
@@ -161,16 +168,20 @@ function getOTPEmailTemplate(otp: string, userName?: string, transactionAmount?:
 /**
  * Plain text version of OTP email
  */
-function getOTPEmailPlainText(otp: string, userName?: string, transactionAmount?: number): string {
-  const formattedAmount = transactionAmount 
-    ? `$${transactionAmount.toFixed(2)}` 
-    : 'your transaction';
+function getOTPEmailPlainText(
+  otp: string,
+  userName?: string,
+  transactionAmount?: number,
+): string {
+  const formattedAmount = transactionAmount
+    ? `$${transactionAmount.toFixed(2)}`
+    : "your transaction";
 
   return `
 Transaction Verification Required
 Zero Trust Security System
 
-${userName ? `Hello ${userName},` : 'Hello,'}
+${userName ? `Hello ${userName},` : "Hello,"}
 
 We detected unusual activity with your recent transaction for ${formattedAmount}. 
 To ensure this transaction is legitimate, please verify your identity using the one-time password below.
@@ -200,7 +211,7 @@ export async function sendOTPEmail(
   options?: {
     userName?: string;
     transactionAmount?: number;
-  }
+  },
 ): Promise<void> {
   try {
     const transporter = createTransporter();
@@ -208,15 +219,25 @@ export async function sendOTPEmail(
     const mailOptions = {
       from: `"${EMAIL_FROM_NAME}" <${EMAIL_FROM}>`,
       to,
-      subject: 'Transaction Verification Required - OTP Code',
-      html: getOTPEmailTemplate(otp, options?.userName, options?.transactionAmount),
-      text: getOTPEmailPlainText(otp, options?.userName, options?.transactionAmount),
+      subject: "Transaction Verification Required - OTP Code",
+      html: getOTPEmailTemplate(
+        otp,
+        options?.userName,
+        options?.transactionAmount,
+      ),
+      text: getOTPEmailPlainText(
+        otp,
+        options?.userName,
+        options?.transactionAmount,
+      ),
     };
 
     await transporter.sendMail(mailOptions);
   } catch (error) {
-    console.error('Failed to send OTP email:', error);
-    throw new Error('Failed to send verification email. Please try again or contact support.');
+    console.error("Failed to send OTP email:", error);
+    throw new Error(
+      "Failed to send verification email. Please try again or contact support.",
+    );
   }
 }
 
@@ -227,7 +248,7 @@ export async function sendOTPEmail(
 export async function verifySmtpConfig(): Promise<boolean> {
   try {
     if (!SMTP_CONFIG.auth.user || !SMTP_CONFIG.auth.pass) {
-      console.error('SMTP credentials not configured');
+      console.error("SMTP credentials not configured");
       return false;
     }
 
@@ -235,8 +256,7 @@ export async function verifySmtpConfig(): Promise<boolean> {
     await transporter.verify();
     return true;
   } catch (error) {
-    console.error('SMTP configuration verification failed:', error);
+    console.error("SMTP configuration verification failed:", error);
     return false;
   }
 }
-

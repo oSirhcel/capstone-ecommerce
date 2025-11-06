@@ -1,21 +1,21 @@
-import Stripe from 'stripe';
+import Stripe from "stripe";
 
 // Initialize Stripe with secret key
 export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2024-06-20',
+  apiVersion: "2025-08-27.basil",
 });
 
 // Stripe configuration
 export const stripeConfig = {
   publishableKey: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!,
-  currency: 'aud', // Australian Dollar
-  country: 'AU',
+  currency: "aud", // Australian Dollar
+  country: "AU",
 };
 
 // Payment method types we support
 export const supportedPaymentMethods = [
-  'card',
-  'au_becs_debit', // Australian bank debits
+  "card",
+  "au_becs_debit", // Australian bank debits
 ] as const;
 
 // Convert amount to cents (Stripe requires amounts in smallest currency unit)
@@ -83,8 +83,8 @@ export const createOrRetrieveCustomer = async (params: {
       return searchResults.data[0];
     }
   } catch (error) {
-    console.warn('Stripe customer search failed, falling back to list:', error);
-    
+    console.warn("Stripe customer search failed, falling back to list:", error);
+
     // Fallback to list method if search fails
     const existingCustomers = await stripe.customers.list({
       limit: 100, // Increase limit for better chance of finding customer
@@ -116,7 +116,7 @@ export const createOrRetrieveCustomer = async (params: {
   }
 
   // Create new customer
-  const customerData: any = {
+  const customerData: Stripe.CustomerCreateParams = {
     metadata: {
       userId,
     },
@@ -151,17 +151,17 @@ export const savePaymentMethod = async (params: {
 export const getCustomerPaymentMethods = async (customerId: string) => {
   return stripe.paymentMethods.list({
     customer: customerId,
-    type: 'card',
+    type: "card",
   });
 };
 
 // Confirm payment intent
 export const confirmPaymentIntent = async (
   paymentIntentId: string,
-  paymentMethodId?: string
+  paymentMethodId?: string,
 ) => {
   const updateParams: Stripe.PaymentIntentUpdateParams = {};
-  
+
   if (paymentMethodId) {
     updateParams.payment_method = paymentMethodId;
   }
@@ -172,9 +172,9 @@ export const confirmPaymentIntent = async (
 // Handle webhook events
 export const constructWebhookEvent = (
   payload: string | Buffer,
-  signature: string
+  signature: string,
 ) => {
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
-  
+
   return stripe.webhooks.constructEvent(payload, signature, webhookSecret);
 };

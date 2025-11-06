@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
 import { riskAssessmentOrderLinks, riskAssessmentStoreLinks, orders, orderItems } from "@/server/db/schema";
 import { auth } from "@/lib/auth";
-import { eq, inArray, sql } from "drizzle-orm";
+import { inArray, sql } from "drizzle-orm";
 
 // POST /api/risk-assessments/link-orders
 // Links a risk assessment to multiple orders (for multi-store transactions)
@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
       if (!order.storeId) continue;
 
       const existing = storeLinksMap.get(order.storeId);
-      const itemCount = itemCountMap.get(order.orderId) || 0;
+      const itemCount = itemCountMap.get(order.orderId) ?? 0;
 
       if (existing) {
         // Accumulate if multiple orders from same store (edge case)

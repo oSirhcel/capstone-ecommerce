@@ -3,7 +3,7 @@
  * Get verification status
  */
 
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { getVerificationStatus } from "@/lib/api/otp-verification";
 
@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
   try {
     const session = await auth();
 
-    if (!session || !session.user) {
+    if (!session?.user) {
       return NextResponse.json(
         { error: "Unauthorized. Please sign in." },
         { status: 401 }

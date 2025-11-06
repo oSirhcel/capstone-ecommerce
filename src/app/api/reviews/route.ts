@@ -1,8 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/server/db";
-import { reviews, userProfiles, users, orders, orderItems } from "@/server/db/schema";
-import { eq, and, sql, desc, asc, count, inArray, or } from "drizzle-orm";
+import { reviews, userProfiles, users } from "@/server/db/schema";
+import { eq, and, sql, desc, asc, count } from "drizzle-orm";
 import { z } from "zod";
 
 type SessionUser = {

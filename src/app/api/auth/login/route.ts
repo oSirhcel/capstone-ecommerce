@@ -39,9 +39,7 @@ export async function POST(request: Request) {
     }
 
     // Do not return password
-    const { password: _pw, ...safeUser } = user as typeof user & {
-      password?: string;
-    };
+    const { ...safeUser } = user;
     return Response.json({ message: "Login successful", user: safeUser });
   } catch (error: unknown) {
     let message = "Invalid request";

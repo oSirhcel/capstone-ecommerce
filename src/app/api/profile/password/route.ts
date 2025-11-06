@@ -13,14 +13,18 @@ interface SessionUser {
   image?: string | null;
 }
 
-const PasswordChangeSchema = z.object({
-  currentPassword: z.string().min(1, "Current password is required"),
-  newPassword: z.string().min(6, "New password must be at least 6 characters"),
-  confirmPassword: z.string().min(1, "Password confirmation is required"),
-}).refine((data) => data.newPassword === data.confirmPassword, {
-  message: "Passwords don't match",
-  path: ["confirmPassword"],
-});
+const PasswordChangeSchema = z
+  .object({
+    currentPassword: z.string().min(1, "Current password is required"),
+    newPassword: z
+      .string()
+      .min(6, "New password must be at least 6 characters"),
+    confirmPassword: z.string().min(1, "Password confirmation is required"),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: "Passwords don't match",
+    path: ["confirmPassword"],
+  });
 
 // PUT /api/profile/password - Change user password
 export async function PUT(request: NextRequest) {
@@ -31,9 +35,19 @@ export async function PUT(request: NextRequest) {
     }
 
     const userId = (session.user as SessionUser).id;
-    const body = await request.json();
-    
-    const passwordData = PasswordChangeSchema.parse(body);
+    const body = (await request.json()) as z.infer<typeof PasswordChangeSchema>;
+
+    const validationResult = PasswordChangeSchema.safeParse(body);
+    if (!validationResult.success) {
+      return NextResponse.json(
+        {
+          error: "Validation error",
+          details: z.treeifyError(validationResult.error),
+        },
+        { status: 400 },
+      );
+    }
+    const passwordData = validationResult.data;
 
     // Get current user data
     const [user] = await db
@@ -52,19 +66,22 @@ export async function PUT(request: NextRequest) {
     // Verify current password
     const isCurrentPasswordValid = await bcrypt.compare(
       passwordData.currentPassword,
-      user.password
+      user.password,
     );
 
     if (!isCurrentPasswordValid) {
       return NextResponse.json(
         { error: "Current password is incorrect" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     // Hash new password
     const saltRounds = 12;
-    const hashedNewPassword = await bcrypt.hash(passwordData.newPassword, saltRounds);
+    const hashedNewPassword = await bcrypt.hash(
+      passwordData.newPassword,
+      saltRounds,
+    );
 
     // Update password
     await db
@@ -79,15 +96,15 @@ export async function PUT(request: NextRequest) {
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: "Validation error", details: error.errors },
-        { status: 400 }
+        { error: "Validation error", details: z.treeifyError(error) },
+        { status: 400 },
       );
     }
 
     console.error("Error updating password:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

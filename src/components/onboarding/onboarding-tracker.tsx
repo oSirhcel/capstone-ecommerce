@@ -1,7 +1,13 @@
 "use client";
 
 import { useOnboardingStatus } from "@/hooks/onboarding/use-onboarding-status";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, Circle, ArrowRight, Loader2 } from "lucide-react";
@@ -68,7 +74,7 @@ export function OnboardingTracker() {
     return (
       <Card>
         <CardContent className="flex items-center justify-center py-6">
-          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+          <Loader2 className="text-muted-foreground h-4 w-4 animate-spin" />
         </CardContent>
       </Card>
     );
@@ -102,14 +108,14 @@ export function OnboardingTracker() {
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        <Progress 
-          value={data.progress} 
-          className="h-2" 
+        <Progress
+          value={data.progress}
+          className="h-2"
           aria-label={`Onboarding progress: ${data.progress}%`}
         />
         <div className="space-y-2" role="list" aria-label="Onboarding steps">
           {ALL_STEPS.map((stepKey) => {
-            const config = STEP_CONFIGS[stepKey];
+            const config = STEP_CONFIGS[stepKey as keyof typeof STEP_CONFIGS];
             const isCompleted = completedStepsSet.has(stepKey);
             const hasRoute = !!config.route;
 
@@ -123,13 +129,13 @@ export function OnboardingTracker() {
                 )}
               >
                 {isCompleted ? (
-                  <CheckCircle2 
-                    className="text-primary h-5 w-5 shrink-0" 
+                  <CheckCircle2
+                    className="text-primary h-5 w-5 shrink-0"
                     aria-label={`${config.label} completed`}
                   />
                 ) : (
-                  <Circle 
-                    className="text-muted-foreground h-5 w-5 shrink-0" 
+                  <Circle
+                    className="text-muted-foreground h-5 w-5 shrink-0"
                     aria-label={`${config.label} not completed`}
                   />
                 )}
@@ -145,8 +151,8 @@ export function OnboardingTracker() {
                 </span>
                 {!isCompleted && hasRoute && (
                   <Button asChild variant="ghost" size="sm">
-                    <Link 
-                      href={config.route} 
+                    <Link
+                      href={config.route ?? ""}
                       className="flex items-center gap-1"
                       aria-label={`Complete ${config.label}`}
                     >
@@ -163,4 +169,3 @@ export function OnboardingTracker() {
     </Card>
   );
 }
-

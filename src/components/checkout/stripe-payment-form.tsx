@@ -32,7 +32,7 @@ interface StripePaymentFormProps {
   }) => void;
   onError: (error: string | Error) => void;
   onCreateOrder?: () => Promise<number>;
-  orderData?: any; // Order data for verification flow
+  orderData?: Record<string, unknown>; // Order data for verification flow
 }
 
 function PaymentForm({

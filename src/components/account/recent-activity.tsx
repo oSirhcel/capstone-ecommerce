@@ -7,7 +7,6 @@ import { Badge } from "@/components/ui/badge";
 import {
   CheckCircle,
   Clock,
-  MapPin,
   Package,
   XCircle,
   AlertCircle,
@@ -82,7 +81,7 @@ export default function RecentActivity() {
                       Order #{o.id} - {o.status}
                     </p>
                     <p className="text-muted-foreground text-xs">
-                      {o.items.slice(0, 1)[0]?.productName || "Items"}
+                      {o.items.slice(0, 1)[0]?.productName ?? "Items"}
                     </p>
                   </div>
                 </div>

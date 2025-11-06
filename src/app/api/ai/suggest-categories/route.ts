@@ -4,6 +4,7 @@ import { suggestCategories } from "@/lib/ai/extractors/product-extractor";
 import { db } from "@/server/db";
 import { categories } from "@/server/db/schema";
 import { z } from "zod";
+import { env } from "@/env";
 
 const suggestCategoriesRequestSchema = z.object({
   description: z.string().min(1, "Description is required"),
@@ -16,7 +17,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
+    if (env.GOOGLE_GENERATIVE_AI_API_KEY) {
       return NextResponse.json(
         { error: "Google AI API key not configured" },
         { status: 500 },

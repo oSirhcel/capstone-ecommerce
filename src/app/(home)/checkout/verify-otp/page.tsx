@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { Shield, Mail, Clock, RefreshCcw } from "lucide-react";
+import type { VerificationVerifyOTPResponse, VerificationResendOTPResponse } from "@/types/api-responses";
 
 function VerifyOTPContent() {
   const router = useRouter();
@@ -79,10 +80,10 @@ function VerifyOTPContent() {
         body: JSON.stringify({ token, otp }),
       });
 
-      const data = await response.json();
+      const data = await response.json() as VerificationVerifyOTPResponse;
 
       if (!response.ok || !data.success) {
-        setError(data.error || "Verification failed");
+        setError(data.error ?? "Verification failed");
         return;
       }
 
@@ -116,11 +117,11 @@ function VerifyOTPContent() {
         body: JSON.stringify({ token }),
       });
 
-      const data = await response.json();
+      const data = await response.json() as VerificationResendOTPResponse;
 
       if (!response.ok || !data.success) {
         toast.error("Failed to resend code", {
-          description: data.error || "Please try again",
+          description: data.error ?? "Please try again",
         });
         return;
       }
@@ -191,7 +192,7 @@ function VerifyOTPContent() {
                   <p className="text-sm font-medium">Verification Email Sent</p>
                   <p className="text-muted-foreground text-sm">
                     We sent a 6-digit code to{" "}
-                    <strong>{userEmail || "your email"}</strong>
+                    <strong>{userEmail ?? "your email"}</strong>
                   </p>
                 </div>
               </div>
@@ -257,7 +258,7 @@ function VerifyOTPContent() {
                   protect your account from fraudulent transactions.
                 </p>
                 <p className="mt-2">
-                  Didn't request this? Contact{" "}
+                  Didn&apos;t request this? Contact{" "}
                   <a href="mailto:support@yourstore.com" className="underline">
                     support
                   </a>

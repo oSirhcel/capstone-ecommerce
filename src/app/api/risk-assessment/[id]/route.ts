@@ -3,12 +3,12 @@
  * Fetch a risk assessment with its AI justification
  */
 
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { getRiskAssessment } from "@/lib/api/risk-justification-server";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id } = await params;
@@ -17,7 +17,7 @@ export async function GET(
     if (isNaN(assessmentId)) {
       return NextResponse.json(
         { error: "Invalid assessment ID" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -27,13 +27,21 @@ export async function GET(
     if (!assessment) {
       return NextResponse.json(
         { error: "Risk assessment not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
     // Parse risk factors from JSON
-    const riskFactors = assessment.riskFactors
-      ? JSON.parse(assessment.riskFactors)
+    const riskFactors: Array<{
+      factor: string;
+      impact: number;
+      description: string;
+    }> = assessment.riskFactors
+      ? (JSON.parse(assessment.riskFactors as unknown as string) as Array<{
+          factor: string;
+          impact: number;
+          description: string;
+        }>)
       : [];
 
     // Return assessment with parsed factors
@@ -67,8 +75,7 @@ export async function GET(
     console.error("Error fetching risk assessment:", error);
     return NextResponse.json(
       { error: "Failed to fetch risk assessment" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
-

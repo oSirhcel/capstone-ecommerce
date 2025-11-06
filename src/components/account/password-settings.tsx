@@ -53,7 +53,7 @@ export default function PasswordSettings({
       await onChangePassword(data);
       toast.success("Password updated successfully");
       reset();
-    } catch (error) {
+    } catch {
       toast.error(
         "Failed to update password. Please check your current password and try again.",
       );

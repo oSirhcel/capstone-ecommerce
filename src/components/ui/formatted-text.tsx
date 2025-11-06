@@ -31,7 +31,7 @@ export function FormattedText({ text }: { text: string }) {
 
         // Handle numbered lists
         if (/^[\s]*\d+\.\s/.test(line)) {
-          const match = line.match(/^([\s]*\d+\.)\s(.*)$/);
+          const match = /^([\s]*\d+\.)\s(.*)$/.exec(line);
           if (match) {
             const [, number, content] = match;
             return (

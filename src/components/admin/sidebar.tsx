@@ -39,7 +39,6 @@ import {
 } from "@/components/ui/collapsible";
 
 import { cn } from "@/lib/utils";
-import { useProfileQuery } from "@/hooks/admin/use-profile-query";
 import Image from "next/image";
 
 const navigation = [

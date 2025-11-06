@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { fetchTags, type Tag } from "@/lib/api/tags";
+import { fetchTags } from "@/lib/api/tags";
 
 export function useTagsQuery() {
   return useQuery({

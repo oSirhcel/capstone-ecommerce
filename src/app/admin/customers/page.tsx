@@ -10,7 +10,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Search, Filter, MapPin, Users } from "lucide-react";
+import { Search, Filter, Users } from "lucide-react";
 import Link from "next/link";
 import { useCustomersQuery } from "@/hooks/admin/customers/use-customers-query";
 import { useSession } from "next-auth/react";

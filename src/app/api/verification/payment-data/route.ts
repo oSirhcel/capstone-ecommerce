@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/server/db";
 import { zeroTrustVerifications } from "@/server/db/schema";
 import { and, eq } from "drizzle-orm";
+import type { PaymentData } from "@/types/api-responses";
 
 // GET /api/verification/payment-data?token=...
 export async function GET(req: NextRequest) {
@@ -36,7 +37,7 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const paymentData = JSON.parse(verification.paymentData) as unknown;
+    const paymentData = JSON.parse(verification.paymentData) as PaymentData;
     return NextResponse.json({ paymentData });
   } catch (error) {
     console.error("Failed to get payment data:", error);

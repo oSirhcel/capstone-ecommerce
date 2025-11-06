@@ -332,13 +332,6 @@ export async function fetchFeaturedProducts(
   });
 }
 
-// Utility function to check if user can edit product (placeholder for auth)
-export function canEditProduct(_product: Product, _userId?: string): boolean {
-  // TODO: Implement proper authorization logic
-  // For now, return false (will be updated when auth is implemented)
-  return false;
-}
-
 // Transform API Product to ProductCard props
 export const transformProductToCardProps = (
   product: Product | SearchProduct,

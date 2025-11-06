@@ -1,10 +1,10 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { db } from "@/server/db";
 import { paymentTransactions, orders } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
 import { constructWebhookEvent } from "@/lib/stripe";
-import Stripe from "stripe";
+import type Stripe from "stripe";
 
 // POST /api/payments/webhooks - Handle Stripe webhook events
 export async function POST(request: NextRequest) {
@@ -32,37 +32,27 @@ export async function POST(request: NextRequest) {
     // Handle different event types
     switch (event.type) {
       case "payment_intent.succeeded":
-        await handlePaymentIntentSucceeded(
-          event.data.object as Stripe.PaymentIntent,
-        );
+        await handlePaymentIntentSucceeded(event.data.object);
         break;
 
       case "payment_intent.payment_failed":
-        await handlePaymentIntentFailed(
-          event.data.object as Stripe.PaymentIntent,
-        );
+        await handlePaymentIntentFailed(event.data.object);
         break;
 
       case "payment_intent.processing":
-        await handlePaymentIntentProcessing(
-          event.data.object as Stripe.PaymentIntent,
-        );
+        await handlePaymentIntentProcessing(event.data.object);
         break;
 
       case "payment_intent.canceled":
-        await handlePaymentIntentCanceled(
-          event.data.object as Stripe.PaymentIntent,
-        );
+        await handlePaymentIntentCanceled(event.data.object);
         break;
 
       case "payment_method.attached":
-        await handlePaymentMethodAttached(
-          event.data.object as Stripe.PaymentMethod,
-        );
+        await handlePaymentMethodAttached(event.data.object);
         break;
 
       case "customer.created":
-        await handleCustomerCreated(event.data.object as Stripe.Customer);
+        await handleCustomerCreated(event.data.object);
         break;
 
       default:
@@ -86,6 +76,15 @@ async function handlePaymentIntentSucceeded(
   try {
     console.log("Processing payment_intent.succeeded:", paymentIntent.id);
 
+    // Get charges if available (may need to be expanded)
+    const charges =
+      "charges" in paymentIntent
+        ? (paymentIntent.charges as {
+            data?: Array<{ receipt_url?: string | null }>;
+          })
+        : null;
+    const receiptUrl = charges?.data?.[0]?.receipt_url ?? null;
+
     // Update transaction status
     await db
       .update(paymentTransactions)
@@ -95,8 +94,7 @@ async function handlePaymentIntentSucceeded(
           paymentIntentId: paymentIntent.id,
           status: paymentIntent.status,
           paymentMethod: paymentIntent.payment_method,
-          charges: paymentIntent.charges,
-          receiptUrl: paymentIntent.charges?.data?.[0]?.receipt_url,
+          receiptUrl,
         }),
         updatedAt: new Date(),
       })
@@ -147,11 +145,12 @@ async function handlePaymentIntentFailed(paymentIntent: Stripe.PaymentIntent) {
       const orderId = parseInt(paymentIntent.metadata.orderId);
 
       // Check if this is a denial (card declined, insufficient funds, etc.)
-      const isDenied = paymentIntent.last_payment_error?.code === "card_declined" ||
-                      paymentIntent.last_payment_error?.code === "insufficient_funds" ||
-                      paymentIntent.last_payment_error?.code === "expired_card" ||
-                      paymentIntent.last_payment_error?.code === "incorrect_cvc" ||
-                      paymentIntent.last_payment_error?.code === "processing_error";
+      const isDenied =
+        paymentIntent.last_payment_error?.code === "card_declined" ||
+        paymentIntent.last_payment_error?.code === "insufficient_funds" ||
+        paymentIntent.last_payment_error?.code === "expired_card" ||
+        paymentIntent.last_payment_error?.code === "incorrect_cvc" ||
+        paymentIntent.last_payment_error?.code === "processing_error";
 
       await db
         .update(orders)
@@ -162,7 +161,9 @@ async function handlePaymentIntentFailed(paymentIntent: Stripe.PaymentIntent) {
         })
         .where(eq(orders.id, orderId));
 
-      console.log(`Order ${orderId} status updated to ${isDenied ? "Denied" : "Failed"}`);
+      console.log(
+        `Order ${orderId} status updated to ${isDenied ? "Denied" : "Failed"}`,
+      );
     }
   } catch (error) {
     console.error("Error handling payment_intent.payment_failed:", error);
@@ -245,8 +246,12 @@ async function handlePaymentMethodAttached(
     console.log("Processing payment_method.attached:", paymentMethod.id);
 
     // Log for debugging - in production you might want to sync with your database
+    const customerId =
+      typeof paymentMethod.customer === "string"
+        ? paymentMethod.customer
+        : (paymentMethod.customer?.id ?? "unknown");
     console.log(
-      `Payment method ${paymentMethod.id} attached to customer ${paymentMethod.customer}`,
+      `Payment method ${paymentMethod.id} attached to customer ${customerId}`,
     );
   } catch (error) {
     console.error("Error handling payment_method.attached:", error);

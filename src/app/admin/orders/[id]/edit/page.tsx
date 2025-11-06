@@ -130,17 +130,17 @@ export default function EditOrderPage() {
     values: defaultValues, // Reset form when order data changes
   });
 
-  const { watch, handleSubmit: createHandleSubmit } = form;
+  const { handleSubmit: createHandleSubmit } = form;
 
-  // Calculations
-  const orderItems = watch("orderItems");
-  const subtotal = orderItems.reduce(
-    (sum, item) => sum + item.price * item.quantity,
-    0,
-  );
-  const shipping = subtotal > 100 ? 0 : 9.99;
-  const tax = subtotal * 0.1; // 10% GST for Australia
-  const total = subtotal + shipping + tax;
+  // // Calculations
+  // const orderItems = watch("orderItems");
+  // const subtotal = orderItems.reduce(
+  //   (sum, item) => sum + item.price * item.quantity,
+  //   0,
+  // );
+  // const shipping = subtotal > 100 ? 0 : 9.99;
+  // const tax = subtotal * 0.1; // 10% GST for Australia
+  // const _total = subtotal + shipping + tax;
 
   const onSubmit = async (data: OrderEditFormValues) => {
     try {

@@ -7,7 +7,7 @@ const MAX_HISTORY = 50;
 /**
  * Hook for managing chat history persistence
  */
-export function useChatHistory(conversationId?: string) {
+export function useChatHistory(_conversationId?: string) {
   const [history, setHistory] = useState<ChatMessage[]>([]);
 
   // Load history from localStorage

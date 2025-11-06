@@ -328,7 +328,7 @@ export async function POST(request: NextRequest) {
         and(
           inArray(products.id, productIds),
           eq(products.storeId, storeId),
-          eq(products.status, "active"),
+          eq(products.status, "Active"),
         ),
       );
 

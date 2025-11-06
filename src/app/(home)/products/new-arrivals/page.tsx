@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, Suspense } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -64,7 +64,7 @@ function useSearchProductsQuery(query: string, page: number, sort: string) {
   });
 }
 
-export default function NewArrivalsPage() {
+function NewArrivalsPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -271,5 +271,33 @@ export default function NewArrivalsPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function NewArrivalsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="container mx-auto px-4 py-8">
+          <div className="space-y-8">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+                New Arrivals
+              </h1>
+              <p className="text-gray-600 dark:text-gray-400">
+                Check out the latest products added to our marketplace.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+              {Array.from({ length: PRODUCTS_PER_PAGE }).map((_, idx) => (
+                <ProductCardSkeleton key={`product-skeleton-${idx}`} />
+              ))}
+            </div>
+          </div>
+        </div>
+      }
+    >
+      <NewArrivalsPageContent />
+    </Suspense>
   );
 }

@@ -1,15 +1,19 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/server/db";
-import { paymentTransactions, orders, zeroTrustVerifications } from "@/server/db/schema";
-import { eq, and, desc } from "drizzle-orm";
-import {zeroTrustCheck } from '@/lib/zeroTrustMiddleware';
+import {
+  paymentTransactions,
+  orders,
+  zeroTrustVerifications,
+} from "@/server/db/schema";
+import { eq, and } from "drizzle-orm";
+import { zeroTrustCheck } from "@/lib/zeroTrustMiddleware";
 import {
   createPaymentIntent,
   createOrRetrieveCustomer,
   confirmPaymentIntent,
-  formatAmountForStripe,
 } from "@/lib/stripe";
+import type { PaymentData } from "@/types/api-responses";
 
 type SessionUser = {
   id: string;
@@ -24,11 +28,11 @@ interface CreatePaymentRequest {
   paymentMethodId?: string;
   savePaymentMethod?: boolean;
   verificationToken?: string; // required for 'warn' flows
-  orderData?: any; // Complete checkout session data for risk assessment
+  orderData?: PaymentData["orderData"]; // Complete checkout session data for risk assessment
 }
 
 interface ZeroTrustAssessment {
-  decision: 'allow' | 'warn' | 'deny';
+  decision: "allow" | "warn" | "deny";
   score: number;
   confidence: number;
   factors: Array<{
@@ -49,25 +53,49 @@ export async function POST(request: NextRequest) {
     }
 
     const user = session.user as SessionUser;
-    const body = await request.json() as CreatePaymentRequest;
+    const body = (await request.json()) as CreatePaymentRequest;
+
+    // Transform orderData to CheckoutSessionData format if needed
+    // Extract items from storeGroups and map to CheckoutSessionItem format
+    const checkoutSessionData =
+      body.orderData?.storeGroups && body.orderData.storeGroups.length > 0
+        ? {
+            items: body.orderData.storeGroups.flatMap((group) =>
+              group.items.map((item) => ({
+                productId: item.id,
+                price: item.price,
+                quantity: item.quantity,
+              })),
+            ),
+          }
+        : undefined;
 
     // Perform zero trust risk assessment using complete checkout session data
-    const zeroTrustResponse = await zeroTrustCheck(request, body, session, body.orderData);
+    const zeroTrustResponse = await zeroTrustCheck(
+      request,
+      body,
+      session,
+      checkoutSessionData,
+    );
     if (zeroTrustResponse.status !== 200) {
       return zeroTrustResponse;
     }
 
     // Parse the zero trust assessment result
-    const zeroTrustData = await zeroTrustResponse.json() as { riskAssessment: ZeroTrustAssessment & { id?: number } };
+    const zeroTrustData = (await zeroTrustResponse.json()) as {
+      riskAssessment: ZeroTrustAssessment & { id?: number };
+    };
     const riskAssessment = zeroTrustData.riskAssessment;
 
     // Extract orderData early for use in verification
     const { orderData } = body;
 
     // Handle zero trust decisions
-    if (riskAssessment.decision === 'deny') {
-      console.log(`Payment BLOCKED by Zero Trust: Score ${riskAssessment.score}, User: ${user.id}`);
-      
+    if (riskAssessment.decision === "deny") {
+      console.log(
+        `Payment BLOCKED by Zero Trust: Score ${riskAssessment.score}, User: ${user.id}`,
+      );
+
       // Update order status to Failed if orderId is provided
       if (body.orderId) {
         try {
@@ -79,27 +107,38 @@ export async function POST(request: NextRequest) {
               updatedAt: new Date(),
             })
             .where(eq(orders.id, body.orderId));
-          
-          console.log(`Order ${body.orderId} status updated to Failed due to zero trust denial`);
+
+          console.log(
+            `Order ${body.orderId} status updated to Failed due to zero trust denial`,
+          );
         } catch (error) {
-          console.error(`Failed to update order ${body.orderId} status:`, error);
+          console.error(
+            `Failed to update order ${body.orderId} status:`,
+            error,
+          );
           // Continue with the denial response even if order update fails
         }
       }
-      
-      return NextResponse.json({
-        error: 'Transaction blocked for security reasons',
-        errorCode: 'ZERO_TRUST_DENIED',
-        riskScore: riskAssessment.score,
-        riskFactors: riskAssessment.factors.map(f => f.factor),
-        message: 'This transaction has been flagged as high-risk and cannot be processed. Please contact support if you believe this is an error.',
-        supportContact: 'support@yourstore.com'
-      }, { status: 403 });
+
+      return NextResponse.json(
+        {
+          error: "Transaction blocked for security reasons",
+          errorCode: "ZERO_TRUST_DENIED",
+          riskScore: riskAssessment.score,
+          riskFactors: riskAssessment.factors.map((f) => f.factor),
+          message:
+            "This transaction has been flagged as high-risk and cannot be processed. Please contact support if you believe this is an error.",
+          supportContact: "support@yourstore.com",
+        },
+        { status: 403 },
+      );
     }
 
-    if (riskAssessment.decision === 'warn') {
-      console.log(`Payment FLAGGED by Zero Trust: Score ${riskAssessment.score}, User: ${user.id}`);
-      
+    if (riskAssessment.decision === "warn") {
+      console.log(
+        `Payment FLAGGED by Zero Trust: Score ${riskAssessment.score}, User: ${user.id}`,
+      );
+
       // Enforce presence of a verification token
       if (!body.verificationToken) {
         return await requireNewVerification();
@@ -113,12 +152,12 @@ export async function POST(request: NextRequest) {
           and(
             eq(zeroTrustVerifications.token, body.verificationToken),
             eq(zeroTrustVerifications.userId, user.id),
-            eq(zeroTrustVerifications.status, 'verified'),
-          )
+            eq(zeroTrustVerifications.status, "verified"),
+          ),
         )
         .limit(1);
 
-      if (!verification || !verification.verifiedAt) {
+      if (!verification?.verifiedAt) {
         return await requireNewVerification();
       }
 
@@ -131,74 +170,97 @@ export async function POST(request: NextRequest) {
       // Ensure payment data integrity: stored paymentData must match current body
       // For verified payments, orderId may be added after order creation, so exclude it from comparison
       try {
-        const stored = JSON.parse(verification.paymentData || '{}');
-        const keysToCompare: Array<keyof CreatePaymentRequest> = ['amount', 'currency', 'paymentMethodId', 'savePaymentMethod'];
+        const stored = JSON.parse(
+          verification.paymentData ?? "{}",
+        ) as Partial<CreatePaymentRequest>;
+        const keysToCompare: Array<keyof CreatePaymentRequest> = [
+          "amount",
+          "currency",
+          "paymentMethodId",
+          "savePaymentMethod",
+        ];
         const mismatch = keysToCompare.some((k) => {
-          const a = (stored as any)[k];
-          const b = (body as any)[k];
+          const a = stored[k];
+          const b = body[k];
           return (a ?? undefined) !== (b ?? undefined);
         });
         if (mismatch) {
-          return NextResponse.json({
-            error: 'Payment data mismatch. Please restart verification.',
-            errorCode: 'ZERO_TRUST_DATA_MISMATCH',
-          }, { status: 409 });
+          return NextResponse.json(
+            {
+              error: "Payment data mismatch. Please restart verification.",
+              errorCode: "ZERO_TRUST_DATA_MISMATCH",
+            },
+            { status: 409 },
+          );
         }
       } catch {
-        return NextResponse.json({
-          error: 'Invalid stored verification data',
-        }, { status: 500 });
+        return NextResponse.json(
+          {
+            error: "Invalid stored verification data",
+          },
+          { status: 500 },
+        );
       }
 
       async function requireNewVerification() {
         // Use OTP verification system for warn transactions
         try {
-          const { createOTPVerification } = await import('@/lib/api/otp-verification');
-          
-          const { token: verificationToken, expiresAt } = await createOTPVerification({
-            userId: user.id,
-            userEmail: user.email ?? '',
-            userName: user.name ?? undefined,
-            paymentData: { 
-              ...body, 
-              orderData,
-              riskAssessmentId: riskAssessment.id, // Include risk assessment ID for linking
-            }, // Include order data for verification flow
-            riskScore: riskAssessment.score,
-            riskFactors: riskAssessment.factors,
-            transactionAmount: body.amount,
-          });
-          
-          return NextResponse.json({
-            error: 'Transaction requires additional verification',
-            errorCode: 'ZERO_TRUST_VERIFICATION_REQUIRED',
-            riskScore: riskAssessment.score,
-            riskFactors: riskAssessment.factors.map(f => f.factor),
-            riskAssessmentId: riskAssessment.id, // Include risk assessment ID for order linking
-            verificationToken,
-            expiresAt: expiresAt.toISOString(),
-            message: 'A verification code has been sent to your email. Please enter it to complete your transaction.',
-            userEmail: user.email
-          }, { status: 202 }); // 202 Accepted but requires action
+          const { createOTPVerification } = await import(
+            "@/lib/api/otp-verification"
+          );
+
+          const { token: verificationToken, expiresAt } =
+            await createOTPVerification({
+              userId: user.id,
+              userEmail: user.email ?? "",
+              userName: user.name ?? undefined,
+              paymentData: {
+                ...body,
+                orderData,
+                riskAssessmentId: riskAssessment.id, // Include risk assessment ID for linking
+              }, // Include order data for verification flow
+              riskScore: riskAssessment.score,
+              riskFactors: riskAssessment.factors,
+              transactionAmount: body.amount,
+            });
+
+          return NextResponse.json(
+            {
+              error: "Transaction requires additional verification",
+              errorCode: "ZERO_TRUST_VERIFICATION_REQUIRED",
+              riskScore: riskAssessment.score,
+              riskFactors: riskAssessment.factors.map((f) => f.factor),
+              riskAssessmentId: riskAssessment.id, // Include risk assessment ID for order linking
+              verificationToken,
+              expiresAt: expiresAt.toISOString(),
+              message:
+                "A verification code has been sent to your email. Please enter it to complete your transaction.",
+              userEmail: user.email,
+            },
+            { status: 202 },
+          ); // 202 Accepted but requires action
         } catch (error) {
-          console.error('Failed to create OTP verification:', error);
+          console.error("Failed to create OTP verification:", error);
           // Fall back to deny if we can't send OTP
-          return NextResponse.json({
-            error: 'Transaction blocked - verification system unavailable',
-            errorCode: 'ZERO_TRUST_DENIED',
-            message: 'Unable to send verification code. Please try again later or contact support.',
-          }, { status: 503 });
+          return NextResponse.json(
+            {
+              error: "Transaction blocked - verification system unavailable",
+              errorCode: "ZERO_TRUST_DENIED",
+              message:
+                "Unable to send verification code. Please try again later or contact support.",
+            },
+            { status: 503 },
+          );
         }
       }
     }
-    
+
     const {
       amount,
       currency = "aud",
       orderId,
       paymentMethodId,
       savePaymentMethod = false,
-      verificationToken,
     } = body;
 
     // Validate required fields
@@ -318,9 +380,11 @@ export async function PUT(request: NextRequest) {
             updatedAt: new Date(),
           })
           .where(eq(orders.id, orderId));
-      } else if (paymentIntent.status === "requires_payment_method" || 
-                 paymentIntent.status === "canceled" ||
-                 paymentIntent.status === "requires_action") {
+      } else if (
+        paymentIntent.status === "requires_payment_method" ||
+        paymentIntent.status === "canceled" ||
+        paymentIntent.status === "requires_action"
+      ) {
         // Set order status to Denied for denied/failed transactions
         await db
           .update(orders)

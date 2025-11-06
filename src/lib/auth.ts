@@ -68,7 +68,7 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
           id: user.id,
           name: user.username,
           // Provide an email-shaped value so existing callbacks that derive username from email continue to work
-          email: `${user.username}@local`,
+          email: `${user.username}@local.com`,
         };
       },
     }),

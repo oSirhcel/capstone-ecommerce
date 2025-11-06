@@ -10,6 +10,7 @@ import {
   updateCartItem,
   removeFromCart,
   clearCart as clearCartAPI,
+  type CartResponse,
 } from "@/lib/api/cart";
 
 // Extend the session user type to include our custom fields
@@ -102,7 +103,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
-  // Mutations for cart operations
+  // Mutations for cart operations with optimistic updates
   const addItemMutation = useMutation({
     mutationFn: ({
       productId,
@@ -110,8 +111,72 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     }: {
       productId: string;
       quantity: number;
+      item?: CartItem;
     }) => addToCart(productId, quantity),
-    onSuccess: () => {
+    onMutate: async ({ productId, quantity, item }) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ["cart"] });
+
+      // Snapshot previous value
+      const previousCart = queryClient.getQueryData<CartResponse>(["cart"]);
+
+      // Optimistically update cache
+      if (previousCart) {
+        const existingItemIndex = previousCart.items.findIndex(
+          (item) => item.id === productId,
+        );
+
+        let updatedItems: CartItem[];
+        if (existingItemIndex >= 0) {
+          // Item exists, update quantity
+          updatedItems = previousCart.items.map((item, index) =>
+            index === existingItemIndex
+              ? { ...item, quantity: item.quantity + quantity }
+              : item,
+          );
+        } else if (item) {
+          // New item - add it to the beginning (matches API ordering: desc by id)
+          updatedItems = [item, ...previousCart.items] as CartItem[];
+        } else {
+          // Fallback: don't update if we don't have item data
+          updatedItems = previousCart.items;
+        }
+
+        const newItemCount = updatedItems.reduce(
+          (sum, item) => sum + item.quantity,
+          0,
+        );
+        const newSubtotal = updatedItems.reduce(
+          (sum, item) => sum + item.price * item.quantity,
+          0,
+        );
+
+        queryClient.setQueryData<CartResponse>(["cart"], {
+          ...previousCart,
+          items: updatedItems,
+          itemCount: newItemCount,
+          subtotal: newSubtotal,
+        });
+      } else if (item) {
+        // No previous cart, create new one optimistically
+        queryClient.setQueryData<CartResponse>(["cart"], {
+          cartId: 0, // Will be set by server
+          items: [item] as CartItem[],
+          itemCount: item.quantity,
+          subtotal: item.price * item.quantity,
+        });
+      }
+
+      return { previousCart };
+    },
+    onError: (_err, _variables, context) => {
+      // Rollback on error
+      if (context?.previousCart) {
+        queryClient.setQueryData(["cart"], context.previousCart);
+      }
+    },
+    onSettled: () => {
+      // Refetch to ensure consistency
       void queryClient.invalidateQueries({ queryKey: ["cart"] });
     },
   });
@@ -124,21 +189,110 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
       productId: string;
       quantity: number;
     }) => updateCartItem(productId, quantity),
-    onSuccess: () => {
+    onMutate: async ({ productId, quantity }) => {
+      await queryClient.cancelQueries({ queryKey: ["cart"] });
+
+      const previousCart = queryClient.getQueryData<CartResponse>(["cart"]);
+
+      if (previousCart) {
+        const updatedItems = previousCart.items.map((item) =>
+          item.id === productId ? { ...item, quantity } : item,
+        );
+
+        const newItemCount = updatedItems.reduce(
+          (sum, item) => sum + item.quantity,
+          0,
+        );
+        const newSubtotal = updatedItems.reduce(
+          (sum, item) => sum + item.price * item.quantity,
+          0,
+        );
+
+        queryClient.setQueryData<CartResponse>(["cart"], {
+          ...previousCart,
+          items: updatedItems,
+          itemCount: newItemCount,
+          subtotal: newSubtotal,
+        });
+      }
+
+      return { previousCart };
+    },
+    onError: (_err, _variables, context) => {
+      if (context?.previousCart) {
+        queryClient.setQueryData(["cart"], context.previousCart);
+      }
+    },
+    onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: ["cart"] });
     },
   });
 
   const removeItemMutation = useMutation({
     mutationFn: (productId: string) => removeFromCart(productId),
-    onSuccess: () => {
+    onMutate: async (productId) => {
+      await queryClient.cancelQueries({ queryKey: ["cart"] });
+
+      const previousCart = queryClient.getQueryData<CartResponse>(["cart"]);
+
+      if (previousCart) {
+        const updatedItems = previousCart.items.filter(
+          (item) => item.id !== productId,
+        );
+
+        const newItemCount = updatedItems.reduce(
+          (sum, item) => sum + item.quantity,
+          0,
+        );
+        const newSubtotal = updatedItems.reduce(
+          (sum, item) => sum + item.price * item.quantity,
+          0,
+        );
+
+        queryClient.setQueryData<CartResponse>(["cart"], {
+          ...previousCart,
+          items: updatedItems,
+          itemCount: newItemCount,
+          subtotal: newSubtotal,
+        });
+      }
+
+      return { previousCart };
+    },
+    onError: (_err, _variables, context) => {
+      if (context?.previousCart) {
+        queryClient.setQueryData(["cart"], context.previousCart);
+      }
+    },
+    onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: ["cart"] });
     },
   });
 
   const clearCartMutation = useMutation({
     mutationFn: clearCartAPI,
-    onSuccess: () => {
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ["cart"] });
+
+      const previousCart = queryClient.getQueryData<CartResponse>(["cart"]);
+
+      if (previousCart) {
+        queryClient.setQueryData<CartResponse>(["cart"], {
+          ...previousCart,
+          items: [],
+          itemCount: 0,
+          subtotal: 0,
+        });
+      }
+
+      return { previousCart };
+    },
+    onError: (_err, _variables, context) => {
+      if (context?.previousCart) {
+        queryClient.setQueryData(["cart"], context.previousCart);
+      }
+    },
+    onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: ["cart"] });
     },
   });
@@ -152,7 +306,11 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
       router.push(`/auth/signin?callbackUrl=${callbackUrl}`);
       return;
     }
-    addItemMutation.mutate({ productId: item.id, quantity: item.quantity });
+    addItemMutation.mutate({
+      productId: item.id,
+      quantity: item.quantity,
+      item, // Pass full item for optimistic update
+    });
     dispatch({ type: "OPEN_CART" });
   };
 

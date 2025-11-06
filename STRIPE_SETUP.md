@@ -27,7 +27,32 @@ Add these to your `.env.local` file:
 STRIPE_SECRET_KEY="sk_test_your_secret_key_here"
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY="pk_test_your_publishable_key_here"
 STRIPE_WEBHOOK_SECRET="whsec_your_webhook_secret_here"
+
+# Stripe Connect (for multi-store payments)
+STRIPE_CLIENT_ID="ca_your_client_id_here"
 ```
+
+### Getting Your Stripe Client ID (for Stripe Connect)
+
+1. **Log in to Stripe Dashboard** at https://dashboard.stripe.com
+2. **Navigate to**: Settings → Connect → Settings
+3. **Find "Client ID"** - it starts with `ca_`
+4. **Copy the Client ID** and add it to your `.env.local` file
+
+**Note**: The Client ID is different from your API keys. It's specifically used for Stripe Connect OAuth flows.
+
+### Configuring Redirect URIs (Required)
+
+After getting your Client ID, you must configure the redirect URI in Stripe:
+
+1. **In Stripe Dashboard**, go to: Settings → Connect → Settings
+2. **Scroll down to "Redirect URIs"** section
+3. **Add your redirect URI**:
+   - **For local development**: `http://localhost:3000/api/admin/settings/payments/stripe/callback`
+   - **For production**: `https://yourdomain.com/api/admin/settings/payments/stripe/callback`
+4. **Click "Add"** to save
+
+**Important**: The redirect URI must match exactly (including `http://` vs `https://` and the port number). If you're using a custom port or domain, make sure it matches your `NEXT_PUBLIC_APP_URL` or `NEXTAUTH_URL` environment variable.
 
 ## Step 3: Set Up Webhooks (Local Development)
 
@@ -257,16 +282,31 @@ You're ready to test! Follow these steps:
    - Ensure keys don't have extra spaces
    - Restart development server
 
-2. **Webhook signature verification failed**
+2. **"No application matches the supplied client identifier"**
+   - This error occurs when connecting Stripe accounts
+   - Ensure `STRIPE_CLIENT_ID` is set in your `.env.local` file
+   - Get your Client ID from Stripe Dashboard → Settings → Connect → Settings
+   - The Client ID starts with `ca_` (not `sk_` or `pk_`)
+   - Restart your development server after adding the variable
+
+3. **"Invalid redirect URI"**
+   - This error means the redirect URI doesn't match what's configured in Stripe
+   - Go to Stripe Dashboard → Settings → Connect → Settings → Redirect URIs
+   - Add the exact redirect URI: `http://localhost:3000/api/admin/settings/payments/stripe/callback` (for local dev)
+   - For production, use: `https://yourdomain.com/api/admin/settings/payments/stripe/callback`
+   - Make sure the URI matches exactly (including protocol and port)
+   - The redirect URI is automatically generated from your `NEXT_PUBLIC_APP_URL` or `NEXTAUTH_URL` environment variable
+
+4. **Webhook signature verification failed**
    - Check webhook secret in `.env.local`
    - Ensure webhook endpoint is correct
 
-3. **Payment form not loading**
+5. **Payment form not loading**
    - Check browser console for errors
    - Verify publishable key is set
    - Ensure Stripe Elements are loading
 
-4. **Database errors**
+6. **Database errors**
    - Run `npm run db:push` to update schema
    - Check database connection
 

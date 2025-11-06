@@ -1,9 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { db } from "@/server/db";
-import { paymentTransactions, orders } from "@/server/db/schema";
+import { paymentTransactions, orders, storePaymentProviders } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
-import { constructWebhookEvent } from "@/lib/stripe";
+import { constructWebhookEvent, stripe } from "@/lib/stripe";
 import type Stripe from "stripe";
 
 // POST /api/payments/webhooks - Handle Stripe webhook events
@@ -53,6 +53,10 @@ export async function POST(request: NextRequest) {
 
       case "customer.created":
         await handleCustomerCreated(event.data.object);
+        break;
+
+      case "account.updated":
+        await handleAccountUpdated(event.data.object);
         break;
 
       default:
@@ -364,6 +368,45 @@ async function handleCustomerCreated(customer: Stripe.Customer) {
   } catch (error) {
     console.error("Error handling customer.created:", error);
     throw error;
+  }
+}
+
+// Handle Connect account updates
+async function handleAccountUpdated(account: Stripe.Account) {
+  try {
+    console.log("Processing account.updated:", account.id);
+
+    // Update payment provider status when Connect account status changes
+    const [provider] = await db
+      .select()
+      .from(storePaymentProviders)
+      .where(eq(storePaymentProviders.stripeAccountId, account.id))
+      .limit(1);
+
+    if (provider) {
+      const accountStatus =
+        account.details_submitted && account.charges_enabled
+          ? "active"
+          : account.details_submitted
+            ? "pending"
+            : "restricted";
+
+      await db
+        .update(storePaymentProviders)
+        .set({
+          stripeAccountStatus: accountStatus,
+          isActive: accountStatus === "active",
+          updatedAt: new Date(),
+        })
+        .where(eq(storePaymentProviders.stripeAccountId, account.id));
+
+      console.log(
+        `Updated payment provider status for account ${account.id} to ${accountStatus}`,
+      );
+    }
+  } catch (error) {
+    console.error("Error handling account.updated:", error);
+    // Don't throw - webhook processing should be idempotent
   }
 }
 

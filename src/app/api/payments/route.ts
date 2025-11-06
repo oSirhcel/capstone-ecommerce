@@ -6,7 +6,7 @@ import {
   orders,
   zeroTrustVerifications,
 } from "@/server/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { zeroTrustCheck } from "@/lib/zeroTrustMiddleware";
 import {
   createPaymentIntent,
@@ -14,6 +14,12 @@ import {
   confirmPaymentIntent,
 } from "@/lib/stripe";
 import type { PaymentData } from "@/types/api-responses";
+import {
+  validateStoresHaveProviders,
+  getPaymentProvidersForStores,
+  getStripeAccountForStore,
+} from "@/lib/payment-providers";
+import { formatAmountForStripe } from "@/lib/stripe";
 
 type SessionUser = {
   id: string;
@@ -269,6 +275,98 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid amount" }, { status: 400 });
     }
 
+    // Extract store IDs from orderData or orderId
+    let storeIds: string[] = [];
+    if (body.orderData?.storeGroups && body.orderData.storeGroups.length > 0) {
+      storeIds = body.orderData.storeGroups.map(
+        (group: { storeId: string }) => group.storeId,
+      );
+    } else if (orderId) {
+      // Query orders table to get store IDs
+      const orderRows = await db
+        .select({ storeId: orders.storeId })
+        .from(orders)
+        .where(eq(orders.id, orderId));
+      storeIds = orderRows
+        .map((o) => o.storeId)
+        .filter((id): id is string => id !== null);
+    }
+
+    // Validate all stores have active payment providers
+    if (storeIds.length > 0) {
+      const validation = await validateStoresHaveProviders(storeIds);
+      if (!validation.valid) {
+        const missingStoreNames = validation.missingStores
+          .map((s) => s.storeId)
+          .join(", ");
+        return NextResponse.json(
+          {
+            error: "Payment setup required",
+            errorCode: "PAYMENT_PROVIDER_MISSING",
+            message: `The following stores need payment setup: ${missingStoreNames}`,
+            missingStores: validation.missingStores,
+          },
+          { status: 400 },
+        );
+      }
+    }
+
+    // Determine payment routing strategy
+    // For single-store orders: use that store's Connect account
+    // For multi-store orders: use platform account with transfers
+    const providers = await getPaymentProvidersForStores(storeIds);
+    const isMultiStore = storeIds.length > 1;
+    let stripeAccountId: string | undefined;
+    let transferData: { destination: string; amount: number }[] | undefined =
+      undefined;
+
+    if (isMultiStore && body.orderData?.storeGroups) {
+      // Multi-store: create payment on platform account with transfers
+      stripeAccountId = undefined; // Use platform account
+      const totalSubtotal = body.orderData.storeGroups.reduce(
+        (sum: number, g: { subtotal: number }) => sum + (g.subtotal || 0),
+        0,
+      );
+      const shipping = totalSubtotal > 50 ? 0 : 5.99;
+      const tax = totalSubtotal * 0.1;
+
+      transferData = body.orderData.storeGroups
+        .map((group: { storeId: string; subtotal: number }) => {
+          const provider = providers.get(group.storeId);
+          if (!provider?.stripeAccountId) {
+            return null;
+          }
+          // Calculate store amount including proportional shipping and tax
+          const storeSubtotal = group.subtotal || 0;
+          const storeAmount =
+            storeSubtotal +
+            (shipping * storeSubtotal) / totalSubtotal +
+            (tax * storeSubtotal) / totalSubtotal;
+
+          return {
+            destination: provider.stripeAccountId,
+            amount: formatAmountForStripe(storeAmount),
+          };
+        })
+        .filter(
+          (t): t is { destination: string; amount: number } => t !== null,
+        );
+
+      // If we can't create transfers for all stores, fall back to single store
+      if (transferData.length !== storeIds.length) {
+        console.warn(
+          "Not all stores have payment providers, falling back to first store",
+        );
+        const firstProvider = providers.get(storeIds[0]);
+        stripeAccountId = firstProvider?.stripeAccountId ?? undefined;
+        transferData = undefined;
+      }
+    } else if (storeIds.length === 1) {
+      // Single-store: use that store's Connect account
+      stripeAccountId =
+        (await getStripeAccountForStore(storeIds[0])) ?? undefined;
+    }
+
     // Create or retrieve Stripe customer
     // Handle credentials users who have fake @local.com emails
     const userEmail = user.email?.endsWith("@local.com")
@@ -281,6 +379,7 @@ export async function POST(request: NextRequest) {
         userId: user.id,
         email: userEmail ?? undefined,
         name: user.name ?? undefined,
+        stripeAccountId, // Use Connect account if available
       });
     } catch (error) {
       console.error("Failed to create/retrieve Stripe customer:", error);
@@ -294,9 +393,19 @@ export async function POST(request: NextRequest) {
     }
 
     // Create payment intent
+    // For multi-store with transfers, create on platform account
+    // For single-store, create on Connect account
     let paymentIntent;
     try {
-      paymentIntent = await createPaymentIntent({
+      const paymentIntentParams: {
+        amount: number;
+        currency: string;
+        customerId: string;
+        paymentMethodId?: string;
+        metadata: Record<string, string>;
+        stripeAccountId?: string;
+        transferData?: { destination: string; amount?: number };
+      } = {
         amount,
         currency,
         customerId: customer.id,
@@ -305,8 +414,27 @@ export async function POST(request: NextRequest) {
           userId: user.id,
           orderId: orderId?.toString() ?? "",
           savePaymentMethod: savePaymentMethod.toString(),
+          storeIds: storeIds.join(","),
         },
-      });
+      };
+
+      // For multi-store with transfers, use first transfer as primary
+      // Note: Stripe Connect transfers require creating on platform account
+      // and using transfer_data for the primary destination
+      if (transferData && transferData.length > 0) {
+        // Use platform account (no stripeAccountId) with transfer_data
+        paymentIntentParams.transferData = {
+          destination: transferData[0].destination,
+          amount: transferData[0].amount,
+        };
+        // Additional transfers would need to be handled via separate transfers API
+        // For now, we'll route the full amount to the first store
+        // TODO: Implement proper split payments for multi-store
+      } else if (stripeAccountId) {
+        paymentIntentParams.stripeAccountId = stripeAccountId;
+      }
+
+      paymentIntent = await createPaymentIntent(paymentIntentParams);
     } catch (error) {
       console.error("Failed to create Stripe payment intent:", error);
 

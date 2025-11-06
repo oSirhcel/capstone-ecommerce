@@ -1,4 +1,5 @@
 "use client";
+import { useState } from "react";
 import { DataTable } from "@/components/admin/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,7 +11,15 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Search, Filter, MapPin, Users } from "lucide-react";
+import { Search, Users } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
 import { useCustomersQuery } from "@/hooks/admin/customers/use-customers-query";
 import { useSession } from "next-auth/react";
@@ -37,6 +46,12 @@ const columns = [
         </div>
       );
     },
+    skeleton: () => (
+      <div className="space-y-2">
+        <Skeleton className="h-4 w-32" />
+        <Skeleton className="h-3 w-40" />
+      </div>
+    ),
   },
   {
     header: "Status",
@@ -49,6 +64,7 @@ const columns = [
         </Badge>
       );
     },
+    skeleton: () => <Skeleton className="h-6 w-16 rounded-full" />,
   },
   {
     header: "Total Orders",
@@ -57,6 +73,7 @@ const columns = [
       const customer = row.original;
       return <div className="text-center">{customer.totalOrders}</div>;
     },
+    skeleton: () => <Skeleton className="h-4 w-8 mx-auto" />,
   },
   {
     header: "Total Spent",
@@ -69,6 +86,7 @@ const columns = [
         </div>
       );
     },
+    skeleton: () => <Skeleton className="h-4 w-16" />,
   },
   {
     header: "Join Date",
@@ -81,6 +99,7 @@ const columns = [
         </div>
       );
     },
+    skeleton: () => <Skeleton className="h-4 w-24" />,
   },
   {
     header: "Actions",
@@ -94,20 +113,26 @@ const columns = [
         </div>
       );
     },
+    skeleton: () => <Skeleton className="h-8 w-16" />,
   },
 ];
 
 export default function CustomersPage() {
   const session = useSession();
   const storeId = session?.data?.store?.id ?? "";
-  console.log("Store ID", storeId);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sortBy, setSortBy] = useState<"name" | "joinDate" | "totalSpent">(
+    "joinDate",
+  );
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+
   const { data, isLoading } = useCustomersQuery({
     storeId,
     page: 1,
     limit: 10,
-    search: undefined,
-    sortBy: "joinDate",
-    sortOrder: "desc",
+    search: searchTerm || undefined,
+    sortBy,
+    sortOrder,
   });
 
   return (
@@ -127,15 +152,39 @@ export default function CustomersPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="mb-6 flex items-center gap-4">
+          <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center">
             <div className="relative max-w-sm flex-1">
               <Search className="text-muted-foreground absolute top-2.5 left-2.5 h-4 w-4" />
-              <Input placeholder="Search customers..." className="pl-8" />
+              <Input
+                placeholder="Search customers..."
+                className="pl-8"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
             </div>
-            <Button variant="outline">
-              <Filter className="mr-2 h-4 w-4" />
-              Filter
-            </Button>
+            <Select
+              value={`${sortBy}-${sortOrder}`}
+              onValueChange={(v) => {
+                const [by, order] = v.split("-") as [
+                  "name" | "joinDate" | "totalSpent",
+                  "asc" | "desc",
+                ];
+                setSortBy(by);
+                setSortOrder(order);
+              }}
+            >
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Sort" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="name-asc">Name: A-Z</SelectItem>
+                <SelectItem value="name-desc">Name: Z-A</SelectItem>
+                <SelectItem value="joinDate-desc">Join Date: Newest</SelectItem>
+                <SelectItem value="joinDate-asc">Join Date: Oldest</SelectItem>
+                <SelectItem value="totalSpent-desc">Total Spent: High-Low</SelectItem>
+                <SelectItem value="totalSpent-asc">Total Spent: Low-High</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <DataTable
             columns={columns}

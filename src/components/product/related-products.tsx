@@ -22,7 +22,7 @@ interface RelatedProductsProps {
 }
 
 export function RelatedProducts({
-  category,
+  category: _category,
   currentProductSlug,
 }: RelatedProductsProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);

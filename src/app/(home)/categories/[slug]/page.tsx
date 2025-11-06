@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -32,7 +32,7 @@ interface Category {
   description: string | null;
 }
 
-export default function CategoryPage({ params }: CategoryPageProps) {
+function CategoryPageContent({ params }: CategoryPageProps) {
   const [categoryName, setCategoryName] = useState<string>("");
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -295,5 +295,29 @@ export default function CategoryPage({ params }: CategoryPageProps) {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function CategoryPage({ params }: CategoryPageProps) {
+  return (
+    <Suspense
+      fallback={
+        <div className="container mx-auto px-4 py-8">
+          <div className="space-y-8">
+            <div className="space-y-2">
+              <div className="h-8 w-48 animate-pulse rounded bg-gray-200 dark:bg-gray-700" />
+              <div className="h-4 w-64 animate-pulse rounded bg-gray-200 dark:bg-gray-700" />
+            </div>
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+              {Array.from({ length: PRODUCTS_PER_PAGE }).map((_, idx) => (
+                <ProductCardSkeleton key={`product-skeleton-${idx}`} />
+              ))}
+            </div>
+          </div>
+        </div>
+      }
+    >
+      <CategoryPageContent params={params} />
+    </Suspense>
   );
 }

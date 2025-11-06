@@ -6,7 +6,7 @@ import {
   useEffect,
   useState,
   useCallback,
-  ReactNode,
+  type ReactNode,
 } from "react";
 import type { WidgetState } from "@/types/ai-assistant";
 
@@ -32,7 +32,7 @@ interface SavedState {
 export function WidgetProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<WidgetState>("minimized");
   const [notificationCount, setNotificationCount] = useState(0);
-  const [lastMessage, setLastMessage] = useState<string>();
+  // const [lastMessage, _setLastMessage] = useState<string>();
 
   // Load saved state from localStorage on mount
   useEffect(() => {
@@ -78,7 +78,7 @@ export function WidgetProvider({ children }: { children: ReactNode }) {
       value={{
         status,
         notificationCount,
-        lastMessage,
+        // lastMessage,c
         expand,
         minimize,
         toggle,

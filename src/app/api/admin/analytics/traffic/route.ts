@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/server/db";
 import { stores, pageViews } from "@/server/db/schema";
-import { and, between, count, eq, sql, inArray, isNotNull } from "drizzle-orm";
+import { and, between, eq, inArray } from "drizzle-orm";
 
 function categorizeReferrer(referrer: string | null): string {
   if (!referrer) return "Direct";

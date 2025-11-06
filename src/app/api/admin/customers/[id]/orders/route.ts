@@ -10,7 +10,7 @@ import { eq, desc, count, and } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { ordersQuerySchema } from "@/lib/api/admin/customers";
 import { formatOrderNumber } from "@/lib/utils/order-number";
-import { OrderStatus } from "@/lib/api/admin/orders";
+import type { OrderStatus } from "@/lib/api/admin/orders";
 
 /**
  * GET /api/admin/customers/[id]/orders
@@ -119,7 +119,7 @@ export async function GET(
           status: order.status,
           totalAmount: order.totalAmount,
           itemCount: order.itemCount,
-          paymentStatus: payment?.status || "pending",
+          paymentStatus: payment?.status ?? "pending",
         };
       }),
     );

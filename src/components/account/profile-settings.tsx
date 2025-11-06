@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { User, Mail, Calendar } from "lucide-react";
 
@@ -120,6 +121,40 @@ export default function ProfileSettings({
             </Button>
           </div>
         </form>
+      </CardContent>
+    </Card>
+  );
+}
+
+export function ProfileSettingsSkeleton() {
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-5 w-5" />
+          <Skeleton className="h-6 w-48" />
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-20" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-3 w-64" />
+            </div>
+          </div>
+          <div className="flex items-center gap-4">
+            <Skeleton className="h-4 w-32" />
+          </div>
+          <div className="flex justify-end">
+            <Skeleton className="h-10 w-32" />
+          </div>
+        </div>
       </CardContent>
     </Card>
   );

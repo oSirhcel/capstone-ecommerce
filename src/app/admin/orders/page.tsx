@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import type { DateRange } from "react-day-picker";
 import { DataTable } from "@/components/admin/data-table";
 import { formatOrderNumber } from "@/lib/utils/order-number";
 import { Button } from "@/components/ui/button";
@@ -27,6 +28,8 @@ import { DatePickerWithRange } from "@/components/ui/date-range-picker";
 import { OrdersStats } from "@/components/admin/orders/orders-stats";
 import { useSession } from "next-auth/react";
 import { useOrdersQuery } from "@/hooks/admin/orders/use-orders-query";
+import type { PaymentStatus } from "@/lib/api/admin/orders";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type OrdersListRow = {
   id: number;
@@ -115,6 +118,12 @@ const columns = [
         </div>
       </div>
     ),
+    skeleton: () => (
+      <div className="space-y-2">
+        <Skeleton className="h-4 w-24" />
+        <Skeleton className="h-3 w-20" />
+      </div>
+    ),
   },
   {
     header: "Customer",
@@ -131,6 +140,12 @@ const columns = [
         </div>
       </div>
     ),
+    skeleton: () => (
+      <div className="space-y-2">
+        <Skeleton className="h-4 w-32" />
+        <Skeleton className="h-3 w-40" />
+      </div>
+    ),
   },
   {
     header: "Amount",
@@ -143,6 +158,12 @@ const columns = [
         </div>
       </div>
     ),
+    skeleton: () => (
+      <div className="space-y-2">
+        <Skeleton className="h-4 w-16" />
+        <Skeleton className="h-3 w-12" />
+      </div>
+    ),
   },
   {
     header: "Fulfillment Status",
@@ -150,6 +171,7 @@ const columns = [
     cell: ({ row }: { row: { original: OrdersListRow } }) => (
       <div className="space-y-1">{getStatusBadge(row.original.status)}</div>
     ),
+    skeleton: () => <Skeleton className="h-6 w-20 rounded-full" />,
   },
   {
     header: "Payment Status",
@@ -159,6 +181,7 @@ const columns = [
         {getPaymentStatusBadge(row.original.paymentStatus)}
       </div>
     ),
+    skeleton: () => <Skeleton className="h-6 w-16 rounded-full" />,
   },
 ];
 
@@ -178,8 +201,13 @@ export default function OrdersPage() {
     | "On-hold"
     | "Failed";
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-  const [paymentFilter, setPaymentFilter] = useState("all");
-  // For now, keep date picker uncontrolled to avoid prop mismatch
+  type PaymentFilter = "all" | "Pending" | "Paid" | "Failed" | "Refunded";
+  const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>("all");
+  const [dateRange, setDateRange] = useState<DateRange | undefined>();
+  const [sortBy, setSortBy] = useState<"createdAt" | "totalAmount" | "status">(
+    "createdAt",
+  );
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
   const { data, isLoading, refetch } = useOrdersQuery({
     storeId,
@@ -187,6 +215,14 @@ export default function OrdersPage() {
     limit: 10,
     search: searchTerm || undefined,
     status: statusFilter === "all" ? undefined : statusFilter,
+    paymentStatus:
+      paymentFilter === "all"
+        ? undefined
+        : (paymentFilter satisfies PaymentStatus),
+    dateFrom: dateRange?.from?.toISOString(),
+    dateTo: dateRange?.to?.toISOString(),
+    sortBy,
+    sortOrder,
   });
 
   const filteredOrders = useMemo<OrdersListRow[]>(
@@ -236,7 +272,7 @@ export default function OrdersPage() {
               </CardDescription>
             </div>
             <div className="flex gap-2">
-              <DatePickerWithRange />
+              <DatePickerWithRange value={dateRange} onChange={setDateRange} />
             </div>
           </div>
         </CardHeader>
@@ -271,7 +307,10 @@ export default function OrdersPage() {
                 <SelectItem value="Failed">Failed</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={paymentFilter} onValueChange={setPaymentFilter}>
+            <Select
+              value={paymentFilter}
+              onValueChange={(v) => setPaymentFilter(v as PaymentFilter)}
+            >
               <SelectTrigger className="w-[140px]">
                 <SelectValue placeholder="Payment" />
               </SelectTrigger>
@@ -281,6 +320,33 @@ export default function OrdersPage() {
                 <SelectItem value="Pending">Pending</SelectItem>
                 <SelectItem value="Refunded">Refunded</SelectItem>
                 <SelectItem value="Failed">Failed</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select
+              value={`${sortBy}-${sortOrder}`}
+              onValueChange={(v) => {
+                const [by, order] = v.split("-") as [
+                  "createdAt" | "totalAmount" | "status",
+                  "asc" | "desc",
+                ];
+                setSortBy(by);
+                setSortOrder(order);
+              }}
+            >
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Sort" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="createdAt-desc">Date: Newest</SelectItem>
+                <SelectItem value="createdAt-asc">Date: Oldest</SelectItem>
+                <SelectItem value="totalAmount-desc">
+                  Amount: High-Low
+                </SelectItem>
+                <SelectItem value="totalAmount-asc">
+                  Amount: Low-High
+                </SelectItem>
+                <SelectItem value="status-asc">Status: A-Z</SelectItem>
+                <SelectItem value="status-desc">Status: Z-A</SelectItem>
               </SelectContent>
             </Select>
           </div>

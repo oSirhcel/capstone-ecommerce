@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/server/db";
 import { storePaymentProviders, stores } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
+import { stripe } from "@/lib/stripe";
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,11 +13,55 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const { searchParams } = new URL(request.url);
     const code = searchParams.get("code");
+    const error = searchParams.get("error");
+    const errorDescription = searchParams.get("error_description");
+
+    if (error) {
+      console.error("Stripe OAuth error:", error, errorDescription);
+      return NextResponse.redirect(
+        new URL(
+          `/admin/settings/payments?error=${encodeURIComponent(errorDescription ?? error)}`,
+          request.url,
+        ),
+      );
+    }
+
     if (!code)
       return NextResponse.json({ error: "Missing code" }, { status: 400 });
 
-    // Simulate exchanging code for Stripe Account ID
-    const stripeAccountId = `acct_${Math.random().toString(36).slice(2, 10)}`;
+    // Exchange authorization code for account ID
+    let stripeAccountId: string;
+    let accountStatus = "pending";
+
+    try {
+      const response = await stripe.oauth.token({
+        grant_type: "authorization_code",
+        code: code,
+      });
+
+      stripeAccountId = response.stripe_user_id ?? "";
+      // Check account status
+      try {
+        const account = await stripe.accounts.retrieve(stripeAccountId);
+        accountStatus =
+          account.details_submitted && account.charges_enabled
+            ? "active"
+            : account.details_submitted
+              ? "pending"
+              : "restricted";
+      } catch (accountError) {
+        console.warn("Failed to retrieve account status:", accountError);
+        accountStatus = "pending";
+      }
+    } catch (oauthError) {
+      console.error("Stripe OAuth token exchange error:", oauthError);
+      return NextResponse.redirect(
+        new URL(
+          `/admin/settings/payments?error=${encodeURIComponent("Failed to connect Stripe account")}`,
+          request.url,
+        ),
+      );
+    }
 
     const storeRow = await db
       .select({ id: stores.id })
@@ -40,8 +85,8 @@ export async function GET(request: NextRequest) {
         .set({
           provider: "stripe",
           stripeAccountId,
-          stripeAccountStatus: "active",
-          isActive: true,
+          stripeAccountStatus: accountStatus,
+          isActive: accountStatus === "active",
           connectedAt: new Date(),
           updatedAt: new Date(),
         })
@@ -51,8 +96,8 @@ export async function GET(request: NextRequest) {
         storeId,
         provider: "stripe",
         stripeAccountId,
-        stripeAccountStatus: "active",
-        isActive: true,
+        stripeAccountStatus: accountStatus,
+        isActive: accountStatus === "active",
         connectedAt: new Date(),
         createdAt: new Date(),
         updatedAt: new Date(),

@@ -1,9 +1,6 @@
 import { useState, useCallback } from "react";
 import { useMutation } from "@tanstack/react-query";
-import type {
-  ExtractedProduct,
-  ProductExtractionResult,
-} from "@/lib/ai/extractors/product-extractor";
+import type { ExtractedProduct } from "@/lib/ai/extractors/product-extractor";
 
 interface ExtractProductRequest {
   description: string;
@@ -34,11 +31,11 @@ export function useProductExtraction() {
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to extract product");
+        const error = (await response.json()) as { error?: string };
+        throw new Error(error.error ?? "Failed to extract product");
       }
 
-      return await response.json();
+      return (await response.json()) as ExtractProductResponse;
     },
     onSuccess: (data) => {
       if (data.success && data.data) {

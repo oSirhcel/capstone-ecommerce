@@ -89,14 +89,19 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
       setRating(5);
       setComment("");
       setIsSubmittingReview(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Check if it's a "already reviewed" error
-      if (error?.message?.includes("already reviewed")) {
+      if (
+        error instanceof Error &&
+        error.message.includes("already reviewed")
+      ) {
         toast.error(
           "You have already reviewed this product. You can edit your existing review below.",
         );
       } else {
-        toast.error(error?.message || "Failed to submit review");
+        toast.error(
+          error instanceof Error ? error.message : "Failed to submit review",
+        );
       }
     }
   };

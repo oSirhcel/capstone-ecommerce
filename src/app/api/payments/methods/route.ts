@@ -1,13 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
-import { db } from '@/server/db';
-import { paymentMethods } from '@/server/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { type NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
+import { db } from "@/server/db";
+import { paymentMethods } from "@/server/db/schema";
+import { eq, and } from "drizzle-orm";
 import {
   createOrRetrieveCustomer,
   savePaymentMethod,
   getCustomerPaymentMethods,
-} from '@/lib/stripe';
+} from "@/lib/stripe";
 
 type SessionUser = {
   id: string;
@@ -15,13 +15,23 @@ type SessionUser = {
   name?: string | null;
 };
 
+interface SavePaymentMethodRequest {
+  paymentMethodId: string;
+  setAsDefault?: boolean;
+}
+
+interface UpdatePaymentMethodRequest {
+  paymentMethodId: number;
+  setAsDefault?: boolean;
+}
+
 // GET /api/payments/methods - Get user's saved payment methods
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const session = await auth();
-    
+
     if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const user = session.user as SessionUser;
@@ -33,27 +43,27 @@ export async function GET(request: NextRequest) {
       .where(
         and(
           eq(paymentMethods.userId, user.id),
-          eq(paymentMethods.isActive, true)
-        )
+          eq(paymentMethods.isActive, true),
+        ),
       );
 
     // Also get from Stripe for real-time data
     try {
-      // Handle credentials users who have fake @local emails
-      const userEmail = user.email?.endsWith('@local') ? undefined : user.email;
-      
+      // Handle credentials users who have fake @local.com emails
+      const userEmail = user.email?.endsWith("@local.com") ? undefined : user.email;
+
       const customer = await createOrRetrieveCustomer({
         userId: user.id,
-        email: userEmail || undefined,
-        name: user.name || undefined,
+        email: userEmail ?? undefined,
+        name: user.name ?? undefined,
       });
 
       const stripePaymentMethods = await getCustomerPaymentMethods(customer.id);
 
       // Combine and format the data
-      const formattedMethods = dbPaymentMethods.map(method => {
+      const formattedMethods = dbPaymentMethods.map((method) => {
         const stripeMethod = stripePaymentMethods.data.find(
-          sm => sm.id === method.provider
+          (sm) => sm.id === method.provider,
         );
 
         return {
@@ -73,13 +83,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         paymentMethods: formattedMethods,
       });
-
     } catch (stripeError) {
-      console.warn('Stripe payment methods fetch failed:', stripeError);
-      
+      console.warn("Stripe payment methods fetch failed:", stripeError);
+
       // Return just database methods if Stripe fails
       return NextResponse.json({
-        paymentMethods: dbPaymentMethods.map(method => ({
+        paymentMethods: dbPaymentMethods.map((method) => ({
           id: method.id,
           type: method.type,
           provider: method.provider,
@@ -91,12 +100,11 @@ export async function GET(request: NextRequest) {
         })),
       });
     }
-
   } catch (error) {
-    console.error('Get payment methods error:', error);
+    console.error("Get payment methods error:", error);
     return NextResponse.json(
-      { error: 'Failed to get payment methods' },
-      { status: 500 }
+      { error: "Failed to get payment methods" },
+      { status: 500 },
     );
   }
 }
@@ -105,31 +113,31 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const session = await auth();
-    
+
     if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const user = session.user as SessionUser;
-    const body = await request.json();
-    
+    const body = (await request.json()) as SavePaymentMethodRequest;
+
     const { paymentMethodId, setAsDefault = false } = body;
 
     if (!paymentMethodId) {
       return NextResponse.json(
-        { error: 'Payment method ID required' },
-        { status: 400 }
+        { error: "Payment method ID required" },
+        { status: 400 },
       );
     }
 
     // Create or retrieve Stripe customer
-    // Handle credentials users who have fake @local emails
-    const userEmail = user.email?.endsWith('@local') ? undefined : user.email;
-    
+    // Handle credentials users who have fake @local.com emails
+    const userEmail = user.email?.endsWith("@local.com") ? undefined : user.email;
+
     const customer = await createOrRetrieveCustomer({
       userId: user.id,
-      email: userEmail || undefined,
-      name: user.name || undefined,
+      email: userEmail ?? undefined,
+      name: user.name ?? undefined,
     });
 
     // Attach payment method to customer in Stripe
@@ -153,9 +161,9 @@ export async function POST(request: NextRequest) {
         userId: user.id,
         type: stripePaymentMethod.type,
         provider: stripePaymentMethod.id,
-        lastFourDigits: stripePaymentMethod.card?.last4 || null,
-        expiryMonth: stripePaymentMethod.card?.exp_month || null,
-        expiryYear: stripePaymentMethod.card?.exp_year || null,
+        lastFourDigits: stripePaymentMethod.card?.last4 ?? null,
+        expiryMonth: stripePaymentMethod.card?.exp_month ?? null,
+        expiryYear: stripePaymentMethod.card?.exp_year ?? null,
         isDefault: setAsDefault,
         isActive: true,
       })
@@ -175,12 +183,11 @@ export async function POST(request: NextRequest) {
         funding: stripePaymentMethod.card?.funding,
       },
     });
-
   } catch (error) {
-    console.error('Save payment method error:', error);
+    console.error("Save payment method error:", error);
     return NextResponse.json(
-      { error: 'Failed to save payment method' },
-      { status: 500 }
+      { error: "Failed to save payment method" },
+      { status: 500 },
     );
   }
 }
@@ -189,20 +196,20 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const session = await auth();
-    
+
     if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const user = session.user as SessionUser;
-    const body = await request.json();
-    
+    const body = (await request.json()) as UpdatePaymentMethodRequest;
+
     const { paymentMethodId, setAsDefault } = body;
 
     if (!paymentMethodId) {
       return NextResponse.json(
-        { error: 'Payment method ID required' },
-        { status: 400 }
+        { error: "Payment method ID required" },
+        { status: 400 },
       );
     }
 
@@ -213,15 +220,15 @@ export async function PUT(request: NextRequest) {
       .where(
         and(
           eq(paymentMethods.id, paymentMethodId),
-          eq(paymentMethods.userId, user.id)
-        )
+          eq(paymentMethods.userId, user.id),
+        ),
       )
       .limit(1);
 
     if (!existingMethod) {
       return NextResponse.json(
-        { error: 'Payment method not found' },
-        { status: 404 }
+        { error: "Payment method not found" },
+        { status: 404 },
       );
     }
 
@@ -246,12 +253,11 @@ export async function PUT(request: NextRequest) {
       success: true,
       paymentMethod: updatedMethod,
     });
-
   } catch (error) {
-    console.error('Update payment method error:', error);
+    console.error("Update payment method error:", error);
     return NextResponse.json(
-      { error: 'Failed to update payment method' },
-      { status: 500 }
+      { error: "Failed to update payment method" },
+      { status: 500 },
     );
   }
 }
@@ -260,19 +266,19 @@ export async function PUT(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const session = await auth();
-    
+
     if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const user = session.user as SessionUser;
     const { searchParams } = new URL(request.url);
-    const paymentMethodId = searchParams.get('id');
+    const paymentMethodId = searchParams.get("id");
 
     if (!paymentMethodId) {
       return NextResponse.json(
-        { error: 'Payment method ID required' },
-        { status: 400 }
+        { error: "Payment method ID required" },
+        { status: 400 },
       );
     }
 
@@ -282,16 +288,16 @@ export async function DELETE(request: NextRequest) {
       .from(paymentMethods)
       .where(
         and(
-          eq(paymentMethods.id, parseInt(paymentMethodId)),
-          eq(paymentMethods.userId, user.id)
-        )
+          eq(paymentMethods.id, Number(paymentMethodId)),
+          eq(paymentMethods.userId, user.id),
+        ),
       )
       .limit(1);
 
     if (!existingMethod) {
       return NextResponse.json(
-        { error: 'Payment method not found' },
-        { status: 404 }
+        { error: "Payment method not found" },
+        { status: 404 },
       );
     }
 
@@ -302,18 +308,17 @@ export async function DELETE(request: NextRequest) {
         isActive: false,
         isDefault: false,
       })
-      .where(eq(paymentMethods.id, parseInt(paymentMethodId)));
+      .where(eq(paymentMethods.id, Number(paymentMethodId)));
 
     return NextResponse.json({
       success: true,
-      message: 'Payment method deleted successfully',
+      message: "Payment method deleted successfully",
     });
-
   } catch (error) {
-    console.error('Delete payment method error:', error);
+    console.error("Delete payment method error:", error);
     return NextResponse.json(
-      { error: 'Failed to delete payment method' },
-      { status: 500 }
+      { error: "Failed to delete payment method" },
+      { status: 500 },
     );
   }
 }

@@ -34,6 +34,7 @@ export interface Product {
     name: string;
     slug: string;
     description?: string;
+    imageUrl?: string;
     createdAt?: Date;
     productCount?: number;
     averageRating?: number;
@@ -121,6 +122,7 @@ export async function fetchProducts(params?: {
   category?: number;
   store?: string;
   search?: string;
+  status?: "Active" | "Draft" | "Archived" | "all";
   featured?: boolean;
   sort?:
     | "price-low"
@@ -140,6 +142,7 @@ export async function fetchProducts(params?: {
     searchParams.append("category", params.category.toString());
   if (params?.store) searchParams.append("store", params.store);
   if (params?.search) searchParams.append("search", params.search);
+  if (params?.status) searchParams.append("status", params.status);
   if (params?.featured) searchParams.append("featured", "true");
   if (params?.sort) searchParams.append("sort", params.sort);
 
@@ -330,13 +333,6 @@ export async function fetchFeaturedProducts(
     limit,
     sort: "rating-high",
   });
-}
-
-// Utility function to check if user can edit product (placeholder for auth)
-export function canEditProduct(_product: Product, _userId?: string): boolean {
-  // TODO: Implement proper authorization logic
-  // For now, return false (will be updated when auth is implemented)
-  return false;
 }
 
 // Transform API Product to ProductCard props

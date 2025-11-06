@@ -32,7 +32,7 @@ function getQueryClient() {
     // suspends during the initial render. This may not be needed if we
     // have a suspense boundary BELOW the creation of the query client
 
-    if (!browserQueryClient) browserQueryClient = makeQueryClient();
+    browserQueryClient ??= makeQueryClient();
     return browserQueryClient;
   }
 }

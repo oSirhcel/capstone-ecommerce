@@ -15,6 +15,7 @@ export interface DataTableColumn<T = unknown> {
   accessorKey?: string;
   cell?: (props: { row: { original: T } }) => React.ReactNode;
   sortable?: boolean;
+  skeleton?: () => React.ReactNode;
 }
 
 interface DataTableProps<T = unknown> {
@@ -77,9 +78,13 @@ export function DataTable<T = unknown>({
           {isLoading ? (
             Array.from({ length: 5 }).map((_, rowIndex) => (
               <TableRow key={`skeleton-${rowIndex}`}>
-                {columns.map((_, colIndex) => (
+                {columns.map((column, colIndex) => (
                   <TableCell key={`skeleton-${rowIndex}-${colIndex}`}>
-                    <Skeleton className="h-4 w-full" />
+                    {column.skeleton ? (
+                      column.skeleton()
+                    ) : (
+                      <Skeleton className="h-4 w-full" />
+                    )}
                   </TableCell>
                 ))}
               </TableRow>

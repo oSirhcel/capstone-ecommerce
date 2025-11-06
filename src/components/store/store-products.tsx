@@ -24,7 +24,7 @@ interface StoreProductsProps {
 function transformStoreProduct(product: StoreProduct) {
   return {
     id: product.id,
-    slug: product.slug,
+    slug: product.slug!,
     name: product.name,
     price: (product.price ?? 0) / 100, // Convert cents to dollars
     image:

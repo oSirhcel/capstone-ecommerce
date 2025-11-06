@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,14 +16,18 @@ import {
   CheckCircle,
 } from "lucide-react";
 import Link from "next/link";
+import type {
+  VerificationSendResponse,
+  VerificationVerifyResponse,
+} from "@/types/api-responses";
 
-export default function CheckoutVerifyPage() {
+function CheckoutVerifyPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
   const verificationToken = searchParams.get("token");
   const riskScore = searchParams.get("score");
-  const riskFactors = searchParams.get("factors")?.split(",") || [];
+  const riskFactors = searchParams.get("factors")?.split(",") ?? [];
   const userEmail = searchParams.get("email");
 
   const [verificationCode, setVerificationCode] = useState("");
@@ -84,7 +89,7 @@ export default function CheckoutVerifyPage() {
       });
 
       if (response.ok) {
-        const result = await response.json();
+        const result = (await response.json()) as VerificationSendResponse;
         setEmailSent(true);
 
         // In development, show the verification code
@@ -94,10 +99,10 @@ export default function CheckoutVerifyPage() {
           setVerificationCode(result.developmentCode);
         }
       } else {
-        const errorData = await response.json();
-        setError(errorData.error || "Failed to send verification email");
+        const errorData = (await response.json()) as { error?: string };
+        setError(errorData.error ?? "Failed to send verification email");
       }
-    } catch (err) {
+    } catch {
       setError("Network error. Please try again.");
     } finally {
       setIsVerifying(false);
@@ -124,14 +129,14 @@ export default function CheckoutVerifyPage() {
       });
 
       if (response.ok) {
-        const result = await response.json();
+        const result = (await response.json()) as VerificationVerifyResponse;
         // Redirect to verified page
-        router.push(result.redirectTo || "/checkout/verified");
+        router.push(result.redirectTo ?? "/checkout/verified");
       } else {
-        const errorData = await response.json();
-        setError(errorData.error || "Invalid verification code");
+        const errorData = (await response.json()) as { error?: string };
+        setError(errorData.error ?? "Invalid verification code");
       }
-    } catch (err) {
+    } catch {
       setError("Network error. Please try again.");
     } finally {
       setIsVerifying(false);
@@ -256,7 +261,7 @@ export default function CheckoutVerifyPage() {
                       Email Verification
                     </h3>
                     <p className="text-muted-foreground mb-3 text-sm">
-                      We'll send a verification code to:{" "}
+                      We&apos;ll send a verification code to:{" "}
                       <strong>{userEmail}</strong>
                     </p>
                     <Button
@@ -334,5 +339,45 @@ export default function CheckoutVerifyPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function CheckoutVerifyPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="bg-background min-h-screen">
+          <div className="container mx-auto px-4 py-12 md:px-6">
+            <div className="mx-auto max-w-2xl">
+              <div className="mb-8 text-center">
+                <ShieldCheck className="mx-auto mb-4 h-16 w-16 text-yellow-500" />
+                <h1 className="mb-2 text-3xl font-bold text-yellow-600">
+                  Email Verification Required
+                </h1>
+                <p className="text-muted-foreground">
+                  Additional verification is needed to complete your transaction
+                </p>
+              </div>
+              <Card className="border-yellow-200">
+                <CardHeader className="bg-yellow-50">
+                  <CardTitle className="flex items-center gap-2 text-yellow-700">
+                    <Mail className="h-5 w-5" />
+                    Security Verification
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6 p-6">
+                  <div className="animate-pulse space-y-4">
+                    <div className="h-10 w-full rounded bg-gray-200" />
+                    <div className="h-10 w-full rounded bg-gray-200" />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </div>
+      }
+    >
+      <CheckoutVerifyPageContent />
+    </Suspense>
   );
 }

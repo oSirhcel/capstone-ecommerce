@@ -1,26 +1,13 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { TagIcon } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fetchCategories } from "@/lib/api/categories";
-import { CategoryCard } from "@/components/home/category-card";
-
-function CategoryCardSkeleton() {
-  return (
-    <Card>
-      <CardHeader className="text-center">
-        <Skeleton className="mx-auto h-12 w-12 rounded-full" />
-        <Skeleton className="mx-auto h-6 w-24" />
-        <Skeleton className="mx-auto h-4 w-32" />
-      </CardHeader>
-      <CardContent className="pt-0 text-center">
-        <Skeleton className="mx-auto h-4 w-28" />
-      </CardContent>
-    </Card>
-  );
-}
+import {
+  CategoryCard,
+  CategoryCardSkeleton,
+} from "@/components/home/category-card";
 
 export default function AllCategoriesPage() {
   const { data, isLoading, error } = useQuery({
@@ -46,11 +33,16 @@ export default function AllCategoriesPage() {
         {/* Categories Grid */}
         <div className="space-y-6">
           {isLoading && (
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-              {Array.from({ length: 8 }).map((_, idx) => (
-                <CategoryCardSkeleton key={`category-skeleton-${idx}`} />
-              ))}
-            </div>
+            <>
+              <div className="flex items-center justify-between">
+                <Skeleton className="h-5 w-40" />
+              </div>
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                {Array.from({ length: 8 }).map((_, idx) => (
+                  <CategoryCardSkeleton key={`category-skeleton-${idx}`} />
+                ))}
+              </div>
+            </>
           )}
 
           {error && !isLoading && (

@@ -10,6 +10,10 @@ import {
   products,
   orderAddresses,
   productImages,
+  paymentTransactions,
+  paymentMethods,
+  orderShipping,
+  shippingMethods,
 } from "@/server/db/schema";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
@@ -135,10 +139,70 @@ export async function GET(
       .from(orderAddresses)
       .where(eq(orderAddresses.orderId, Number(id)));
 
+    // Fetch payment transaction data
+    const [paymentTransaction] = await db
+      .select({
+        id: paymentTransactions.id,
+        amount: paymentTransactions.amount,
+        currency: paymentTransactions.currency,
+        status: paymentTransactions.status,
+        transactionId: paymentTransactions.transactionId,
+        createdAt: paymentTransactions.createdAt,
+        paymentMethodId: paymentTransactions.paymentMethodId,
+        paymentMethod: {
+          type: paymentMethods.type,
+          provider: paymentMethods.provider,
+          lastFourDigits: paymentMethods.lastFourDigits,
+          expiryMonth: paymentMethods.expiryMonth,
+          expiryYear: paymentMethods.expiryYear,
+        },
+      })
+      .from(paymentTransactions)
+      .leftJoin(
+        paymentMethods,
+        eq(paymentMethods.id, paymentTransactions.paymentMethodId),
+      )
+      .where(eq(paymentTransactions.orderId, Number(id)))
+      .limit(1);
+
+    // Fetch shipping information
+    const [shippingInfo] = await db
+      .select({
+        trackingNumber: orderShipping.trackingNumber,
+        shippedAt: orderShipping.shippedAt,
+        deliveredAt: orderShipping.deliveredAt,
+        methodName: shippingMethods.name,
+        methodDescription: shippingMethods.description,
+        basePrice: shippingMethods.basePrice,
+      })
+      .from(orderShipping)
+      .leftJoin(
+        shippingMethods,
+        eq(shippingMethods.id, orderShipping.shippingMethodId),
+      )
+      .where(eq(orderShipping.orderId, Number(id)))
+      .limit(1);
+
+    // Calculate subtotal from order items
+    const subtotal = items.reduce(
+      (sum, item) => sum + item.priceAtTime * item.quantity,
+      0,
+    );
+
+    // Get shipping cost (from shipping info or 0)
+    const shippingAmount = shippingInfo?.basePrice ?? 0;
+
+    // Calculate tax as the difference between total and (subtotal + shipping)
+    const taxAmount = orderRow.totalAmount - subtotal - shippingAmount;
+
     return NextResponse.json({
       id: orderRow.id,
       status: orderRow.status,
+      paymentStatus: orderRow.paymentStatus,
       totalAmount: orderRow.totalAmount,
+      subtotalAmount: subtotal,
+      taxAmount: taxAmount,
+      shippingAmount: shippingAmount,
       createdAt: orderRow.createdAt,
       updatedAt: orderRow.updatedAt,
       customer: {
@@ -158,9 +222,37 @@ export async function GET(
         imageUrl: i.imageUrl ?? null,
       })),
       addresses,
-      payment: {
-        status: "Pending",
-      },
+      payment: paymentTransaction
+        ? {
+            amount: paymentTransaction.amount,
+            currency: paymentTransaction.currency,
+            status: paymentTransaction.status,
+            transactionId: paymentTransaction.transactionId,
+            createdAt: paymentTransaction.createdAt,
+            paymentMethod: paymentTransaction.paymentMethod
+              ? {
+                  type: paymentTransaction.paymentMethod.type,
+                  provider: paymentTransaction.paymentMethod.provider,
+                  lastFourDigits:
+                    paymentTransaction.paymentMethod.lastFourDigits,
+                  expiryMonth: paymentTransaction.paymentMethod.expiryMonth,
+                  expiryYear: paymentTransaction.paymentMethod.expiryYear,
+                }
+              : null,
+          }
+        : {
+            status: orderRow.paymentStatus,
+          },
+      shipping: shippingInfo
+        ? {
+            trackingNumber: shippingInfo.trackingNumber,
+            shippedAt: shippingInfo.shippedAt,
+            deliveredAt: shippingInfo.deliveredAt,
+            method: shippingInfo.methodName ?? "Standard Shipping",
+            description: shippingInfo.methodDescription,
+            cost: shippingInfo.basePrice,
+          }
+        : null,
       timeline: [],
     });
   } catch (error) {
@@ -374,12 +466,72 @@ export async function PATCH(
         .from(orderAddresses)
         .where(eq(orderAddresses.orderId, Number(id)));
 
+      // Fetch payment transaction data
+      const [paymentTransaction] = await db
+        .select({
+          id: paymentTransactions.id,
+          amount: paymentTransactions.amount,
+          currency: paymentTransactions.currency,
+          status: paymentTransactions.status,
+          transactionId: paymentTransactions.transactionId,
+          createdAt: paymentTransactions.createdAt,
+          paymentMethodId: paymentTransactions.paymentMethodId,
+          paymentMethod: {
+            type: paymentMethods.type,
+            provider: paymentMethods.provider,
+            lastFourDigits: paymentMethods.lastFourDigits,
+            expiryMonth: paymentMethods.expiryMonth,
+            expiryYear: paymentMethods.expiryYear,
+          },
+        })
+        .from(paymentTransactions)
+        .leftJoin(
+          paymentMethods,
+          eq(paymentMethods.id, paymentTransactions.paymentMethodId),
+        )
+        .where(eq(paymentTransactions.orderId, Number(id)))
+        .limit(1);
+
+      // Fetch shipping information
+      const [shippingInfo] = await db
+        .select({
+          trackingNumber: orderShipping.trackingNumber,
+          shippedAt: orderShipping.shippedAt,
+          deliveredAt: orderShipping.deliveredAt,
+          methodName: shippingMethods.name,
+          methodDescription: shippingMethods.description,
+          basePrice: shippingMethods.basePrice,
+        })
+        .from(orderShipping)
+        .leftJoin(
+          shippingMethods,
+          eq(shippingMethods.id, orderShipping.shippingMethodId),
+        )
+        .where(eq(orderShipping.orderId, Number(id)))
+        .limit(1);
+
+      // Calculate subtotal from order items
+      const subtotal = items.reduce(
+        (sum, item) => sum + item.priceAtTime * item.quantity,
+        0,
+      );
+
+      // Get shipping cost (from shipping info or 0)
+      const shippingAmount = shippingInfo?.basePrice ?? 0;
+
+      // Calculate tax as the difference between total and (subtotal + shipping)
+      const taxAmount = orderRow.totalAmount - subtotal - shippingAmount;
+
       return NextResponse.json({
         success: true,
         order: {
           id: orderRow.id,
           status: orderRow.status,
+          paymentStatus: orderRow.paymentStatus,
           totalAmount: orderRow.totalAmount,
+          subtotalAmount: subtotal,
+          taxAmount: taxAmount,
+          shippingAmount: shippingAmount,
           createdAt: orderRow.createdAt,
           updatedAt: orderRow.updatedAt,
           customer: {
@@ -399,9 +551,37 @@ export async function PATCH(
             imageUrl: i.imageUrl ?? null,
           })),
           addresses,
-          payment: {
-            status: "Pending",
-          },
+          payment: paymentTransaction
+            ? {
+                amount: paymentTransaction.amount,
+                currency: paymentTransaction.currency,
+                status: paymentTransaction.status,
+                transactionId: paymentTransaction.transactionId,
+                createdAt: paymentTransaction.createdAt,
+                paymentMethod: paymentTransaction.paymentMethod
+                  ? {
+                      type: paymentTransaction.paymentMethod.type,
+                      provider: paymentTransaction.paymentMethod.provider,
+                      lastFourDigits:
+                        paymentTransaction.paymentMethod.lastFourDigits,
+                      expiryMonth: paymentTransaction.paymentMethod.expiryMonth,
+                      expiryYear: paymentTransaction.paymentMethod.expiryYear,
+                    }
+                  : null,
+              }
+            : {
+                status: orderRow.paymentStatus,
+              },
+          shipping: shippingInfo
+            ? {
+                trackingNumber: shippingInfo.trackingNumber,
+                shippedAt: shippingInfo.shippedAt,
+                deliveredAt: shippingInfo.deliveredAt,
+                method: shippingInfo.methodName ?? "Standard Shipping",
+                description: shippingInfo.methodDescription,
+                cost: shippingInfo.basePrice,
+              }
+            : null,
           timeline: [],
         },
       });

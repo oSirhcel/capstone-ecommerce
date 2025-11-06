@@ -155,15 +155,11 @@ export function CustomerOrders({ isOverview = false }: CustomerOrdersProps) {
         </div>
       </CardHeader>
       <CardContent>
-        {isLoading ? (
-          <div className="flex h-32 items-center justify-center">
-            <p className="text-muted-foreground text-sm">Loading orders...</p>
-          </div>
-        ) : error ? (
+        {error ? (
           <div className="flex h-32 items-center justify-center">
             <p className="text-destructive text-sm">Failed to load orders</p>
           </div>
-        ) : !data?.orders.length ? (
+        ) : !data?.orders.length && !isLoading ? (
           <Empty>
             <EmptyHeader>
               <EmptyMedia variant="icon">
@@ -182,7 +178,7 @@ export function CustomerOrders({ isOverview = false }: CustomerOrdersProps) {
             </EmptyContent>
           </Empty>
         ) : (
-          <DataTable columns={columns} data={data.orders} />
+          <DataTable columns={columns} data={data?.orders ?? []} isLoading={isLoading} />
         )}
       </CardContent>
     </Card>

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { Bell, Shield, Trash2, AlertTriangle } from "lucide-react";
 import {
@@ -55,7 +56,7 @@ export default function AccountPreferences({
     try {
       await onDeleteAccount(deletePassword);
       toast.success("Account deleted");
-    } catch (error) {
+    } catch {
       toast.error("Failed to delete account. Please try again.");
     } finally {
       setIsLoading(false);
@@ -240,6 +241,68 @@ export default function AccountPreferences({
                 </DialogFooter>
               </DialogContent>
             </Dialog>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+export function AccountPreferencesSkeleton() {
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-5 w-5" />
+            <Skeleton className="h-6 w-48" />
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-3 w-48" />
+              </div>
+              <Skeleton className="h-6 w-11 rounded-full" />
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-5 w-5" />
+            <Skeleton className="h-6 w-40" />
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Skeleton className="h-4 w-28" />
+              <Skeleton className="h-3 w-56" />
+            </div>
+            <Skeleton className="h-6 w-11 rounded-full" />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-destructive">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-5 w-5" />
+            <Skeleton className="h-6 w-32" />
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div>
+              <Skeleton className="mb-2 h-4 w-28" />
+              <Skeleton className="h-3 w-full" />
+            </div>
+            <Skeleton className="h-9 w-32" />
           </div>
         </CardContent>
       </Card>

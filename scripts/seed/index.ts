@@ -1,8 +1,5 @@
-import "dotenv/config";
-import { Pool } from "pg";
-import { drizzle } from "drizzle-orm/node-postgres";
 import { sql } from "drizzle-orm";
-
+import { db } from "@/server/db";
 import { seedUsers } from "./users";
 import { seedStores } from "./stores";
 import { seedCategories } from "./categories";
@@ -15,14 +12,6 @@ import { seedRiskAssessments } from "./risk-assessments";
 import { seedAnalytics } from "./analytics";
 
 async function main() {
-  const databaseUrl = process.env.DATABASE_URL;
-  if (!databaseUrl) {
-    throw new Error("DATABASE_URL is not set in environment");
-  }
-
-  const pool = new Pool({ connectionString: databaseUrl });
-  const db = drizzle(pool);
-
   try {
     console.log("🔄 Resetting database...");
 
@@ -111,8 +100,6 @@ async function main() {
   } catch (error) {
     console.error("❌ Seed failed:", error);
     process.exit(1);
-  } finally {
-    await pool.end();
   }
 }
 

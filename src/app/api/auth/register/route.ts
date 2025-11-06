@@ -10,7 +10,6 @@ export async function POST(request: Request) {
     };
     const { username, password } = body;
 
-    // TODO: Proper validation
     if (!username || !password) {
       return Response.json(
         { error: "Missing username or password" },

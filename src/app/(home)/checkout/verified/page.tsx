@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useState, Suspense, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckCircle2, Loader2, XCircle } from "lucide-react";
@@ -8,6 +8,8 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { useCart } from "@/contexts/cart-context";
+import type { VerificationStatusResponse, VerificationPaymentDataResponse, OrdersResponse, ProcessPaymentResponse, PaymentErrorResponse } from "@/types/api-responses";
+import type { OrderDTO } from "@/lib/api/orders";
 
 function VerifiedContent() {
   const router = useRouter();
@@ -20,16 +22,12 @@ function VerifiedContent() {
 
   const token = searchParams.get("token");
 
-  useEffect(() => {
+  const processVerifiedPayment = useCallback(async () => {
     if (!token) {
       router.push("/checkout");
       return;
     }
 
-    processVerifiedPayment();
-  }, [token]);
-
-  const processVerifiedPayment = async () => {
     try {
       // Get verification status to retrieve payment data
       const statusResponse = await fetch(
@@ -40,7 +38,7 @@ function VerifiedContent() {
         throw new Error("Failed to verify token");
       }
 
-      const statusData = await statusResponse.json();
+      const statusData = await statusResponse.json() as VerificationStatusResponse;
 
       if (statusData.status !== "verified") {
         throw new Error("Verification not completed");
@@ -54,14 +52,14 @@ function VerifiedContent() {
         throw new Error("Failed to retrieve payment data");
       }
 
-      const { paymentData } = await dataResponse.json();
+      const { paymentData } = await dataResponse.json() as VerificationPaymentDataResponse;
 
       // Handle order creation for warn transactions
       // Note: For multi-store transactions, orders should have been created before OTP verification
       // The orderId and orderIds should already be present in paymentData
       let orderId = paymentData.orderId;
       let orderIds: number[] =
-        paymentData.orderIds || (orderId ? [orderId] : []);
+        paymentData.orderIds ?? (orderId ? [orderId] : []);
       const riskAssessmentId = paymentData.riskAssessmentId;
 
       console.log("Verified page - paymentData:", {
@@ -90,9 +88,9 @@ function VerifiedContent() {
             `/api/orders?recent=true&limit=10`,
           );
           if (ordersResponse.ok) {
-            const ordersData = await ordersResponse.json();
+            const ordersData = await ordersResponse.json() as OrdersResponse;
             const recentOrderIds =
-              ordersData.orders?.map((o: any) => o.id) || [];
+              ordersData.orders?.map((o: OrderDTO) => o.id) ?? [];
 
             if (recentOrderIds.length > 0) {
               orderIds = recentOrderIds;
@@ -119,11 +117,11 @@ function VerifiedContent() {
         });
 
         if (!orderResponse.ok) {
-          const errorData = await orderResponse.json();
-          throw new Error(errorData.error || "Failed to create order");
+          const errorData = await orderResponse.json() as { error?: string };
+          throw new Error(errorData.error ?? "Failed to create order");
         }
 
-        const orderResult = await orderResponse.json();
+        const orderResult = await orderResponse.json() as { orderId: number };
         orderId = orderResult.orderId;
         orderIds.push(orderId);
 
@@ -172,11 +170,11 @@ function VerifiedContent() {
       });
 
       if (!paymentResponse.ok) {
-        const errorData = await paymentResponse.json();
-        throw new Error(errorData.error || "Payment processing failed");
+        const errorData = await paymentResponse.json() as PaymentErrorResponse;
+        throw new Error(errorData.error ?? "Payment processing failed");
       }
 
-      const result = await paymentResponse.json();
+      const result = await paymentResponse.json() as ProcessPaymentResponse;
 
       // Create payment transaction record with order ID
       if (orderId && result.paymentIntentId) {
@@ -192,7 +190,7 @@ function VerifiedContent() {
                 paymentIntentId: result.paymentIntentId,
                 orderId: orderId,
                 amount: paymentData.amount,
-                currency: paymentData.currency || "aud",
+                currency: paymentData.currency ?? "aud",
               }),
             },
           );
@@ -227,7 +225,7 @@ function VerifiedContent() {
         const params = new URLSearchParams();
         params.set("payment_intent", result.paymentIntentId);
         if (orderId) {
-          params.set("order_id", orderId.toString());
+          params.set("order_id", String(orderId));
         }
         console.log(
           "Redirecting to success page with params:",
@@ -244,7 +242,11 @@ function VerifiedContent() {
           : "Failed to process verified payment",
       );
     }
-  };
+  }, [token, router, clearCart]);
+
+  useEffect(() => {
+    void processVerifiedPayment();
+  }, [processVerifiedPayment]);
 
   return (
     <div className="bg-background min-h-screen">

@@ -15,13 +15,34 @@ import {
 
 interface DatePickerWithRangeProps {
   className?: string;
+  value?: DateRange;
+  onChange?: (date: DateRange | undefined) => void;
 }
 
-export function DatePickerWithRange({ className }: DatePickerWithRangeProps) {
-  const [date, setDate] = React.useState<DateRange | undefined>({
-    from: new Date(2024, 0, 1),
-    to: new Date(),
-  });
+export function DatePickerWithRange({
+  className,
+  value,
+  onChange,
+}: DatePickerWithRangeProps) {
+  const [internalDate, setInternalDate] = React.useState<DateRange | undefined>(
+    value,
+  );
+
+  const date = value ?? internalDate;
+
+  const handleSelect = (selectedDate: DateRange | undefined) => {
+    if (onChange) {
+      onChange(selectedDate);
+    } else {
+      setInternalDate(selectedDate);
+    }
+  };
+
+  React.useEffect(() => {
+    if (value !== undefined) {
+      setInternalDate(value);
+    }
+  }, [value]);
 
   return (
     <div className={cn("grid gap-2", className)}>
@@ -56,7 +77,7 @@ export function DatePickerWithRange({ className }: DatePickerWithRangeProps) {
             mode="range"
             defaultMonth={date?.from}
             selected={date}
-            onSelect={setDate}
+            onSelect={handleSelect}
             numberOfMonths={2}
           />
         </PopoverContent>

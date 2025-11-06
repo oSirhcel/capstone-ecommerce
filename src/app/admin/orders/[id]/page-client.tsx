@@ -85,8 +85,7 @@ export default function OrderViewPageClient({ orderId }: { orderId: string }) {
   const payment = useMemo(() => {
     if (!order) {
       return {
-        method: "Card",
-        last4: "0000",
+        status: "Pending",
         billingAddress: {
           street: "",
           city: "",
@@ -99,8 +98,7 @@ export default function OrderViewPageClient({ orderId }: { orderId: string }) {
     const billingAddr =
       order.addresses.find((a) => a.type === "billing") ?? order.addresses[0];
     return {
-      method: "Card",
-      last4: "0000",
+      ...order.payment,
       billingAddress: {
         street: billingAddr?.addressLine1 ?? "",
         city: billingAddr?.city ?? "",
@@ -127,7 +125,13 @@ export default function OrderViewPageClient({ orderId }: { orderId: string }) {
       <div className="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-[1fr_380px]">
         <div className="min-w-0 space-y-6">
           <OrderItems items={items} />
-          <OrderPayment payment={payment} total={order.totalAmount / 100} />
+          <OrderPayment
+            payment={payment}
+            total={order.totalAmount / 100}
+            subtotal={order.subtotalAmount}
+            tax={order.taxAmount}
+            shipping={order.shippingAmount}
+          />
         </div>
 
         <div className="min-w-0 space-y-6">

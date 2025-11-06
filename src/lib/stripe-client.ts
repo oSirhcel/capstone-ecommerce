@@ -23,61 +23,143 @@ export interface ProcessPaymentResponse {
   paymentIntentId: string;
 }
 
+export interface PaymentStatus {
+  status: string;
+  amount: number;
+  currency: string;
+  orderId?: number;
+}
+
+export interface SavePaymentMethodResponse {
+  success: boolean;
+}
+
+export interface PaymentMethod {
+  id: number;
+  type: string;
+  last4?: string;
+  expiryMonth?: number;
+  expiryYear?: number;
+  isDefault: boolean;
+}
+
+export interface GetPaymentMethodsResponse {
+  paymentMethods: PaymentMethod[];
+}
+
+export interface DeletePaymentMethodResponse {
+  success: boolean;
+}
+
+interface PaymentErrorResponse {
+  error?: string;
+  errorCode?: string;
+  message?: string;
+  riskScore?: number;
+  riskFactors?: unknown;
+  supportContact?: string;
+  verificationToken?: string;
+  expiresAt?: string;
+  userEmail?: string;
+}
+
+interface ZeroTrustBlockError extends Error {
+  isZeroTrustBlock: true;
+  riskScore?: number;
+  riskFactors?: unknown;
+  supportContact?: string;
+}
+
+interface ZeroTrustVerificationError extends Error {
+  isZeroTrustVerification: true;
+  riskScore?: number;
+  riskFactors?: unknown;
+  verificationToken?: string;
+  expiresAt?: string;
+  userEmail?: string;
+}
+
 // Payment processing utilities
 export const processPayment = async (params: {
   amount: number;
   currency?: string;
   orderId?: number;
   savePaymentMethod?: boolean;
-  orderData?: any;
+  orderData?: Record<string, unknown>;
 }): Promise<ProcessPaymentResponse> => {
-  const response = await fetch("/api/payments", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(params),
-  });
+  let response: Response;
+  try {
+    response = await fetch("/api/payments", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(params),
+    });
+  } catch (networkError) {
+    console.error("Network error during payment processing:", networkError);
+    throw new Error(
+      "Network error. Please check your connection and try again.",
+    );
+  }
 
   // Handle 202 Accepted (verification required) as an error case
   if (response.status === 202 || !response.ok) {
-    const error = await response.json();
-    
-    console.log('Payment API response:', { status: response.status, error });
-    
+    let error: PaymentErrorResponse;
+    try {
+      error = (await response.json()) as PaymentErrorResponse;
+    } catch (jsonError) {
+      // If response is not JSON, create a generic error
+      console.error("Failed to parse error response:", jsonError);
+      throw new Error(
+        `Payment processing failed with status ${response.status}. Please try again.`,
+      );
+    }
+
+    console.log("Payment API response:", { status: response.status, error });
+
     // Handle zero trust blocking specially
-    if (error.errorCode === 'ZERO_TRUST_DENIED') {
-      const zeroTrustError = new Error(error.message || 'Transaction blocked for security reasons');
-      (zeroTrustError as any).isZeroTrustBlock = true;
-      (zeroTrustError as any).riskScore = error.riskScore;
-      (zeroTrustError as any).riskFactors = error.riskFactors;
-      (zeroTrustError as any).supportContact = error.supportContact;
+    if (error.errorCode === "ZERO_TRUST_DENIED") {
+      const zeroTrustError = new Error(
+        error.message ?? "Transaction blocked for security reasons",
+      ) as ZeroTrustBlockError;
+      zeroTrustError.isZeroTrustBlock = true;
+      zeroTrustError.riskScore = error.riskScore;
+      zeroTrustError.riskFactors = error.riskFactors;
+      zeroTrustError.supportContact = error.supportContact;
       throw zeroTrustError;
     }
-    
+
     // Handle zero trust verification required (202 status)
-    if (error.errorCode === 'ZERO_TRUST_VERIFICATION_REQUIRED' || response.status === 202) {
-      console.log('Creating verification error with:', error);
-      const verificationError = new Error(error.message || 'Transaction requires verification');
-      (verificationError as any).isZeroTrustVerification = true;
-      (verificationError as any).riskScore = error.riskScore;
-      (verificationError as any).riskFactors = error.riskFactors;
-      (verificationError as any).verificationToken = error.verificationToken;
-      (verificationError as any).expiresAt = error.expiresAt;
-      (verificationError as any).userEmail = error.userEmail;
-      console.log('Throwing verification error:', verificationError);
+    if (
+      error.errorCode === "ZERO_TRUST_VERIFICATION_REQUIRED" ||
+      response.status === 202
+    ) {
+      console.log("Creating verification error with:", error);
+      const verificationError = new Error(
+        error.message ?? "Transaction requires verification",
+      ) as ZeroTrustVerificationError;
+      verificationError.isZeroTrustVerification = true;
+      verificationError.riskScore = error.riskScore;
+      verificationError.riskFactors = error.riskFactors;
+      verificationError.verificationToken = error.verificationToken;
+      verificationError.expiresAt = error.expiresAt;
+      verificationError.userEmail = error.userEmail;
+      console.log("Throwing verification error:", verificationError);
       throw verificationError;
     }
-    
-    throw new Error(error.error || 'Payment processing failed');
+
+    throw new Error(error.error ?? "Payment processing failed");
   }
 
-  return (await response.json()) as ProcessPaymentResponse;
+  // Parse successful response
+  try {
+    return (await response.json()) as ProcessPaymentResponse;
+  } catch (jsonError) {
+    console.error("Failed to parse payment response:", jsonError);
+    throw new Error("Invalid response from payment server. Please try again.");
+  }
 };
-
-interface SavePaymentMethodResponse {
-  success: boolean;
-}
 
 // Save payment method for future use
 export const savePaymentMethod = async (params: {
@@ -100,19 +182,6 @@ export const savePaymentMethod = async (params: {
   return (await response.json()) as SavePaymentMethodResponse;
 };
 
-interface PaymentMethod {
-  id: number;
-  type: string;
-  last4?: string;
-  expiryMonth?: number;
-  expiryYear?: number;
-  isDefault: boolean;
-}
-
-interface GetPaymentMethodsResponse {
-  paymentMethods: PaymentMethod[];
-}
-
 // Get user's saved payment methods
 export const getPaymentMethods =
   async (): Promise<GetPaymentMethodsResponse> => {
@@ -125,10 +194,6 @@ export const getPaymentMethods =
 
     return (await response.json()) as GetPaymentMethodsResponse;
   };
-
-interface DeletePaymentMethodResponse {
-  success: boolean;
-}
 
 // Delete a payment method
 export const deletePaymentMethod = async (
@@ -145,13 +210,6 @@ export const deletePaymentMethod = async (
 
   return (await response.json()) as DeletePaymentMethodResponse;
 };
-
-interface PaymentStatus {
-  status: string;
-  amount: number;
-  currency: string;
-  orderId?: number;
-}
 
 // Get payment status
 export const getPaymentStatus = async (params: {

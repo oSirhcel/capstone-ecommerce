@@ -27,6 +27,7 @@ import { StripePaymentForm } from "@/components/checkout/stripe-payment-form";
 import { AddressForm } from "@/components/checkout/address-form";
 import { useAddressesByType } from "@/hooks/use-addresses";
 import { createOrders as createOrdersAPI } from "@/lib/api/orders";
+import { useValidatePaymentProviders } from "@/hooks/checkout/use-validate-payment-providers";
 
 // Type definitions
 interface RiskAssessmentResponse {
@@ -119,6 +120,13 @@ export function CheckoutClient() {
     defaultAddress: defaultBilling,
     isLoading: loadingBilling,
   } = useAddressesByType("billing");
+
+  // Validate payment providers for all stores
+  const {
+    isValid: paymentProvidersValid,
+    isLoading: validatingProviders,
+    missingStores,
+  } = useValidatePaymentProviders(storeGroups);
 
   // Form instances
   const contactForm = useForm<ContactFormData>({
@@ -333,6 +341,21 @@ export function CheckoutClient() {
       }
     }
 
+    // Check payment providers before proceeding
+    if (!paymentProvidersValid) {
+      if (missingStores.length > 0) {
+        const storeNames = missingStores.map((s) => s.storeName).join(", ");
+        toast.error("Payment setup required", {
+          description: `The following stores need payment setup: ${storeNames}`,
+        });
+      } else {
+        toast.error("Payment setup required", {
+          description: "Some stores need payment setup before checkout",
+        });
+      }
+      return;
+    }
+
     setCurrentStep("payment");
   };
 
@@ -412,17 +435,43 @@ export function CheckoutClient() {
       // First, perform risk assessment to get assessment ID
       const orderData = getOrderDataForVerification();
 
-      const riskAssessmentResponse = await fetch("/api/payments", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          amount: total,
-          currency: "aud",
-          orderData,
-        }),
-      });
+      let riskAssessmentResponse: Response;
+      try {
+        riskAssessmentResponse = await fetch("/api/payments", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            amount: total,
+            currency: "aud",
+            orderData,
+          }),
+        });
+      } catch (networkError) {
+        console.error("Network error during risk assessment:", networkError);
+        throw new Error(
+          "Network error. Please check your connection and try again.",
+        );
+      }
+
+      // Handle non-200/202 responses
+      if (
+        riskAssessmentResponse.status !== 200 &&
+        riskAssessmentResponse.status !== 202
+      ) {
+        let errorMessage = "Failed to process payment";
+        try {
+          const errorData = (await riskAssessmentResponse.json()) as {
+            error?: string;
+            message?: string;
+          };
+          errorMessage = errorData.error ?? errorData.message ?? errorMessage;
+        } catch {
+          // If JSON parsing fails, use default message
+        }
+        throw new Error(errorMessage);
+      }
 
       const riskData =
         (await riskAssessmentResponse.json()) as RiskAssessmentResponse & {
@@ -436,6 +485,19 @@ export function CheckoutClient() {
 
       // Create orders with risk assessment ID
       const orderResult = await handleCreateOrders(riskAssessmentId);
+
+      // Validate order creation result
+      if (!orderResult.primaryOrderId) {
+        throw new Error(
+          "Order was created but no order ID was returned. Please contact support.",
+        );
+      }
+
+      if (!orderResult.orderIds || orderResult.orderIds.length === 0) {
+        throw new Error(
+          "Order creation failed. No orders were created. Please try again.",
+        );
+      }
 
       if (orderResult.storeCount > 1) {
         toast.info(`Creating ${orderResult.storeCount} orders`, {
@@ -473,8 +535,12 @@ export function CheckoutClient() {
       return orderResult.primaryOrderId;
     } catch (error) {
       console.error("Order creation error:", error);
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Failed to create order. Please try again or contact support.";
       toast.error("Failed to create order", {
-        description: "Please try again or contact support.",
+        description: errorMessage,
       });
       throw error;
     }
@@ -981,7 +1047,33 @@ export function CheckoutClient() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    {getStoreCount() > 1 && (
+                    {validatingProviders && (
+                      <div className="rounded-md border border-yellow-200 bg-yellow-50 p-3 text-sm dark:border-yellow-800 dark:bg-yellow-950">
+                        <p className="text-yellow-900 dark:text-yellow-100">
+                          Validating payment setup...
+                        </p>
+                      </div>
+                    )}
+                    {!validatingProviders && !paymentProvidersValid && (
+                      <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm dark:border-red-800 dark:bg-red-950">
+                        <p className="mb-2 font-medium text-red-900 dark:text-red-100">
+                          Payment Setup Required
+                        </p>
+                        <p className="mb-2 text-red-700 dark:text-red-300">
+                          The following stores need payment setup before checkout
+                          can proceed:
+                        </p>
+                        <ul className="list-disc list-inside space-y-1 text-red-700 dark:text-red-300">
+                          {missingStores.map((store) => (
+                            <li key={store.storeId}>{store.storeName}</li>
+                          ))}
+                        </ul>
+                        <p className="mt-2 text-xs text-red-600 dark:text-red-400">
+                          Please contact the store owners or try again later.
+                        </p>
+                      </div>
+                    )}
+                    {getStoreCount() > 1 && paymentProvidersValid && (
                       <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm dark:border-blue-800 dark:bg-blue-950">
                         <p className="mb-1 font-medium text-blue-900 dark:text-blue-100">
                           Processing {getStoreCount()} Orders
@@ -993,14 +1085,16 @@ export function CheckoutClient() {
                         </p>
                       </div>
                     )}
-                    <StripePaymentForm
-                      amount={total}
-                      currency="aud"
-                      onSuccess={handlePaymentSuccess}
-                      onError={handlePaymentError}
-                      onCreateOrder={handlePaymentInit}
-                      orderData={getOrderDataForVerification()}
-                    />
+                    {paymentProvidersValid && (
+                      <StripePaymentForm
+                        amount={total}
+                        currency="aud"
+                        onSuccess={handlePaymentSuccess}
+                        onError={handlePaymentError}
+                        onCreateOrder={handlePaymentInit}
+                        orderData={getOrderDataForVerification()}
+                      />
+                    )}
                   </CardContent>
                 </Card>
               </>

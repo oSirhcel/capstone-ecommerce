@@ -1,10 +1,14 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { db } from "@/server/db";
-import { paymentTransactions, orders } from "@/server/db/schema";
+import {
+  paymentTransactions,
+  orders,
+  storePaymentProviders,
+} from "@/server/db/schema";
 import { eq } from "drizzle-orm";
 import { constructWebhookEvent } from "@/lib/stripe";
-import Stripe from "stripe";
+import type Stripe from "stripe";
 
 // POST /api/payments/webhooks - Handle Stripe webhook events
 export async function POST(request: NextRequest) {
@@ -32,37 +36,31 @@ export async function POST(request: NextRequest) {
     // Handle different event types
     switch (event.type) {
       case "payment_intent.succeeded":
-        await handlePaymentIntentSucceeded(
-          event.data.object as Stripe.PaymentIntent,
-        );
+        await handlePaymentIntentSucceeded(event.data.object);
         break;
 
       case "payment_intent.payment_failed":
-        await handlePaymentIntentFailed(
-          event.data.object as Stripe.PaymentIntent,
-        );
+        await handlePaymentIntentFailed(event.data.object);
         break;
 
       case "payment_intent.processing":
-        await handlePaymentIntentProcessing(
-          event.data.object as Stripe.PaymentIntent,
-        );
+        await handlePaymentIntentProcessing(event.data.object);
         break;
 
       case "payment_intent.canceled":
-        await handlePaymentIntentCanceled(
-          event.data.object as Stripe.PaymentIntent,
-        );
+        await handlePaymentIntentCanceled(event.data.object);
         break;
 
       case "payment_method.attached":
-        await handlePaymentMethodAttached(
-          event.data.object as Stripe.PaymentMethod,
-        );
+        await handlePaymentMethodAttached(event.data.object);
         break;
 
       case "customer.created":
-        await handleCustomerCreated(event.data.object as Stripe.Customer);
+        await handleCustomerCreated(event.data.object);
+        break;
+
+      case "account.updated":
+        await handleAccountUpdated(event.data.object);
         break;
 
       default:
@@ -86,40 +84,101 @@ async function handlePaymentIntentSucceeded(
   try {
     console.log("Processing payment_intent.succeeded:", paymentIntent.id);
 
-    // Update transaction status
-    await db
-      .update(paymentTransactions)
-      .set({
-        status: "completed",
-        gatewayResponse: JSON.stringify({
-          paymentIntentId: paymentIntent.id,
-          status: paymentIntent.status,
-          paymentMethod: paymentIntent.payment_method,
-          charges: paymentIntent.charges,
-          receiptUrl: paymentIntent.charges?.data?.[0]?.receipt_url,
-        }),
-        updatedAt: new Date(),
-      })
-      .where(eq(paymentTransactions.transactionId, paymentIntent.id));
+    // Get charges if available (may need to be expanded)
+    const charges =
+      "charges" in paymentIntent
+        ? (paymentIntent.charges as {
+            data?: Array<{ receipt_url?: string | null }>;
+          })
+        : null;
+    const receiptUrl = charges?.data?.[0]?.receipt_url ?? null;
+
+    // Check if transaction exists (idempotency check)
+    const [existingTransaction] = await db
+      .select()
+      .from(paymentTransactions)
+      .where(eq(paymentTransactions.transactionId, paymentIntent.id))
+      .limit(1);
+
+    if (existingTransaction) {
+      // If transaction already exists and is completed, skip update (idempotency)
+      if (existingTransaction.status === "completed") {
+        console.log(
+          `Transaction ${paymentIntent.id} already processed, skipping duplicate webhook`,
+        );
+        return;
+      }
+
+      // Update transaction status
+      try {
+        await db
+          .update(paymentTransactions)
+          .set({
+            status: "completed",
+            gatewayResponse: JSON.stringify({
+              paymentIntentId: paymentIntent.id,
+              status: paymentIntent.status,
+              paymentMethod: paymentIntent.payment_method,
+              receiptUrl,
+            }),
+            updatedAt: new Date(),
+          })
+          .where(eq(paymentTransactions.transactionId, paymentIntent.id));
+      } catch (dbError) {
+        console.error(
+          "Failed to update transaction status in webhook:",
+          dbError,
+        );
+        // Don't throw - continue to order update
+      }
+    } else {
+      // Transaction doesn't exist - might be a webhook before transaction record was created
+      // This can happen in edge cases, log but don't fail
+      console.warn(
+        `Transaction ${paymentIntent.id} not found in database, skipping transaction update`,
+      );
+    }
 
     // Update order status if orderId exists in metadata
     if (paymentIntent.metadata?.orderId) {
       const orderId = parseInt(paymentIntent.metadata.orderId);
 
-      await db
-        .update(orders)
-        .set({
-          status: "Processing",
-          paymentStatus: "Paid",
-          updatedAt: new Date(),
-        })
-        .where(eq(orders.id, orderId));
+      // Check if order exists before updating
+      const [existingOrder] = await db
+        .select({ id: orders.id })
+        .from(orders)
+        .where(eq(orders.id, orderId))
+        .limit(1);
 
-      console.log(`Order ${orderId} status updated to Processing`);
+      if (existingOrder) {
+        try {
+          await db
+            .update(orders)
+            .set({
+              status: "Processing",
+              paymentStatus: "Paid",
+              updatedAt: new Date(),
+            })
+            .where(eq(orders.id, orderId));
+
+          console.log(`Order ${orderId} status updated to Processing`);
+        } catch (dbError) {
+          console.error(
+            `Failed to update order ${orderId} status in webhook:`,
+            dbError,
+          );
+          // Don't throw - webhook was processed, order update can be retried
+        }
+      } else {
+        console.warn(
+          `Order ${orderId} not found in database for payment intent ${paymentIntent.id}`,
+        );
+      }
     }
   } catch (error) {
     console.error("Error handling payment_intent.succeeded:", error);
-    throw error;
+    // Don't throw - webhook processing should be idempotent
+    // Stripe will retry if we return an error, but we've already logged it
   }
 }
 
@@ -128,45 +187,90 @@ async function handlePaymentIntentFailed(paymentIntent: Stripe.PaymentIntent) {
   try {
     console.log("Processing payment_intent.payment_failed:", paymentIntent.id);
 
-    // Update transaction status
-    await db
-      .update(paymentTransactions)
-      .set({
-        status: "Failed",
-        gatewayResponse: JSON.stringify({
-          paymentIntentId: paymentIntent.id,
-          status: paymentIntent.status,
-          lastPaymentError: paymentIntent.last_payment_error,
-        }),
-        updatedAt: new Date(),
-      })
-      .where(eq(paymentTransactions.transactionId, paymentIntent.id));
+    // Check if transaction exists (idempotency check)
+    const [existingTransaction] = await db
+      .select()
+      .from(paymentTransactions)
+      .where(eq(paymentTransactions.transactionId, paymentIntent.id))
+      .limit(1);
+
+    if (existingTransaction) {
+      // Update transaction status
+      try {
+        await db
+          .update(paymentTransactions)
+          .set({
+            status: "Failed",
+            gatewayResponse: JSON.stringify({
+              paymentIntentId: paymentIntent.id,
+              status: paymentIntent.status,
+              lastPaymentError: paymentIntent.last_payment_error,
+            }),
+            updatedAt: new Date(),
+          })
+          .where(eq(paymentTransactions.transactionId, paymentIntent.id));
+      } catch (dbError) {
+        console.error(
+          "Failed to update transaction status in webhook:",
+          dbError,
+        );
+        // Continue to order update
+      }
+    } else {
+      console.warn(
+        `Transaction ${paymentIntent.id} not found in database, skipping transaction update`,
+      );
+    }
 
     // Update order status if orderId exists in metadata
     if (paymentIntent.metadata?.orderId) {
       const orderId = parseInt(paymentIntent.metadata.orderId);
 
-      // Check if this is a denial (card declined, insufficient funds, etc.)
-      const isDenied = paymentIntent.last_payment_error?.code === "card_declined" ||
-                      paymentIntent.last_payment_error?.code === "insufficient_funds" ||
-                      paymentIntent.last_payment_error?.code === "expired_card" ||
-                      paymentIntent.last_payment_error?.code === "incorrect_cvc" ||
-                      paymentIntent.last_payment_error?.code === "processing_error";
+      // Check if order exists before updating
+      const [existingOrder] = await db
+        .select({ id: orders.id })
+        .from(orders)
+        .where(eq(orders.id, orderId))
+        .limit(1);
 
-      await db
-        .update(orders)
-        .set({
-          status: isDenied ? "Denied" : "Failed",
-          paymentStatus: "Failed",
-          updatedAt: new Date(),
-        })
-        .where(eq(orders.id, orderId));
+      if (existingOrder) {
+        // Check if this is a denial (card declined, insufficient funds, etc.)
+        const isDenied =
+          paymentIntent.last_payment_error?.code === "card_declined" ||
+          paymentIntent.last_payment_error?.code === "insufficient_funds" ||
+          paymentIntent.last_payment_error?.code === "expired_card" ||
+          paymentIntent.last_payment_error?.code === "incorrect_cvc" ||
+          paymentIntent.last_payment_error?.code === "processing_error";
 
-      console.log(`Order ${orderId} status updated to ${isDenied ? "Denied" : "Failed"}`);
+        try {
+          await db
+            .update(orders)
+            .set({
+              status: isDenied ? "Denied" : "Failed",
+              paymentStatus: "Failed",
+              updatedAt: new Date(),
+            })
+            .where(eq(orders.id, orderId));
+
+          console.log(
+            `Order ${orderId} status updated to ${isDenied ? "Denied" : "Failed"}`,
+          );
+        } catch (dbError) {
+          console.error(
+            `Failed to update order ${orderId} status in webhook:`,
+            dbError,
+          );
+          // Don't throw - webhook was processed
+        }
+      } else {
+        console.warn(
+          `Order ${orderId} not found in database for payment intent ${paymentIntent.id}`,
+        );
+      }
     }
   } catch (error) {
     console.error("Error handling payment_intent.payment_failed:", error);
-    throw error;
+    // Don't throw - webhook processing should be idempotent
   }
 }
 
@@ -245,8 +349,12 @@ async function handlePaymentMethodAttached(
     console.log("Processing payment_method.attached:", paymentMethod.id);
 
     // Log for debugging - in production you might want to sync with your database
+    const customerId =
+      typeof paymentMethod.customer === "string"
+        ? paymentMethod.customer
+        : (paymentMethod.customer?.id ?? "unknown");
     console.log(
-      `Payment method ${paymentMethod.id} attached to customer ${paymentMethod.customer}`,
+      `Payment method ${paymentMethod.id} attached to customer ${customerId}`,
     );
   } catch (error) {
     console.error("Error handling payment_method.attached:", error);
@@ -264,6 +372,45 @@ async function handleCustomerCreated(customer: Stripe.Customer) {
   } catch (error) {
     console.error("Error handling customer.created:", error);
     throw error;
+  }
+}
+
+// Handle Connect account updates
+async function handleAccountUpdated(account: Stripe.Account) {
+  try {
+    console.log("Processing account.updated:", account.id);
+
+    // Update payment provider status when Connect account status changes
+    const [provider] = await db
+      .select()
+      .from(storePaymentProviders)
+      .where(eq(storePaymentProviders.stripeAccountId, account.id))
+      .limit(1);
+
+    if (provider) {
+      const accountStatus =
+        account.details_submitted && account.charges_enabled
+          ? "active"
+          : account.details_submitted
+            ? "pending"
+            : "restricted";
+
+      await db
+        .update(storePaymentProviders)
+        .set({
+          stripeAccountStatus: accountStatus,
+          isActive: accountStatus === "active",
+          updatedAt: new Date(),
+        })
+        .where(eq(storePaymentProviders.stripeAccountId, account.id));
+
+      console.log(
+        `Updated payment provider status for account ${account.id} to ${accountStatus}`,
+      );
+    }
+  } catch (error) {
+    console.error("Error handling account.updated:", error);
+    // Don't throw - webhook processing should be idempotent
   }
 }
 

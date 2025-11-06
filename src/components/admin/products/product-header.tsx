@@ -15,6 +15,7 @@ interface ProductHeaderProps {
     id: string;
     name: string;
     sku: string;
+    slug: string;
     status: string;
     featured: boolean;
     price: number;
@@ -25,11 +26,11 @@ interface ProductHeaderProps {
 export function ProductHeader({ product }: ProductHeaderProps) {
   const getStatusVariant = (status: string) => {
     switch (status.toLowerCase()) {
-      case "active":
+      case "Active":
         return "default";
-      case "draft":
+      case "Draft":
         return "secondary";
-      case "archived":
+      case "Archived":
         return "outline";
       default:
         return "secondary";
@@ -61,7 +62,7 @@ export function ProductHeader({ product }: ProductHeaderProps) {
 
       <div className="flex items-center gap-2">
         <Button variant="outline" asChild>
-          <Link href={`/product/${product.slug || product.id}`} target="_blank">
+          <Link href={`/product/${product.slug ?? product.id}`} target="_blank">
             <Eye className="mr-2 h-4 w-4" />
             View Live
           </Link>

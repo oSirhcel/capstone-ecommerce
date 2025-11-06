@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { RefreshCwIcon } from "lucide-react";
-import { useRightSidebar } from "@/contexts/right-sidebar-context";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -15,7 +14,6 @@ interface ChatbotHeaderProps {
 }
 
 export function ChatbotHeader({ onReset }: ChatbotHeaderProps) {
-  const { close } = useRightSidebar();
   const [open, setOpen] = useState(false);
 
   const handleReset = () => {

@@ -190,7 +190,7 @@ export function CartOverviewClient() {
 
                       <div className="min-w-0 flex-1">
                         <Link
-                          href={`/product/${item.slug || item.id}`}
+                          href={`/product/${item.slug ?? item.id}`}
                           className="line-clamp-1 font-medium hover:underline"
                         >
                           {item.name}

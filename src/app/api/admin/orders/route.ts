@@ -24,7 +24,10 @@ import {
   inArray,
   isNull,
 } from "drizzle-orm";
-import { orderStatusSchema } from "@/lib/api/admin/orders";
+import {
+  orderStatusSchema,
+  paymentStatusSchema,
+} from "@/lib/api/admin/orders";
 
 export async function GET(request: NextRequest) {
   const session = await auth();
@@ -40,6 +43,7 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(Number(searchParams.get("limit") ?? "10"), 100);
     const search = searchParams.get("search") ?? undefined;
     const status = searchParams.get("status") ?? undefined;
+    const paymentStatus = searchParams.get("paymentStatus") ?? undefined;
     const sortBy = (searchParams.get("sortBy") ?? "createdAt") as
       | "createdAt"
       | "totalAmount"
@@ -90,9 +94,19 @@ export async function GET(request: NextRequest) {
         : undefined
       : undefined;
 
+    // Validate payment status if provided
+    const validatedPaymentStatus = paymentStatus
+      ? paymentStatusSchema.safeParse(paymentStatus).success
+        ? (paymentStatus as "Pending" | "Paid" | "Failed" | "Refunded")
+        : undefined
+      : undefined;
+
     const commonFilters = and(
       eq(orders.storeId, storeId),
       validatedStatus ? eq(orders.status, validatedStatus) : undefined,
+      validatedPaymentStatus
+        ? eq(orders.paymentStatus, validatedPaymentStatus)
+        : undefined,
       dateFrom && dateTo
         ? between(orders.createdAt, new Date(dateFrom), new Date(dateTo))
         : undefined,
@@ -328,7 +342,7 @@ export async function POST(request: NextRequest) {
         and(
           inArray(products.id, productIds),
           eq(products.storeId, storeId),
-          eq(products.status, "active"),
+          eq(products.status, "Active"),
         ),
       );
 

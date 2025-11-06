@@ -2,7 +2,7 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { db } from "@/server/db";
 import { reviews, userProfiles, products, stores } from "@/server/db/schema";
-import { eq, and, sql, desc, asc, count, inArray } from "drizzle-orm";
+import { eq, sql, desc, asc, count, inArray } from "drizzle-orm";
 
 // GET /api/stores/[id]/reviews - Get aggregated reviews from all store products
 export async function GET(

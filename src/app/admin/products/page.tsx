@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { DataTable } from "@/components/admin/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,10 +12,18 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Search, Plus, Filter, Trash2, Package } from "lucide-react";
+import { Search, Plus, Package } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import Image from "next/image";
 import Link from "next/link";
 import { useProductsQuery } from "@/hooks/products/use-products-query";
+import { useCategoriesQuery } from "@/hooks/categories/use-categories-query";
 
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -50,6 +58,15 @@ const columns = [
         </div>
       );
     },
+    skeleton: () => (
+      <div className="flex items-center gap-3">
+        <Skeleton className="h-10 w-10 rounded-md" />
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-32" />
+          <Skeleton className="h-3 w-24" />
+        </div>
+      </div>
+    ),
   },
   {
     header: "Price",
@@ -59,6 +76,7 @@ const columns = [
         ${((row.original.price ?? 0) / 100).toFixed(2)}
       </span>
     ),
+    skeleton: () => <Skeleton className="h-4 w-16" />,
   },
   {
     header: "Stock",
@@ -71,6 +89,7 @@ const columns = [
         </span>
       );
     },
+    skeleton: () => <Skeleton className="h-4 w-12" />,
   },
   {
     header: "Status",
@@ -95,6 +114,7 @@ const columns = [
 
       return <Badge variant={variant}>{displayStatus}</Badge>;
     },
+    skeleton: () => <Skeleton className="h-6 w-20 rounded-full" />,
   },
 ];
 
@@ -103,6 +123,23 @@ export default function ProductsPage() {
   const router = useRouter();
   const storeId = session?.data?.store?.id ?? "";
   const [searchTerm, setSearchTerm] = useState("");
+  type StatusFilter = "all" | "Active" | "Draft" | "Archived";
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  type StockFilter = "all" | "low" | "out";
+  const [stockFilter, setStockFilter] = useState<StockFilter>("all");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [sortOption, setSortOption] = useState<
+    | "price-low"
+    | "price-high"
+    | "name-asc"
+    | "name-desc"
+    | "release-newest"
+    | "release-oldest"
+  >("release-newest");
+
+  const { data: categoriesData } = useCategoriesQuery();
+  const categories = categoriesData?.categories ?? [];
+
   const {
     data: productsData,
     isLoading,
@@ -110,15 +147,36 @@ export default function ProductsPage() {
   } = useProductsQuery({
     search: searchTerm || undefined,
     store: storeId,
+    status: statusFilter === "all" ? "all" : statusFilter,
+    category:
+      categoryFilter === "all"
+        ? undefined
+        : parseInt(categoryFilter) || undefined,
+    sort: sortOption,
   });
 
-  const products = productsData?.products ?? [];
+  const allProducts = useMemo(
+    () => productsData?.products ?? [],
+    [productsData?.products],
+  );
+
+  // Apply stock filter client-side
+  const products = useMemo(() => {
+    if (stockFilter === "all") return allProducts;
+    if (stockFilter === "low")
+      return allProducts.filter((p) => p.stock > 0 && p.stock < 20);
+    if (stockFilter === "out") return allProducts.filter((p) => p.stock === 0);
+    return allProducts;
+  }, [allProducts, stockFilter]);
+
   const totalProducts = productsData?.pagination?.total ?? 0;
-  const activeProducts = products.filter((p) => p.status === "Active").length;
-  const lowStockProducts = products.filter(
+  const activeProducts = allProducts.filter(
+    (p) => p.status === "Active",
+  ).length;
+  const lowStockProducts = allProducts.filter(
     (p) => p.stock > 0 && p.stock < 20,
   ).length;
-  const outOfStockProducts = products.filter((p) => p.stock === 0).length;
+  const outOfStockProducts = allProducts.filter((p) => p.stock === 0).length;
 
   const handleRowClick = (product: Product) => {
     router.push(`/admin/products/${product.id}/edit`);
@@ -247,7 +305,7 @@ export default function ProductsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="mb-6 flex items-center gap-4">
+          <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center">
             <div className="relative max-w-sm flex-1">
               <Search className="text-muted-foreground absolute top-2.5 left-2.5 h-4 w-4" />
               <Input
@@ -257,10 +315,72 @@ export default function ProductsPage() {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <Button variant="outline">
-              <Filter className="mr-2 h-4 w-4" />
-              Filter
-            </Button>
+            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                {categories.map((cat) => (
+                  <SelectItem key={cat.id} value={cat.id.toString()}>
+                    {cat.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select
+              value={statusFilter}
+              onValueChange={(v) => setStatusFilter(v as StatusFilter)}
+            >
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="Active">Active</SelectItem>
+                <SelectItem value="Draft">Draft</SelectItem>
+                <SelectItem value="Archived">Archived</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select
+              value={stockFilter}
+              onValueChange={(v) => setStockFilter(v as StockFilter)}
+            >
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="Stock" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Stock</SelectItem>
+                <SelectItem value="low">Low Stock</SelectItem>
+                <SelectItem value="out">Out of Stock</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select
+              value={sortOption}
+              onValueChange={(v) =>
+                setSortOption(
+                  v as
+                    | "price-low"
+                    | "price-high"
+                    | "name-asc"
+                    | "name-desc"
+                    | "release-newest"
+                    | "release-oldest",
+                )
+              }
+            >
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Sort" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="release-newest">Newest First</SelectItem>
+                <SelectItem value="release-oldest">Oldest First</SelectItem>
+                <SelectItem value="price-low">Price: Low-High</SelectItem>
+                <SelectItem value="price-high">Price: High-Low</SelectItem>
+                <SelectItem value="name-asc">Name: A-Z</SelectItem>
+                <SelectItem value="name-desc">Name: Z-A</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <DataTable
             columns={columns}

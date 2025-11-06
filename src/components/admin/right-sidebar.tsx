@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { usePathname } from "next/navigation";
 import { useRightSidebar } from "@/contexts/right-sidebar-context";

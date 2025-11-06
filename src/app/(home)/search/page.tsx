@@ -236,7 +236,7 @@ function SearchPageContent() {
                               }
                               alt={product.images[0]?.altText ?? product.name}
                               fill
-                              className="object-contain"
+                              className="aspect-square object-contain"
                             />
                           </div>
                           <h3 className="mb-2 line-clamp-2 text-sm font-semibold">
@@ -294,7 +294,7 @@ function SearchPageContent() {
                             }
                             alt={product.images[0]?.altText ?? product.name}
                             fill
-                            className="object-contain"
+                            className="aspect-square object-contain"
                           />
                         </div>
                         <h3 className="mb-2 line-clamp-2 text-sm font-semibold">

@@ -76,11 +76,13 @@ export const createPaymentIntent = async (params: {
   }
 
   // Use Stripe Connect if account ID provided
-  const options: Stripe.RequestOptions = stripeAccountId
+  const options: Stripe.RequestOptions | undefined = stripeAccountId
     ? { stripeAccount: stripeAccountId }
-    : {};
+    : undefined;
 
-  return stripe.paymentIntents.create(paymentIntentParams, options);
+  return options
+    ? await stripe.paymentIntents.create(paymentIntentParams, options)
+    : await stripe.paymentIntents.create(paymentIntentParams);
 };
 
 // Create or retrieve a Stripe customer
@@ -92,19 +94,20 @@ export const createOrRetrieveCustomer = async (params: {
 }) => {
   const { userId, email, name, stripeAccountId } = params;
 
-  const options: Stripe.RequestOptions = stripeAccountId
+  // Only create options if stripeAccountId is provided
+  const options: Stripe.RequestOptions | undefined = stripeAccountId
     ? { stripeAccount: stripeAccountId }
-    : {};
+    : undefined;
 
   // First, try to find existing customer by userId in metadata
   try {
-    const searchResults = await stripe.customers.search(
-      {
-        query: `metadata['userId']:'${userId}'`,
-        limit: 1,
-      },
-      options,
-    );
+    const searchParams = {
+      query: `metadata['userId']:'${userId}'`,
+      limit: 1,
+    };
+    const searchResults = options
+      ? await stripe.customers.search(searchParams, options)
+      : await stripe.customers.search(searchParams);
 
     if (searchResults.data.length > 0) {
       return searchResults.data[0];
@@ -113,12 +116,12 @@ export const createOrRetrieveCustomer = async (params: {
     console.warn("Stripe customer search failed, falling back to list:", error);
 
     // Fallback to list method if search fails
-    const existingCustomers = await stripe.customers.list(
-      {
-        limit: 100, // Increase limit for better chance of finding customer
-      },
-      options,
-    );
+    const listParams = {
+      limit: 100, // Increase limit for better chance of finding customer
+    };
+    const existingCustomers = options
+      ? await stripe.customers.list(listParams, options)
+      : await stripe.customers.list(listParams);
 
     // Search through customers to find one with matching userId
     for (const customer of existingCustomers.data) {
@@ -130,25 +133,31 @@ export const createOrRetrieveCustomer = async (params: {
 
   // If we have an email and no existing customer found, search by email
   if (email) {
-    const emailCustomers = await stripe.customers.list(
-      {
-        limit: 1,
-        email: email,
-      },
-      options,
-    );
+    const emailParams = {
+      limit: 1,
+      email: email,
+    };
+    const emailCustomers = options
+      ? await stripe.customers.list(emailParams, options)
+      : await stripe.customers.list(emailParams);
 
     if (emailCustomers.data.length > 0) {
       // Update the customer with our userId metadata
-      return stripe.customers.update(
-        emailCustomers.data[0].id,
-        {
-          metadata: {
-            userId,
-          },
+      const updateParams = {
+        metadata: {
+          userId,
         },
-        options,
-      );
+      };
+      return options
+        ? await stripe.customers.update(
+            emailCustomers.data[0].id,
+            updateParams,
+            options,
+          )
+        : await stripe.customers.update(
+            emailCustomers.data[0].id,
+            updateParams,
+          );
     }
   }
 
@@ -169,7 +178,9 @@ export const createOrRetrieveCustomer = async (params: {
     customerData.name = name;
   }
 
-  return stripe.customers.create(customerData, options);
+  return options
+    ? await stripe.customers.create(customerData, options)
+    : await stripe.customers.create(customerData);
 };
 
 // Save payment method to customer
@@ -180,17 +191,17 @@ export const savePaymentMethod = async (params: {
 }) => {
   const { customerId, paymentMethodId, stripeAccountId } = params;
 
-  const options: Stripe.RequestOptions = stripeAccountId
+  const options: Stripe.RequestOptions | undefined = stripeAccountId
     ? { stripeAccount: stripeAccountId }
-    : {};
+    : undefined;
 
-  return stripe.paymentMethods.attach(
-    paymentMethodId,
-    {
-      customer: customerId,
-    },
-    options,
-  );
+  const attachParams = {
+    customer: customerId,
+  };
+
+  return options
+    ? await stripe.paymentMethods.attach(paymentMethodId, attachParams, options)
+    : await stripe.paymentMethods.attach(paymentMethodId, attachParams);
 };
 
 // Get customer's payment methods
@@ -198,17 +209,18 @@ export const getCustomerPaymentMethods = async (
   customerId: string,
   stripeAccountId?: string, // Stripe Connect account ID
 ) => {
-  const options: Stripe.RequestOptions = stripeAccountId
+  const options: Stripe.RequestOptions | undefined = stripeAccountId
     ? { stripeAccount: stripeAccountId }
-    : {};
+    : undefined;
 
-  return stripe.paymentMethods.list(
-    {
-      customer: customerId,
-      type: "card",
-    },
-    options,
-  );
+  const listParams: Stripe.PaymentMethodListParams = {
+    customer: customerId,
+    type: "card",
+  };
+
+  return options
+    ? await stripe.paymentMethods.list(listParams, options)
+    : await stripe.paymentMethods.list(listParams);
 };
 
 // Confirm payment intent
@@ -223,11 +235,17 @@ export const confirmPaymentIntent = async (
     updateParams.payment_method = paymentMethodId;
   }
 
-  const options: Stripe.RequestOptions = stripeAccountId
+  const options: Stripe.RequestOptions | undefined = stripeAccountId
     ? { stripeAccount: stripeAccountId }
-    : {};
+    : undefined;
 
-  return stripe.paymentIntents.confirm(paymentIntentId, updateParams, options);
+  return options
+    ? await stripe.paymentIntents.confirm(
+        paymentIntentId,
+        updateParams,
+        options,
+      )
+    : await stripe.paymentIntents.confirm(paymentIntentId, updateParams);
 };
 
 // Handle webhook events

@@ -183,7 +183,7 @@ export function CartOverviewClient() {
                           src={item.image || "/placeholder.svg"}
                           alt={item.name}
                           fill
-                          className="object-contain"
+                          className="aspect-square object-contain"
                           sizes="80px"
                         />
                       </div>

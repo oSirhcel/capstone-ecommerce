@@ -221,11 +221,11 @@ export default function OrdersPage() {
                   {order.items.slice(0, 2).map((item) => (
                     <div key={item.id} className="flex items-center gap-3">
                       <Image
-                        src={"/placeholder.svg"}
+                        src={item.imageUrl! || "/placeholder.svg"}
                         alt={item.productName ?? "Item"}
                         width={48}
                         height={48}
-                        className="rounded-md object-contain"
+                        className="aspect-square rounded-md object-contain"
                       />
                       <div className="min-w-0 flex-1">
                         <p className="truncate font-medium">

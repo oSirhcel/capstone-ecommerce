@@ -15,7 +15,6 @@ import {
 } from "@/lib/stripe";
 import type { PaymentData } from "@/types/api-responses";
 import {
-  validateStoresHaveProviders,
   getPaymentProvidersForStores,
   getStripeAccountForStore,
 } from "@/lib/payment-providers";
@@ -292,24 +291,8 @@ export async function POST(request: NextRequest) {
         .filter((id): id is string => id !== null);
     }
 
-    // Validate all stores have active payment providers
-    if (storeIds.length > 0) {
-      const validation = await validateStoresHaveProviders(storeIds);
-      if (!validation.valid) {
-        const missingStoreNames = validation.missingStores
-          .map((s) => s.storeId)
-          .join(", ");
-        return NextResponse.json(
-          {
-            error: "Payment setup required",
-            errorCode: "PAYMENT_PROVIDER_MISSING",
-            message: `The following stores need payment setup: ${missingStoreNames}`,
-            missingStores: validation.missingStores,
-          },
-          { status: 400 },
-        );
-      }
-    }
+    // Note: For demo purposes, stores without payment setup will use default Stripe account
+    // Validation is skipped to allow fallback to platform account
 
     // Determine payment routing strategy
     // For single-store orders: use that store's Connect account
@@ -333,6 +316,7 @@ export async function POST(request: NextRequest) {
       transferData = body.orderData.storeGroups
         .map((group: { storeId: string; subtotal: number }) => {
           const provider = providers.get(group.storeId);
+          // For demo: if store doesn't have payment setup, skip transfer (use platform account)
           if (!provider?.stripeAccountId) {
             return null;
           }
@@ -352,19 +336,19 @@ export async function POST(request: NextRequest) {
           (t): t is { destination: string; amount: number } => t !== null,
         );
 
-      // If we can't create transfers for all stores, fall back to single store
+      // For demo: if not all stores have payment providers, use platform account (no transfers)
       if (transferData.length !== storeIds.length) {
-        console.warn(
-          "Not all stores have payment providers, falling back to first store",
+        console.log(
+          "Some stores don't have payment providers, using default Stripe account",
         );
-        const firstProvider = providers.get(storeIds[0]);
-        stripeAccountId = firstProvider?.stripeAccountId ?? undefined;
+        stripeAccountId = undefined; // Use platform account
         transferData = undefined;
       }
     } else if (storeIds.length === 1) {
-      // Single-store: use that store's Connect account
+      // Single-store: use that store's Connect account, or default Stripe for demo
       stripeAccountId =
         (await getStripeAccountForStore(storeIds[0])) ?? undefined;
+      // If store doesn't have payment setup, stripeAccountId will be undefined (platform account)
     }
 
     // Create or retrieve Stripe customer

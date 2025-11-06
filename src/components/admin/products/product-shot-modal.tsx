@@ -251,7 +251,7 @@ export function ProductShotModal({
                           alt="Selected product"
                           width={200}
                           height={200}
-                          className="mx-auto max-h-48 w-full rounded-lg object-contain"
+                          className="mx-auto aspect-square max-h-48 w-full rounded-lg object-contain"
                         />
                       </div>
                       <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
@@ -381,7 +381,7 @@ export function ProductShotModal({
                     alt="Generated product shot"
                     width={400}
                     height={400}
-                    className="mx-auto w-full rounded-lg object-contain"
+                    className="mx-auto aspect-square w-full rounded-lg object-contain"
                   />
                 </div>
                 <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">

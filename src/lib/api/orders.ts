@@ -7,6 +7,7 @@ export type OrderItemDTO = {
   productName?: string | null;
   quantity: number;
   priceAtTime: number; // cents
+  imageUrl?: string | null;
 };
 
 export type OrderDTO = {
@@ -204,10 +205,10 @@ export async function createOrders(
   // Link risk assessment to all created orders if provided
   if (riskAssessmentId && createdOrders.length > 0) {
     try {
-      await fetch('/api/risk-assessments/link-orders', {
-        method: 'POST',
+      await fetch("/api/risk-assessments/link-orders", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           riskAssessmentId,
@@ -215,7 +216,7 @@ export async function createOrders(
         }),
       });
     } catch (error) {
-      console.error('Failed to link risk assessment to orders:', error);
+      console.error("Failed to link risk assessment to orders:", error);
       // Don't fail the order creation if linking fails
     }
   }

@@ -303,12 +303,7 @@ export function ProductForm({
       markFieldsAsFilled(affectedFields);
       setPendingFieldUpdates(null);
     }
-  }, [
-    pendingFieldUpdates,
-    form,
-    markFieldsAsFilled,
-    setPendingFieldUpdates,
-  ]);
+  }, [pendingFieldUpdates, form, markFieldsAsFilled, setPendingFieldUpdates]);
 
   const onSubmit = async (data: ProductFormValues) => {
     // Create tags that don't exist and convert tag names to tag IDs
@@ -615,7 +610,7 @@ export function ProductForm({
                               alt="Main product image"
                               width={300}
                               height={300}
-                              className="h-48 w-48 rounded-lg border object-contain sm:h-64 sm:w-64 md:h-72 md:w-72 lg:h-80 lg:w-80"
+                              className="aspect-square rounded-lg border object-contain sm:h-64 sm:w-64 md:h-72 md:w-72 lg:h-80 lg:w-80"
                             />
                             <Button
                               type="button"
@@ -673,10 +668,7 @@ export function ProductForm({
                                 form.setValue("images", newImages, {
                                   shouldDirty: true,
                                 });
-                                console.log(
-                                  "Uploaded images:",
-                                  uploadedUrls,
-                                );
+                                console.log("Uploaded images:", uploadedUrls);
                               }}
                               onUploadError={(error) => {
                                 console.error("Upload error:", error);

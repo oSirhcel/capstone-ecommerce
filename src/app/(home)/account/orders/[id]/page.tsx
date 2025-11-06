@@ -264,11 +264,11 @@ export default function OrderPage() {
                     className="flex items-center gap-4 rounded-lg border p-4"
                   >
                     <Image
-                      src="/placeholder.svg"
+                      src={item.imageUrl! || "/placeholder.svg"}
                       alt={item.productName ?? "Product"}
                       width={80}
                       height={80}
-                      className="rounded-md object-contain"
+                      className="aspect-square rounded-md object-contain"
                     />
                     <div className="flex-1">
                       <h4 className="font-medium">

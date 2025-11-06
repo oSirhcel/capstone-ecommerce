@@ -109,6 +109,7 @@ export function CheckoutClient() {
   const [currentStep, setCurrentStep] = useState<"address" | "payment">(
     "address",
   );
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   const {
     addresses: shippingAddresses,
@@ -282,7 +283,8 @@ export function CheckoutClient() {
     );
   }
 
-  if (items.length === 0) {
+  // Don't show empty cart message if we're redirecting to success page
+  if (items.length === 0 && !isRedirecting) {
     return (
       <div className="bg-background min-h-screen">
         <div className="container mx-auto px-4 py-12 md:px-6">
@@ -295,6 +297,23 @@ export function CheckoutClient() {
             <Button asChild className="mt-4">
               <Link href="/">Continue Shopping</Link>
             </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show loading state during redirect
+  if (isRedirecting) {
+    return (
+      <div className="bg-background min-h-screen">
+        <div className="container mx-auto px-4 py-12 md:px-6">
+          <div className="text-center">
+            <CreditCard className="text-muted-foreground mx-auto h-12 w-12 animate-pulse" />
+            <h1 className="mt-4 text-2xl font-bold">Processing...</h1>
+            <p className="text-muted-foreground mt-2">
+              Redirecting to confirmation page...
+            </p>
           </div>
         </div>
       </div>
@@ -596,7 +615,8 @@ export function CheckoutClient() {
     orderId?: number;
   }) => {
     try {
-      clearCart();
+      // Set redirecting flag to prevent empty cart flash
+      setIsRedirecting(true);
 
       // Navigate immediately to success page
       const params = new URLSearchParams();
@@ -611,9 +631,16 @@ export function CheckoutClient() {
         params.set("store_count", storeCount.toString());
       }
 
+      // Navigate first, then clear cart after navigation starts
       router.push(`/checkout/success?${params.toString()}`);
+
+      // Clear cart after navigation (use setTimeout to ensure navigation has started)
+      setTimeout(() => {
+        clearCart();
+      }, 100);
     } catch (error) {
       console.error("Post-payment processing error:", error);
+      setIsRedirecting(false);
       toast.error("Payment successful but order processing failed", {
         description: "Please contact support with your payment confirmation.",
       });
@@ -1060,10 +1087,10 @@ export function CheckoutClient() {
                           Payment Setup Required
                         </p>
                         <p className="mb-2 text-red-700 dark:text-red-300">
-                          The following stores need payment setup before checkout
-                          can proceed:
+                          The following stores need payment setup before
+                          checkout can proceed:
                         </p>
-                        <ul className="list-disc list-inside space-y-1 text-red-700 dark:text-red-300">
+                        <ul className="list-inside list-disc space-y-1 text-red-700 dark:text-red-300">
                           {missingStores.map((store) => (
                             <li key={store.storeId}>{store.storeName}</li>
                           ))}
@@ -1132,7 +1159,7 @@ export function CheckoutClient() {
                                 src={item.image || "/placeholder.svg"}
                                 alt={item.name}
                                 fill
-                                className="object-contain"
+                                className="aspect-square object-contain"
                                 sizes="48px"
                               />
                             </div>

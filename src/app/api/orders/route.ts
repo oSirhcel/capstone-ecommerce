@@ -5,6 +5,7 @@ import { db } from "@/server/db";
 import { orders, orderItems, addresses, products, orderShipping, paymentTransactions, shippingMethods, paymentMethods, orderAddresses } from "@/server/db/schema";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
+import { getStorePaymentProvider } from "@/lib/payment-providers";
 
 type SessionUser = {
   id: string;
@@ -76,6 +77,19 @@ export async function POST(request: NextRequest) {
 
     // Validate required fields
     // All critical validation handled by zod above
+
+    // Validate store has active payment provider
+    const paymentProvider = await getStorePaymentProvider(storeId);
+    if (!paymentProvider) {
+      return NextResponse.json(
+        {
+          error: "Cannot create order: Store payment not configured",
+          errorCode: "PAYMENT_PROVIDER_MISSING",
+          message: "The store needs to set up payment processing before orders can be created.",
+        },
+        { status: 400 },
+      );
+    }
 
     // Helper function to normalize address data (handles both old and new formats)
     const normalizeAddress = (addr: {

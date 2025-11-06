@@ -49,7 +49,11 @@ export async function GET(
     const store = storeData[0];
 
     // Build WHERE conditions
-    const whereConditions = [eq(products.storeId, store.id)];
+    // Only show Active products for public-facing store pages
+    const whereConditions = [
+      eq(products.storeId, store.id),
+      eq(products.status, "Active"),
+    ];
 
     if (category && category !== "all") {
       // First, try to find the category by name

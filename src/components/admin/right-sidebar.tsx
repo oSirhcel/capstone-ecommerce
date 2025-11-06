@@ -1,24 +1,22 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { usePathname } from "next/navigation";
+import { useChat } from "@ai-sdk/react";
+import { DefaultChatTransport } from "ai";
 import { useRightSidebar } from "@/contexts/right-sidebar-context";
 import { ChatbotHeader } from "@/components/ai-assistant/chatbot-header";
 import { ChatbotBody } from "@/components/ai-assistant/chatbot-body";
 import { ChatInput } from "@/components/ai-assistant/chat-input";
 import { ChatMessage } from "@/components/ai-assistant/chat-message";
 import { TypingIndicator } from "@/components/ai-assistant/typing-indicator";
-import { SuggestionChips } from "@/components/ai-assistant/suggestion-chips";
 import { ProductDraftCard } from "@/components/ai-assistant/product-draft-card";
 import { FieldUpdateCard } from "@/components/ai-assistant/field-update-card";
 import { OnboardingStatusCard } from "@/components/ai-assistant/onboarding-status-card";
 import { useAIProductDraft } from "@/contexts/ai-product-draft-context";
 import { useAIFormFields } from "@/contexts/ai-form-fields-context";
-import { useChatMutation } from "@/hooks/ai-assistant/use-chat-mutation";
-import { useMessages } from "@/hooks/ai-assistant/use-messages";
 import { useOnboardingStatus } from "@/hooks/onboarding/use-onboarding-status";
-import type { SuggestionChip } from "@/lib/ai/suggestions-generator";
 import type { ExtractedProduct } from "@/lib/ai/extractors/product-extractor";
 import type { FieldUpdate as ExtractedFieldUpdate } from "@/lib/ai/extractors/field-update-extractor";
 import { BotIcon } from "lucide-react";
@@ -30,6 +28,7 @@ interface FieldUpdate {
 
 function formatPageLabel(page: string): string {
   const pageMap: Record<string, string> = {
+    "/admin": "Dashboard",
     "/admin/dashboard": "Dashboard",
     "/admin/products": "Products",
     "/admin/products/add": "Add Product",
@@ -40,6 +39,7 @@ function formatPageLabel(page: string): string {
     "/admin/settings/shipping": "Shipping Settings",
     "/admin/settings/payments": "Payment Settings",
     "/admin/settings/tax": "Tax Settings",
+    "/admin/risk-assessments": "Risk Assessments",
   };
   return pageMap[page] ?? page;
 }
@@ -48,7 +48,6 @@ export function AdminRightSidebar() {
   const { isOpen } = useRightSidebar();
   const router = useRouter();
   const pathname = usePathname();
-  const [suggestions, setSuggestions] = useState<SuggestionChip[]>([]);
   const [currentDraft, setCurrentDraft] = useState<ExtractedProduct | null>(
     null,
   );
@@ -60,95 +59,69 @@ export function AdminRightSidebar() {
     label: string;
   } | null>(null);
 
-  const { messages, addMessage, clearHistory, createMessage } = useMessages();
-  const chatMutation = useChatMutation();
   const { setPendingDraft } = useAIProductDraft();
   const { setPendingFieldUpdates: setFormPendingUpdates } = useAIFormFields();
   const { data: onboardingStatus, isLoading: isLoadingOnboarding } =
     useOnboardingStatus();
 
-  const handleCloseChat = useCallback(() => {
-    clearHistory();
-    setSuggestions([]);
-    setCurrentDraft(null);
-    setPendingFieldUpdates([]);
-    setPendingNavigation(null);
-  }, [clearHistory]);
+  const storeId = onboardingStatus?.storeId;
+  const [input, setInput] = useState("");
 
-  const handleApplyDraft = useCallback(
-    (draft: ExtractedProduct) => {
-      setPendingDraft(draft);
-      setTimeout(() => router.push("/admin/products/add"), 500);
-      setCurrentDraft(null);
-    },
-    [setPendingDraft, router],
-  );
-
-  const handleNavigate = useCallback(
-    (page: string) => {
-      setPendingNavigation(null);
-      router.push(page);
-    },
-    [router],
-  );
-
-  const handleSendMessage = useCallback(
-    async (content: string) => {
-      const userMessage = createMessage.user(content);
-      addMessage(userMessage);
-      setSuggestions([]);
-      setCurrentDraft(null);
-      setPendingFieldUpdates([]);
-
-      try {
-        const response = await chatMutation.mutateAsync({
-          messages: [...messages, userMessage],
-          pathname,
-        });
-
-        const assistantMessage = createMessage.assistant(response.message);
-        addMessage(assistantMessage);
-
-        if (response.toolCalls && response.toolCalls.length > 0) {
-          for (const toolCall of response.toolCalls) {
-            const toolResult = toolCall.result as {
-              success: boolean;
-              message: string;
-              data?: unknown;
-            };
-
-            if (toolCall.toolName === "navigate_to_page" && toolResult.data) {
-              const navData = toolResult.data as { page: string };
-              const pageLabel = formatPageLabel(navData.page);
-              setPendingNavigation({
-                page: navData.page,
-                label: pageLabel,
-              });
+  const { messages, sendMessage, status } = useChat({
+    // Start with fresh messages each session to avoid invalid message sequences
+    // The Gemini API requires specific tool call ordering that's hard to maintain in storage
+    transport: new DefaultChatTransport({
+      api: "/api/ai/chat",
+      body: {
+        pathname,
+        storeId,
+      },
+    }),
+    onFinish: ({ message }) => {
+      // Handle tool results
+      if (message.parts) {
+        message.parts.forEach((part) => {
+          // Navigation tool
+          if (part.type === "tool-navigate_to_page") {
+            // Check if part has output (type guard)
+            if ("output" in part) {
+              const output = part.output as { page: string; reason?: string };
+              if (output.page) {
+                const pageLabel = formatPageLabel(output.page);
+                setPendingNavigation({
+                  page: output.page,
+                  label: pageLabel,
+                });
+              }
             }
+          }
 
-            if (
-              toolCall.toolName === "create_product_draft" &&
-              toolResult.data
-            ) {
-              const draft = toolResult.data as ExtractedProduct;
+          // Product draft tool
+          if (part.type === "tool-create_product_draft") {
+            // Check if part has output (type guard)
+            if ("output" in part) {
+              const draft = part.output as ExtractedProduct;
+              setPendingDraft(draft);
               setCurrentDraft(draft);
+              setTimeout(() => router.push("/admin/products/add"), 500);
             }
+          }
 
-            if (
-              toolCall.toolName === "update_product_fields" &&
-              toolResult.data
-            ) {
-              const updateData = toolResult.data as {
+          // Field update tool
+          if (part.type === "tool-update_product_fields") {
+            // Check if part has output (type guard)
+            if ("output" in part) {
+              const output = part.output as {
                 updates: ExtractedFieldUpdate[];
                 reasoning?: string;
               };
-              if (updateData.updates && updateData.updates.length > 0) {
-                const mappedUpdates = updateData.updates.map((update) => ({
+              if (output.updates && output.updates.length > 0) {
+                const mappedUpdates = output.updates.map((update) => ({
                   fieldName: update.fieldName,
                   value: update.value,
                 }));
                 setPendingFieldUpdates(mappedUpdates);
-                const updatesMap = updateData.updates.reduce(
+                const updatesMap = output.updates.reduce(
                   (acc, update) => {
                     acc[update.fieldName] = update.value;
                     return acc;
@@ -159,32 +132,39 @@ export function AdminRightSidebar() {
               }
             }
           }
-        }
-
-        if (response.suggestions && response.suggestions.length > 0) {
-          setSuggestions(response.suggestions);
-        }
-      } catch (error) {
-        console.error("Error sending message:", error);
-        const errorMessage = createMessage.error();
-        addMessage(errorMessage);
+        });
       }
     },
-    [
-      messages,
-      chatMutation,
-      addMessage,
-      createMessage,
-      pathname,
-      setFormPendingUpdates,
-    ],
+    onError: (error) => {
+      console.error("Chat error:", error);
+    },
+  });
+
+  const handleCloseChat = useCallback(() => {
+    setCurrentDraft(null);
+    setPendingFieldUpdates([]);
+    setPendingNavigation(null);
+    // Reload to reset chat
+    window.location.reload();
+  }, []);
+
+  const handleApplyDraft = useCallback(
+    (draft: ExtractedProduct) => {
+      setPendingDraft(draft);
+      setTimeout(() => router.push("/admin/products/add"), 500);
+      // Don't clear currentDraft - let the card remain visible
+    },
+    [setPendingDraft, router],
   );
 
-  const handleSuggestClick = useCallback(
-    (label: string) => {
-      void handleSendMessage(label);
+  const handleSendMessage = useCallback(
+    (content: string) => {
+      setCurrentDraft(null);
+      setPendingFieldUpdates([]);
+      setPendingNavigation(null);
+      void sendMessage({ text: content });
     },
-    [handleSendMessage],
+    [sendMessage],
   );
 
   if (!isOpen) {
@@ -238,7 +218,16 @@ export function AdminRightSidebar() {
                 <FieldUpdateCard
                   updates={pendingFieldUpdates}
                   onApply={() => {
-                    setPendingFieldUpdates([]);
+                    // Apply updates to form but keep card visible
+                    const updatesMap = pendingFieldUpdates.reduce(
+                      (acc, update) => {
+                        acc[update.fieldName] = update.value;
+                        return acc;
+                      },
+                      {} as Record<string, unknown>,
+                    );
+                    setFormPendingUpdates(updatesMap);
+                    // Don't clear pendingFieldUpdates - let the card remain visible
                   }}
                 />
               </div>
@@ -249,26 +238,29 @@ export function AdminRightSidebar() {
                   Click to navigate:
                 </p>
                 <button
-                  onClick={() => handleNavigate(pendingNavigation.page)}
+                  onClick={() => router.push(pendingNavigation.page)}
                   className="w-full rounded-lg bg-blue-50 px-4 py-2 text-left text-sm font-medium text-blue-600 transition-colors hover:bg-blue-100"
                 >
                   → {pendingNavigation.label}
                 </button>
               </div>
             )}
-            {chatMutation.isPending && <TypingIndicator />}
+            {(status === "submitted" || status === "streaming") && (
+              <TypingIndicator />
+            )}
           </>
         )}
       </ChatbotBody>
-      {suggestions.length > 0 && !chatMutation.isPending && (
-        <SuggestionChips
-          suggestions={suggestions}
-          onSuggestClick={handleSuggestClick}
-        />
-      )}
       <ChatInput
-        onSend={handleSendMessage}
-        disabled={chatMutation.isPending}
+        value={input}
+        onChange={setInput}
+        onSubmit={() => {
+          if (input.trim()) {
+            handleSendMessage(input.trim());
+            setInput("");
+          }
+        }}
+        disabled={status !== "ready"}
         placeholder="Ask me anything or describe a product..."
       />
     </aside>

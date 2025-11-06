@@ -1,124 +1,77 @@
-import { type NextRequest, NextResponse } from "next/server";
+import { type NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
-import {
-  generateChatResponse,
-  streamChatResponse,
-} from "@/lib/ai/assistant-service";
-import {
-  chatRequestSchema,
-  chatResponseWithToolsSchema,
-  chatErrorResponseSchema,
-} from "@/lib/ai/schemas";
+import { google } from "@ai-sdk/google";
+import { streamText, convertToModelMessages, stepCountIs } from "ai";
+import type { UIMessage } from "ai";
 import { buildChatContext, getUserStoreId } from "@/lib/ai/context-builder";
-import {
-  generateSuggestions,
-  type SuggestionChip,
-} from "@/lib/ai/suggestions-generator";
+import { createChatbotTools } from "@/lib/ai/tools";
+import { buildSystemPrompt } from "@/lib/ai/assistant-service";
+
+export const maxDuration = 30;
 
 export async function POST(request: NextRequest) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return new Response("Unauthorized", { status: 401 });
     }
 
     if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
-      return NextResponse.json(
-        { error: "Google AI API key not configured" },
-        { status: 500 },
-      );
+      return new Response("Google AI API key not configured", { status: 500 });
     }
 
-    const body = (await request.json()) as unknown;
+    const body = (await request.json()) as {
+      messages: UIMessage[];
+      pathname?: string;
+      storeId?: string;
+    };
 
-    // Validate request body with Zod
-    const validationResult = chatRequestSchema.safeParse(body);
-    if (!validationResult.success) {
-      return NextResponse.json(
-        {
-          error: "Invalid request body",
-          details: validationResult.error.issues,
-        },
-        { status: 400 },
-      );
+    if (!body.messages || !Array.isArray(body.messages)) {
+      return new Response("Invalid request body", { status: 400 });
     }
 
-    const { messages, stream } = validationResult.data;
-
-    // Convert Zod-validated messages to ChatMessage format
-    const chatMessages = messages.map((msg) => ({
-      ...msg,
-      timestamp:
-        typeof msg.timestamp === "string"
-          ? new Date(msg.timestamp)
-          : msg.timestamp,
-    }));
+    // Get storeId from body or fetch from database
+    let storeId = body.storeId;
+    storeId ??= (await getUserStoreId(session.user.id)) ?? undefined;
 
     // Build enhanced context
-    const headerPathname = request.headers.get("x-pathname");
-    let headerStoreId = request.headers.get("x-store-id");
-
-    // If store ID not in headers, fetch from database
-    headerStoreId ??= await getUserStoreId(session.user.id);
-
     const context = await buildChatContext({
-      pathname: headerPathname ?? undefined,
-      storeId: headerStoreId ?? undefined,
+      pathname: body.pathname,
+      storeId,
       userId: session.user.id,
     });
 
-    // If streaming is requested, return a streaming response
-    if (stream) {
-      const streamResponse = await streamChatResponse({
-        messages: chatMessages,
-        config: {
-          context,
-          stream: true,
-          storeId: headerStoreId ?? undefined,
-        },
-      });
+    const systemPrompt = buildSystemPrompt(context);
 
-      return streamResponse;
-    }
+    // Convert UIMessages to model messages
+    const modelMessages = convertToModelMessages(body.messages);
 
-    // Otherwise, return a regular JSON response with suggestions
-    const response = await generateChatResponse({
-      messages: chatMessages,
-      config: {
-        context,
-        storeId: headerStoreId ?? undefined,
-        userId: session.user.id,
-        headers: request.headers,
-      },
+    // Create tools with storeId context
+    const tools = createChatbotTools(storeId);
+
+    // Stream text with tools
+    const result = streamText({
+      model: google("gemini-2.5-flash"),
+      system: systemPrompt,
+      messages: modelMessages,
+      tools,
+      stopWhen: stepCountIs(5),
+      temperature: 0.7,
+      maxOutputTokens: 1024,
     });
 
-    // Generate suggestions for next message
-    let suggestions: SuggestionChip[] = [];
-    try {
-      suggestions = await generateSuggestions(chatMessages, context);
-    } catch (error) {
-      console.error("Error generating suggestions:", error);
-      // Suggestions are optional, so continue without them
-    }
-
-    const responseData = {
-      message: response.message,
-      timestamp: new Date().toISOString(),
-      toolCalls: response.toolCalls,
-      suggestions,
-    };
-
-    // Validate response against schema
-    const validatedResponse = chatResponseWithToolsSchema.parse(responseData);
-
-    return NextResponse.json(validatedResponse);
-  } catch (error) {
+    return result.toUIMessageStreamResponse();
+  } catch (error: unknown) {
     console.error("Error in chat API:", error);
-
-    const errorResponse = chatErrorResponseSchema.parse({
-      error: "Failed to generate response",
-    });
-
-    return NextResponse.json(errorResponse, { status: 500 });
+    return new Response(
+      JSON.stringify({
+        error: "Failed to generate response",
+        details: error instanceof Error ? error.message : String(error),
+      }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
   }
 }

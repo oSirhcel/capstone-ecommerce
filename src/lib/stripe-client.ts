@@ -23,6 +23,34 @@ export interface ProcessPaymentResponse {
   paymentIntentId: string;
 }
 
+export interface PaymentStatus {
+  status: string;
+  amount: number;
+  currency: string;
+  orderId?: number;
+}
+
+export interface SavePaymentMethodResponse {
+  success: boolean;
+}
+
+export interface PaymentMethod {
+  id: number;
+  type: string;
+  last4?: string;
+  expiryMonth?: number;
+  expiryYear?: number;
+  isDefault: boolean;
+}
+
+export interface GetPaymentMethodsResponse {
+  paymentMethods: PaymentMethod[];
+}
+
+export interface DeletePaymentMethodResponse {
+  success: boolean;
+}
+
 interface PaymentErrorResponse {
   error?: string;
   errorCode?: string;
@@ -59,17 +87,34 @@ export const processPayment = async (params: {
   savePaymentMethod?: boolean;
   orderData?: Record<string, unknown>;
 }): Promise<ProcessPaymentResponse> => {
-  const response = await fetch("/api/payments", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(params),
-  });
+  let response: Response;
+  try {
+    response = await fetch("/api/payments", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(params),
+    });
+  } catch (networkError) {
+    console.error("Network error during payment processing:", networkError);
+    throw new Error(
+      "Network error. Please check your connection and try again.",
+    );
+  }
 
   // Handle 202 Accepted (verification required) as an error case
   if (response.status === 202 || !response.ok) {
-    const error = (await response.json()) as PaymentErrorResponse;
+    let error: PaymentErrorResponse;
+    try {
+      error = (await response.json()) as PaymentErrorResponse;
+    } catch (jsonError) {
+      // If response is not JSON, create a generic error
+      console.error("Failed to parse error response:", jsonError);
+      throw new Error(
+        `Payment processing failed with status ${response.status}. Please try again.`,
+      );
+    }
 
     console.log("Payment API response:", { status: response.status, error });
 
@@ -107,12 +152,14 @@ export const processPayment = async (params: {
     throw new Error(error.error ?? "Payment processing failed");
   }
 
-  return (await response.json()) as ProcessPaymentResponse;
+  // Parse successful response
+  try {
+    return (await response.json()) as ProcessPaymentResponse;
+  } catch (jsonError) {
+    console.error("Failed to parse payment response:", jsonError);
+    throw new Error("Invalid response from payment server. Please try again.");
+  }
 };
-
-interface SavePaymentMethodResponse {
-  success: boolean;
-}
 
 // Save payment method for future use
 export const savePaymentMethod = async (params: {
@@ -135,19 +182,6 @@ export const savePaymentMethod = async (params: {
   return (await response.json()) as SavePaymentMethodResponse;
 };
 
-interface PaymentMethod {
-  id: number;
-  type: string;
-  last4?: string;
-  expiryMonth?: number;
-  expiryYear?: number;
-  isDefault: boolean;
-}
-
-interface GetPaymentMethodsResponse {
-  paymentMethods: PaymentMethod[];
-}
-
 // Get user's saved payment methods
 export const getPaymentMethods =
   async (): Promise<GetPaymentMethodsResponse> => {
@@ -160,10 +194,6 @@ export const getPaymentMethods =
 
     return (await response.json()) as GetPaymentMethodsResponse;
   };
-
-interface DeletePaymentMethodResponse {
-  success: boolean;
-}
 
 // Delete a payment method
 export const deletePaymentMethod = async (
@@ -180,13 +210,6 @@ export const deletePaymentMethod = async (
 
   return (await response.json()) as DeletePaymentMethodResponse;
 };
-
-interface PaymentStatus {
-  status: string;
-  amount: number;
-  currency: string;
-  orderId?: number;
-}
 
 // Get payment status
 export const getPaymentStatus = async (params: {

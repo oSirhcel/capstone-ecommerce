@@ -1,5 +1,16 @@
 import { z } from "zod";
 
+// Payment status enum values
+export const paymentStatusValues = [
+  "Pending",
+  "Paid",
+  "Failed",
+  "Refunded",
+] as const;
+
+export const paymentStatusSchema = z.enum(paymentStatusValues);
+export type PaymentStatus = z.infer<typeof paymentStatusSchema>;
+
 export const ordersListQuerySchema = z.object({
   storeId: z.string().min(1),
   page: z.coerce.number().min(1).default(1),
@@ -17,6 +28,7 @@ export const ordersListQuerySchema = z.object({
       "Failed",
     ])
     .nullish(),
+  paymentStatus: paymentStatusSchema.nullish(),
   sortBy: z.enum(["createdAt", "totalAmount", "status"]).default("createdAt"),
   sortOrder: z.enum(["asc", "desc"]).default("desc"),
   dateFrom: z.string().nullish(),
@@ -122,7 +134,11 @@ export interface OrderDetailItem {
 export interface OrderDetail {
   id: number;
   status: string;
+  paymentStatus?: string;
   totalAmount: number; // cents
+  subtotalAmount?: number; // cents
+  taxAmount?: number; // cents
+  shippingAmount?: number; // cents
   createdAt: string;
   updatedAt: string;
   customer: { id: string; name: string; email: string };
@@ -141,7 +157,28 @@ export interface OrderDetail {
     country: string;
     createdAt: string;
   }>;
-  payment: { status: string };
+  payment: {
+    status: string;
+    amount?: number; // cents
+    currency?: string;
+    transactionId?: string;
+    createdAt?: string;
+    paymentMethod?: {
+      type: string;
+      provider: string;
+      lastFourDigits?: string;
+      expiryMonth?: number;
+      expiryYear?: number;
+    } | null;
+  };
+  shipping?: {
+    trackingNumber?: string;
+    shippedAt?: string;
+    deliveredAt?: string;
+    method?: string;
+    description?: string;
+    cost?: number; // cents
+  } | null;
   timeline: Array<unknown>;
 }
 
@@ -172,17 +209,6 @@ export const orderStatusValues = [
 export const orderStatusSchema = z.enum(orderStatusValues);
 export type OrderStatus = z.infer<typeof orderStatusSchema>;
 
-// Payment status enum values
-export const paymentStatusValues = [
-  "Pending",
-  "Paid",
-  "Failed",
-  "Refunded",
-] as const;
-
-export const paymentStatusSchema = z.enum(paymentStatusValues);
-export type PaymentStatus = z.infer<typeof paymentStatusSchema>;
-
 export async function fetchOrders(params: Partial<OrdersListQuery>) {
   const sp = new URLSearchParams();
   if (params.storeId) sp.set("storeId", params.storeId);
@@ -190,6 +216,7 @@ export async function fetchOrders(params: Partial<OrdersListQuery>) {
   if (params.limit) sp.set("limit", String(params.limit));
   if (params.search) sp.set("search", params.search);
   if (params.status) sp.set("status", params.status);
+  if (params.paymentStatus) sp.set("paymentStatus", params.paymentStatus);
   if (params.sortBy) sp.set("sortBy", params.sortBy);
   if (params.sortOrder) sp.set("sortOrder", params.sortOrder);
   if (params.dateFrom) sp.set("dateFrom", params.dateFrom);

@@ -1,73 +1,24 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import { toast } from "sonner";
 import ProfileSettings from "@/components/account/profile-settings";
+import { ProfileSettingsSkeleton } from "@/components/account/profile-settings";
 import PasswordSettings from "@/components/account/password-settings";
+import { PasswordSettingsSkeleton } from "@/components/account/password-settings";
 import AccountPreferences from "@/components/account/account-preferences";
-
-interface ProfileData {
-  id: string;
-  username: string;
-  email: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
+import { AccountPreferencesSkeleton } from "@/components/account/account-preferences";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  useProfileQuery,
+  useProfileMutations,
+} from "@/hooks/account/use-profile";
 
 export default function AccountSettingsPage() {
-  const { status } = useSession();
-  const router = useRouter();
-  const [profile, setProfile] = useState<ProfileData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    if (status === "unauthenticated") {
-      router.push("/auth/signin");
-      return;
-    }
-
-    if (status === "authenticated") {
-      void fetchProfile();
-    }
-  }, [status, router]);
-
-  const fetchProfile = async () => {
-    try {
-      const response = await fetch("/api/profile");
-      if (response.ok) {
-        const data = (await response.json()) as { user: ProfileData };
-        setProfile(data.user);
-      } else {
-        throw new Error("Failed to fetch profile");
-      }
-    } catch (error) {
-      console.error("Error fetching profile:", error);
-      toast.error("Failed to load profile data. Please try again.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const { data: profile, isLoading, error } = useProfileQuery();
+  const { updateProfile, changePassword, deleteAccount } =
+    useProfileMutations();
 
   const handleProfileUpdate = async (data: { username: string }) => {
-    const response = await fetch("/api/profile", {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ username: data.username }),
-    });
-
-    if (!response.ok) {
-      const error = (await response.json()) as { error?: string };
-      throw new Error(error.error ?? "Failed to update profile");
-    }
-
-    // Refresh profile data
-    await fetchProfile();
+    await updateProfile(data);
   };
 
   const handlePasswordChange = async (data: {
@@ -75,50 +26,17 @@ export default function AccountSettingsPage() {
     newPassword: string;
     confirmPassword: string;
   }) => {
-    const response = await fetch("/api/profile/password", {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(data),
-    });
-
-    if (!response.ok) {
-      const error = (await response.json()) as { error?: string };
-      throw new Error(error.error ?? "Failed to update password");
-    }
+    await changePassword(data);
   };
 
   const handleDeleteAccount = async (password: string) => {
-    try {
-      const response = await fetch("/api/profile/delete", {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          confirmDelete: true,
-          password: password,
-        }),
-      });
-
-      if (!response.ok) {
-        const error = (await response.json()) as { error?: string };
-        throw new Error(error.error ?? "Failed to delete account");
-      }
-
-      // Sign out the user and redirect to home
-      const { signOut } = await import("next-auth/react");
-      await signOut({ callbackUrl: "/" });
-
-      toast.success("Your account has been permanently deleted");
-    } catch (error) {
-      console.error("Error deleting account:", error);
-      throw error;
-    }
+    await deleteAccount({
+      confirmDelete: true,
+      password,
+    });
   };
 
-  if (status === "loading" || isLoading) {
+  if (isLoading) {
     return (
       <div className="space-y-6">
         <div>
@@ -129,32 +47,15 @@ export default function AccountSettingsPage() {
         </div>
 
         <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <Skeleton className="h-6 w-48" />
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <Skeleton className="h-6 w-40" />
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-            </CardContent>
-          </Card>
+          <ProfileSettingsSkeleton />
+          <PasswordSettingsSkeleton />
+          <AccountPreferencesSkeleton />
         </div>
       </div>
     );
   }
 
-  if (!profile) {
+  if (error || !profile) {
     return (
       <div className="space-y-6">
         <div>

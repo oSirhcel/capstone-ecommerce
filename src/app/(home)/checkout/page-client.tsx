@@ -412,17 +412,43 @@ export function CheckoutClient() {
       // First, perform risk assessment to get assessment ID
       const orderData = getOrderDataForVerification();
 
-      const riskAssessmentResponse = await fetch("/api/payments", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          amount: total,
-          currency: "aud",
-          orderData,
-        }),
-      });
+      let riskAssessmentResponse: Response;
+      try {
+        riskAssessmentResponse = await fetch("/api/payments", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            amount: total,
+            currency: "aud",
+            orderData,
+          }),
+        });
+      } catch (networkError) {
+        console.error("Network error during risk assessment:", networkError);
+        throw new Error(
+          "Network error. Please check your connection and try again.",
+        );
+      }
+
+      // Handle non-200/202 responses
+      if (
+        riskAssessmentResponse.status !== 200 &&
+        riskAssessmentResponse.status !== 202
+      ) {
+        let errorMessage = "Failed to process payment";
+        try {
+          const errorData = (await riskAssessmentResponse.json()) as {
+            error?: string;
+            message?: string;
+          };
+          errorMessage = errorData.error ?? errorData.message ?? errorMessage;
+        } catch {
+          // If JSON parsing fails, use default message
+        }
+        throw new Error(errorMessage);
+      }
 
       const riskData =
         (await riskAssessmentResponse.json()) as RiskAssessmentResponse & {
@@ -436,6 +462,19 @@ export function CheckoutClient() {
 
       // Create orders with risk assessment ID
       const orderResult = await handleCreateOrders(riskAssessmentId);
+
+      // Validate order creation result
+      if (!orderResult.primaryOrderId) {
+        throw new Error(
+          "Order was created but no order ID was returned. Please contact support.",
+        );
+      }
+
+      if (!orderResult.orderIds || orderResult.orderIds.length === 0) {
+        throw new Error(
+          "Order creation failed. No orders were created. Please try again.",
+        );
+      }
 
       if (orderResult.storeCount > 1) {
         toast.info(`Creating ${orderResult.storeCount} orders`, {
@@ -473,8 +512,12 @@ export function CheckoutClient() {
       return orderResult.primaryOrderId;
     } catch (error) {
       console.error("Order creation error:", error);
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Failed to create order. Please try again or contact support.";
       toast.error("Failed to create order", {
-        description: "Please try again or contact support.",
+        description: errorMessage,
       });
       throw error;
     }

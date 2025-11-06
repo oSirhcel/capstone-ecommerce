@@ -23,6 +23,7 @@ const EMAIL_FROM_NAME = process.env.SMTP_FROM_NAME ?? "Zero Trust Security";
 
 /**
  * Create reusable transporter
+ * Throws error only if SMTP credentials are required but not configured
  */
 export function createTransporter() {
   if (!SMTP_CONFIG.auth.user || !SMTP_CONFIG.auth.pass) {
@@ -37,6 +38,13 @@ export function createTransporter() {
     secure: SMTP_CONFIG.secure,
     auth: SMTP_CONFIG.auth,
   });
+}
+
+/**
+ * Check if SMTP is configured
+ */
+export function isSmtpConfigured(): boolean {
+  return !!(SMTP_CONFIG.auth.user && SMTP_CONFIG.auth.pass);
 }
 
 /**
@@ -204,6 +212,7 @@ If you need assistance, please contact support@yourstore.com
 
 /**
  * Send OTP code via email
+ * In development mode (when SMTP is not configured), logs OTP to console instead
  */
 export async function sendOTPEmail(
   to: string,
@@ -213,6 +222,34 @@ export async function sendOTPEmail(
     transactionAmount?: number;
   },
 ): Promise<void> {
+  // Check if SMTP is configured
+  const isSmtpConfigured = SMTP_CONFIG.auth.user && SMTP_CONFIG.auth.pass;
+
+  if (!isSmtpConfigured) {
+    // Development mode: log OTP to console instead of sending email
+    const formattedAmount = options?.transactionAmount
+      ? `$${(options.transactionAmount / 100).toFixed(2)}`
+      : "your transaction";
+
+    console.log("\n" + "=".repeat(60));
+    console.log("📧 OTP VERIFICATION (Development Mode - SMTP not configured)");
+    console.log("=".repeat(60));
+    console.log(`To: ${to}`);
+    if (options?.userName) {
+      console.log(`Hello ${options.userName},`);
+    }
+    console.log(`\nTransaction: ${formattedAmount}`);
+    console.log(`\n🔐 Your Verification Code: ${otp}`);
+    console.log(`\n⏰ Valid for 10 minutes`);
+    console.log("=".repeat(60));
+    console.log("\n⚠️  In production, this would be sent via email.");
+    console.log(
+      "   Set SMTP_USER and SMTP_PASSWORD environment variables to enable email.\n",
+    );
+
+    return; // Successfully "sent" (logged to console)
+  }
+
   try {
     const transporter = createTransporter();
 

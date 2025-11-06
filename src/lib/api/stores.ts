@@ -138,7 +138,8 @@ export async function fetchStores(params?: {
   if (params?.page) searchParams.append("page", params.page.toString());
   if (params?.limit) searchParams.append("limit", params.limit.toString());
   if (params?.search) searchParams.append("search", params.search);
-  if (params?.category) searchParams.append("category", params.category.toString());
+  if (params?.category)
+    searchParams.append("category", params.category.toString());
   if (params?.sort) searchParams.append("sort", params.sort);
 
   const response = await fetch(

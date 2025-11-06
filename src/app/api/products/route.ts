@@ -22,6 +22,7 @@ export async function GET(request: NextRequest) {
       : null;
     const storeId = searchParams.get("store");
     const search = searchParams.get("search");
+    const statusParam = searchParams.get("status");
     const isFeatured = searchParams.get("featured") === "true";
     const sort = searchParams.get("sort") ?? "release-newest";
 
@@ -42,8 +43,18 @@ export async function GET(request: NextRequest) {
                 : desc(products.createdAt);
 
     // Build WHERE conditions using drizzle pattern
+    // Default to "Active" status if not specified (for public API)
+    // Allow filtering by status or "all" for admin
+    const statusFilter =
+      statusParam === "all" || !statusParam
+        ? undefined
+        : eq(products.status, statusParam as "Active" | "Draft" | "Archived");
+
     const whereCondition = and(
-      eq(products.status, "Active"),
+      // If statusParam is undefined (not provided), default to Active
+      // If statusParam is "all", show all statuses (statusFilter is undefined)
+      // Otherwise, filter by the specified status
+      statusParam === undefined ? eq(products.status, "Active") : statusFilter,
       categoryId ? eq(products.categoryId, categoryId) : undefined,
       storeId ? eq(products.storeId, storeId) : undefined,
       search ? ilike(products.name, `%${search}%`) : undefined,
@@ -450,22 +461,4 @@ export async function POST(request: NextRequest) {
       { status: 500 },
     );
   }
-}
-
-// PUT /api/products - Update products (placeholder for future implementation)
-export async function PUT(_request: NextRequest) {
-  // TODO: Implement product updates with proper authentication
-  return NextResponse.json(
-    { error: "Product updates not yet implemented" },
-    { status: 501 },
-  );
-}
-
-// DELETE /api/products - Delete products (placeholder for future implementation)
-export async function DELETE(_request: NextRequest) {
-  // TODO: Implement product deletion with proper authentication
-  return NextResponse.json(
-    { error: "Product deletion not yet implemented" },
-    { status: 501 },
-  );
 }

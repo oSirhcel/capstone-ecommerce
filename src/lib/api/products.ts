@@ -121,6 +121,7 @@ export async function fetchProducts(params?: {
   category?: number;
   store?: string;
   search?: string;
+  status?: "Active" | "Draft" | "Archived" | "all";
   featured?: boolean;
   sort?:
     | "price-low"
@@ -140,6 +141,7 @@ export async function fetchProducts(params?: {
     searchParams.append("category", params.category.toString());
   if (params?.store) searchParams.append("store", params.store);
   if (params?.search) searchParams.append("search", params.search);
+  if (params?.status) searchParams.append("status", params.status);
   if (params?.featured) searchParams.append("featured", "true");
   if (params?.sort) searchParams.append("sort", params.sort);
 

@@ -115,11 +115,11 @@ export interface RiskScore {
   confidence: number; // 0-1
 }
 
-// Risk scoring thresholds (configurable) - More aggressive thresholds
+// Risk scoring thresholds (configurable)
 const RISK_THRESHOLDS = {
-  ALLOW_MAX: 20, // 0-20: Allow (lower threshold)
-  WARN_MAX: 50, // 21-50: Warn (lower threshold)
-  DENY_MIN: 51, // 51-100: Deny (much lower threshold)
+  ALLOW_MAX: 35, // 0-35:
+  WARN_MAX: 75, // 36-75:
+  DENY_MIN: 76, // 76-100:
 };
 
 // Risk factors and their maximum impact scores - Enhanced session & behavioral scoring

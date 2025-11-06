@@ -23,6 +23,12 @@ export default auth(async (req) => {
     }
   }
 
+  if (pathname.startsWith("/account")) {
+    if (!session?.user) {
+      return NextResponse.redirect(new URL("/auth/signin", req.url));
+    }
+  }
+
   // Create response and add security headers
   const response = NextResponse.next();
 

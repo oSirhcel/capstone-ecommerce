@@ -7,6 +7,16 @@ export function useProductsQuery(params?: {
   category?: number;
   store?: string;
   search?: string;
+  status?: "Active" | "Draft" | "Archived" | "all";
+  sort?:
+    | "price-low"
+    | "price-high"
+    | "rating-low"
+    | "rating-high"
+    | "name-asc"
+    | "name-desc"
+    | "release-newest"
+    | "release-oldest";
 }) {
   return useQuery({
     queryKey: ["products", params],

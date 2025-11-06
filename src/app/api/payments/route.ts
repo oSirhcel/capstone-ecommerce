@@ -269,8 +269,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Create or retrieve Stripe customer
-    // Handle credentials users who have fake @local emails
-    const userEmail = user.email?.endsWith("@local") ? undefined : user.email;
+    // Handle credentials users who have fake @local.com emails
+    const userEmail = user.email?.endsWith("@local.com") ? undefined : user.email;
 
     const customer = await createOrRetrieveCustomer({
       userId: user.id,

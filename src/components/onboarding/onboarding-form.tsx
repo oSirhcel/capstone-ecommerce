@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 
 import { useDebounceCallback } from "usehooks-ts";
 
@@ -39,7 +39,6 @@ import { useStoreNameAvailability } from "@/hooks/onboarding/use-store-availabil
 import { useSlugGeneration } from "@/hooks/onboarding/use-slug-generation";
 import { useSlugAvailability } from "@/hooks/onboarding/use-slug-availability";
 import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
 import {
   InputGroup,
   InputGroupAddon,
@@ -99,11 +98,21 @@ const steps = [
 
 export const OnboardingForm = () => {
   const { update } = useSession();
-  const router = useRouter();
   const [activeIndex, setActiveIndex] = useState(0);
+  const [showFallbackRedirect, setShowFallbackRedirect] = useState(false);
+  const fallbackTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const [nameQuery, setNameQuery] = useState("");
   const [slugQuery, setSlugQuery] = useState("");
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (fallbackTimerRef.current) {
+        clearTimeout(fallbackTimerRef.current);
+      }
+    };
+  }, []);
 
   const { data: isHandleAvailable, isLoading: isHandleLoading } =
     useStoreNameAvailability(nameQuery);
@@ -161,19 +170,34 @@ export const OnboardingForm = () => {
       {
         name: values.name,
         description: values.description ?? "",
-        slug: values.slug, // NEW
+        slug: values.slug,
       },
       {
         onSuccess: (result) => {
-          // Ensure session is updated with store id before navigating to admin to avoid redirect loop
           if (result.data) {
+            // Show fallback button after a short delay in case redirect doesn't work
+            fallbackTimerRef.current = setTimeout(() => {
+              setShowFallbackRedirect(true);
+            }, 2000);
+
+            // Wait for session update to complete before navigating
             void update({ store: { id: result.data.id } })
               .then(() => {
-                router.replace("/admin");
+                if (fallbackTimerRef.current) {
+                  clearTimeout(fallbackTimerRef.current);
+                  fallbackTimerRef.current = null;
+                }
+                // Use window.location for full page reload to ensure middleware reads updated session
+                window.location.href = "/admin";
               })
               .catch(() => {
+                if (fallbackTimerRef.current) {
+                  clearTimeout(fallbackTimerRef.current);
+                  fallbackTimerRef.current = null;
+                }
+                setShowFallbackRedirect(true);
                 // Even if update fails, attempt navigation to let middleware evaluate latest token
-                router.replace("/admin");
+                window.location.href = "/admin";
               });
           }
         },
@@ -451,9 +475,27 @@ export const OnboardingForm = () => {
               </Button>
             )}
             {activeIndex === 3 && (
-              <Button type="submit" className="mt-4 w-full">
-                Complete
-              </Button>
+              <>
+                <Button
+                  type="submit"
+                  className="mt-4 w-full"
+                  disabled={mutation.isPending}
+                >
+                  {mutation.isPending ? "Creating store..." : "Complete"}
+                </Button>
+                {showFallbackRedirect && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="mt-3 w-full"
+                    onClick={() => {
+                      window.location.href = "/admin";
+                    }}
+                  >
+                    Continue to Admin Dashboard
+                  </Button>
+                )}
+              </>
             )}
           </div>
         </Card>

@@ -1,4 +1,4 @@
-import type { NodePgDatabase } from "drizzle-orm/node-postgres";
+import type { NeonHttpDatabase } from "drizzle-orm/neon-http";
 import {
   products,
   productImages,
@@ -191,7 +191,7 @@ function shuffle<T>(array: T[]): T[] {
 }
 
 export async function seedProducts(
-  db: NodePgDatabase<Record<string, never>>,
+  db: NeonHttpDatabase<Record<string, never>>,
   stores: SeededStore[],
   categories: SeededCategory[],
   tags: SeededTag[],

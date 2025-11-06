@@ -1,4 +1,4 @@
-import type { NodePgDatabase } from "drizzle-orm/node-postgres";
+import type { NeonHttpDatabase } from "drizzle-orm/neon-http";
 import { categories } from "../../src/server/db/schema";
 
 export interface SeededCategory {
@@ -48,7 +48,7 @@ const categoryData = [
 ];
 
 export async function seedCategories(
-  db: NodePgDatabase<Record<string, never>>,
+  db: NeonHttpDatabase<Record<string, never>>,
 ): Promise<SeededCategory[]> {
   console.log("🌱 Seeding categories...");
 

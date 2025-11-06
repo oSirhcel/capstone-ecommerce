@@ -1,4 +1,4 @@
-import type { NodePgDatabase } from "drizzle-orm/node-postgres";
+import type { NeonHttpDatabase } from "drizzle-orm/neon-http";
 import { addresses, userProfiles } from "../../src/server/db/schema";
 import { inArray, type InferInsertModel } from "drizzle-orm";
 import type { SeededUser } from "./users";
@@ -94,7 +94,7 @@ function generateAddress(
 }
 
 export async function seedAddresses(
-  db: NodePgDatabase<Record<string, never>>,
+  db: NeonHttpDatabase<Record<string, never>>,
   users: SeededUser[],
 ): Promise<SeededAddress[]> {
   console.log("🌱 Seeding addresses...");

@@ -1,10 +1,10 @@
-import type { NodePgDatabase } from "drizzle-orm/node-postgres";
+import type { NeonHttpDatabase } from "drizzle-orm/neon-http";
 import { pageViews, cartEvents } from "../../src/server/db/schema";
 import type { InferInsertModel } from "drizzle-orm";
 import type { SeededUser } from "./users";
 import type { SeededStore } from "./stores";
 import type { SeededProduct } from "./products";
-import { daysAgo, hoursAgo, randomInt, randomItem } from "./utils";
+import { daysAgo, randomInt, randomItem } from "./utils";
 
 type NewPageView = InferInsertModel<typeof pageViews>;
 type NewCartEvent = InferInsertModel<typeof cartEvents>;
@@ -90,7 +90,7 @@ function generateIPAddress(): string {
 }
 
 export async function seedAnalytics(
-  db: NodePgDatabase<Record<string, never>>,
+  db: NeonHttpDatabase<Record<string, never>>,
   users: SeededUser[],
   stores: SeededStore[],
   products: SeededProduct[],

@@ -47,13 +47,22 @@ const columns = [
     sortable: true,
     cell: ({ row }: { row: { original: RiskAssessmentListItem } }) => {
       const user = row.original;
-      if (!user.userName && !user.userEmail && !user.username) {
+      if (
+        !user.userName &&
+        !user.userLastName &&
+        !user.userEmail &&
+        !user.username
+      ) {
         return <span className="text-muted-foreground">Guest</span>;
       }
       const fullName = [user.userName, user.userLastName]
         .filter(Boolean)
-        .join(" ");
-      const displayName = fullName ?? user.username ?? "Unknown";
+        .join(" ")
+        .trim();
+      const displayName =
+        fullName.length > 0
+          ? fullName
+          : user.username || user.userEmail || "Unknown";
       return (
         <div className="flex flex-col">
           <span className="font-medium">{displayName}</span>

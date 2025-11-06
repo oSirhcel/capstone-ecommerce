@@ -62,7 +62,7 @@ const columns = [
       const displayName =
         fullName.length > 0
           ? fullName
-          : user.username || user.userEmail || "Unknown";
+          : (user.username ?? user.userEmail ?? "Unknown");
       return (
         <div className="flex flex-col">
           <span className="font-medium">{displayName}</span>

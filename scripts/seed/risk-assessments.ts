@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from "uuid";
-import type { NodePgDatabase } from "drizzle-orm/node-postgres";
+import type { NeonHttpDatabase } from "drizzle-orm/neon-http";
 import {
   zeroTrustAssessments,
   riskAssessmentStoreLinks,
@@ -89,7 +89,8 @@ function generateRiskFactors(decision: "allow" | "warn" | "deny"): string {
       {
         factor: "High transaction value",
         impact: 25,
-        description: "Transaction amount significantly exceeds user's typical spending",
+        description:
+          "Transaction amount significantly exceeds user's typical spending",
       },
       {
         factor: "Multiple failed attempts",
@@ -208,7 +209,7 @@ function generateAIJustification(
 }
 
 export async function seedRiskAssessments(
-  db: NodePgDatabase<Record<string, never>>,
+  db: NeonHttpDatabase<Record<string, never>>,
   users: SeededUser[],
   stores: SeededStore[],
   seededOrders: SeededOrder[],
@@ -217,7 +218,7 @@ export async function seedRiskAssessments(
 
   // Find specific test users
   const badAccount = users.find((u) => u.username === "badaccount");
-  // MrGood is the test_buyer account
+  // Test123 is the test_buyer account
   const mrGood = users.find((u) => u.username === "test_buyer");
 
   // Get test users with "test_" prefix or any test accounts, excluding badaccount
@@ -225,7 +226,7 @@ export async function seedRiskAssessments(
     (u) =>
       (u.role === "test_account" || u.username.startsWith("test_")) &&
       u.username !== "badaccount" &&
-      u.username !== "test_buyer", // Exclude test_buyer as it's "MrGood"
+      u.username !== "test_buyer", // Exclude test_buyer as it's "Test123"
   );
 
   // Get regular customers
@@ -238,19 +239,22 @@ export async function seedRiskAssessments(
   if (badAccount) {
     console.log("  Creating denied assessments for badaccount...");
     // Find badaccount's orders
-    const badAccountOrders = seededOrders.filter((o) => o.userId === badAccount.id);
-    
+    const badAccountOrders = seededOrders.filter(
+      (o) => o.userId === badAccount.id,
+    );
+
     // If badaccount has no orders, use any order (for test purposes)
-    const ordersToUse = badAccountOrders.length > 0 
-      ? badAccountOrders 
-      : seededOrders.slice(0, Math.min(8, seededOrders.length));
+    const ordersToUse =
+      badAccountOrders.length > 0
+        ? badAccountOrders
+        : seededOrders.slice(0, Math.min(8, seededOrders.length));
 
     for (let i = 0; i < 8; i++) {
       const order = ordersToUse[i % ordersToUse.length];
       if (!order) continue;
 
       const riskScore = randomInt(75, 95);
-      const decision: "deny" = "deny";
+      const decision = "deny";
       const confidence = randomInt(80, 95);
       const createdDaysAgo = randomInt(30, 120);
 
@@ -308,23 +312,24 @@ export async function seedRiskAssessments(
     }
   }
 
-  // 2. Create allowed assessments for MrGood
+  // 2. Create allowed assessments for Test123
   if (mrGood) {
-    console.log("  Creating allowed assessments for MrGood...");
-    // Find MrGood's orders
+    console.log("  Creating allowed assessments for Test123...");
+    // Find Test123's orders
     const mrGoodOrders = seededOrders.filter((o) => o.userId === mrGood.id);
-    
+
     // If mrGood has no orders, use any order (for test purposes)
-    const ordersToUse = mrGoodOrders.length > 0 
-      ? mrGoodOrders 
-      : seededOrders.slice(0, Math.min(10, seededOrders.length));
+    const ordersToUse =
+      mrGoodOrders.length > 0
+        ? mrGoodOrders
+        : seededOrders.slice(0, Math.min(10, seededOrders.length));
 
     for (let i = 0; i < 10; i++) {
       const order = ordersToUse[i % ordersToUse.length];
       if (!order) continue;
 
       const riskScore = randomInt(10, 35);
-      const decision: "allow" = "allow";
+      const decision = "allow";
       const confidence = randomInt(85, 98);
       const createdDaysAgo = randomInt(1, 90);
 
@@ -383,11 +388,13 @@ export async function seedRiskAssessments(
   }
 
   // 2.5. Create specific orders and assessments for alpha_gadgets and beta_crafts
-  console.log("  Creating orders and assessments for alpha_gadgets and beta_crafts...");
-  
+  console.log(
+    "  Creating orders and assessments for alpha_gadgets and beta_crafts...",
+  );
+
   const alphaGadgets = stores.find((s) => s.name === "Alpha Gadgets");
   const betaCrafts = stores.find((s) => s.name === "Beta Crafts");
-  
+
   if (alphaGadgets && betaCrafts && badAccount && mrGood) {
     // Get products from these stores
     const alphaProducts = await db
@@ -395,34 +402,38 @@ export async function seedRiskAssessments(
       .from(products)
       .where(eq(products.storeId, alphaGadgets.id))
       .limit(10);
-    
+
     const betaProducts = await db
       .select()
       .from(products)
       .where(eq(products.storeId, betaCrafts.id))
       .limit(10);
-    
+
     // Get user profiles for addresses
     const testUserProfiles = await db
       .select()
       .from(userProfiles)
       .where(inArray(userProfiles.userId, [badAccount.id, mrGood.id]));
-    
-    const badAccountProfile = testUserProfiles.find((p) => p.userId === badAccount.id);
+
+    const badAccountProfile = testUserProfiles.find(
+      (p) => p.userId === badAccount.id,
+    );
     const mrGoodProfile = testUserProfiles.find((p) => p.userId === mrGood.id);
-    
+
     // Create addresses if they don't exist
     const existingAddresses = await db
       .select()
       .from(addresses)
       .where(inArray(addresses.userId, [badAccount.id, mrGood.id]));
-    
-    const badAccountAddress = existingAddresses.find((a) => a.userId === badAccount.id);
+
+    const badAccountAddress = existingAddresses.find(
+      (a) => a.userId === badAccount.id,
+    );
     const mrGoodAddress = existingAddresses.find((a) => a.userId === mrGood.id);
-    
+
     let badAccountAddressId = badAccountAddress?.id;
     let mrGoodAddressId = mrGoodAddress?.id;
-    
+
     // Create addresses if needed
     if (!badAccountAddressId && badAccountProfile) {
       const [newAddress] = await db
@@ -442,7 +453,7 @@ export async function seedRiskAssessments(
         .returning();
       badAccountAddressId = newAddress.id;
     }
-    
+
     if (!mrGoodAddressId && mrGoodProfile) {
       const [newAddress] = await db
         .insert(addresses)
@@ -461,27 +472,31 @@ export async function seedRiskAssessments(
         .returning();
       mrGoodAddressId = newAddress.id;
     }
-    
+
     // Create 5 denied orders for badaccount at alpha_gadgets
     for (let i = 0; i < 5; i++) {
       if (alphaProducts.length === 0) continue;
-      
+
       const selectedProducts = alphaProducts.slice(0, randomInt(1, 3));
       let totalAmount = 0;
-      const itemsData: Array<{ productId: number; quantity: number; priceAtTime: number }> = [];
-      
+      const itemsData: Array<{
+        productId: number;
+        quantity: number;
+        priceAtTime: number;
+      }> = [];
+
       for (const product of selectedProducts) {
         const quantity = randomInt(1, 3);
         const priceAtTime = product.price ?? 0;
         totalAmount += priceAtTime * quantity;
         itemsData.push({ productId: product.id, quantity, priceAtTime });
       }
-      
+
       totalAmount += cents(randomInt(5, 15)); // Add shipping
-      
+
       const createdDaysAgo = randomInt(20, 90);
       const createdAt = daysAgo(createdDaysAgo);
-      
+
       // Create order
       const [newOrder] = await db
         .insert(orders)
@@ -495,9 +510,9 @@ export async function seedRiskAssessments(
           updatedAt: createdAt,
         })
         .returning();
-      
-      const orderId = newOrder!.id;
-      
+
+      const orderId = newOrder.id;
+
       // Create order items
       for (const item of itemsData) {
         await db.insert(orderItems).values({
@@ -507,7 +522,7 @@ export async function seedRiskAssessments(
           priceAtTime: item.priceAtTime,
         });
       }
-      
+
       // Create order address if we have an address
       if (badAccountAddressId && badAccountProfile) {
         await db.insert(orderAddresses).values({
@@ -523,12 +538,12 @@ export async function seedRiskAssessments(
           createdAt,
         });
       }
-      
+
       // Create risk assessment
       const riskScore = randomInt(80, 98);
-      const decision: "deny" = "deny";
+      const decision = "deny";
       const confidence = randomInt(85, 98);
-      
+
       assessmentsData.push({
         assessment: {
           userId: badAccount.id,
@@ -568,27 +583,31 @@ export async function seedRiskAssessments(
         },
       });
     }
-    
+
     // Create 5 denied orders for badaccount at beta_crafts
     for (let i = 0; i < 5; i++) {
       if (betaProducts.length === 0) continue;
-      
+
       const selectedProducts = betaProducts.slice(0, randomInt(1, 3));
       let totalAmount = 0;
-      const itemsData: Array<{ productId: number; quantity: number; priceAtTime: number }> = [];
-      
+      const itemsData: Array<{
+        productId: number;
+        quantity: number;
+        priceAtTime: number;
+      }> = [];
+
       for (const product of selectedProducts) {
         const quantity = randomInt(1, 2);
         const priceAtTime = product.price ?? 0;
         totalAmount += priceAtTime * quantity;
         itemsData.push({ productId: product.id, quantity, priceAtTime });
       }
-      
+
       totalAmount += cents(randomInt(5, 15)); // Add shipping
-      
+
       const createdDaysAgo = randomInt(25, 100);
       const createdAt = daysAgo(createdDaysAgo);
-      
+
       // Create order
       const [newOrder] = await db
         .insert(orders)
@@ -602,9 +621,9 @@ export async function seedRiskAssessments(
           updatedAt: createdAt,
         })
         .returning();
-      
-      const orderId = newOrder!.id;
-      
+
+      const orderId = newOrder.id;
+
       // Create order items
       for (const item of itemsData) {
         await db.insert(orderItems).values({
@@ -614,7 +633,7 @@ export async function seedRiskAssessments(
           priceAtTime: item.priceAtTime,
         });
       }
-      
+
       // Create order address
       if (badAccountAddressId && badAccountProfile) {
         await db.insert(orderAddresses).values({
@@ -630,12 +649,12 @@ export async function seedRiskAssessments(
           createdAt,
         });
       }
-      
+
       // Create risk assessment
       const riskScore = randomInt(78, 96);
-      const decision: "deny" = "deny";
+      const decision = "deny";
       const confidence = randomInt(82, 96);
-      
+
       assessmentsData.push({
         assessment: {
           userId: badAccount.id,
@@ -675,27 +694,31 @@ export async function seedRiskAssessments(
         },
       });
     }
-    
+
     // Create 6 allowed orders for test_buyer at alpha_gadgets
     for (let i = 0; i < 6; i++) {
       if (alphaProducts.length === 0) continue;
-      
+
       const selectedProducts = alphaProducts.slice(0, randomInt(1, 4));
       let totalAmount = 0;
-      const itemsData: Array<{ productId: number; quantity: number; priceAtTime: number }> = [];
-      
+      const itemsData: Array<{
+        productId: number;
+        quantity: number;
+        priceAtTime: number;
+      }> = [];
+
       for (const product of selectedProducts) {
         const quantity = randomInt(1, 2);
         const priceAtTime = product.price ?? 0;
         totalAmount += priceAtTime * quantity;
         itemsData.push({ productId: product.id, quantity, priceAtTime });
       }
-      
+
       totalAmount += cents(randomInt(5, 15)); // Add shipping
-      
+
       const createdDaysAgo = randomInt(5, 60);
       const createdAt = daysAgo(createdDaysAgo);
-      
+
       // Create order
       const [newOrder] = await db
         .insert(orders)
@@ -709,9 +732,9 @@ export async function seedRiskAssessments(
           updatedAt: createdAt,
         })
         .returning();
-      
-      const orderId = newOrder!.id;
-      
+
+      const orderId = newOrder.id;
+
       // Create order items
       for (const item of itemsData) {
         await db.insert(orderItems).values({
@@ -721,7 +744,7 @@ export async function seedRiskAssessments(
           priceAtTime: item.priceAtTime,
         });
       }
-      
+
       // Create order address
       if (mrGoodAddressId && mrGoodProfile) {
         await db.insert(orderAddresses).values({
@@ -737,12 +760,12 @@ export async function seedRiskAssessments(
           createdAt,
         });
       }
-      
+
       // Create risk assessment
       const riskScore = randomInt(8, 28);
-      const decision: "allow" = "allow";
+      const decision = "allow";
       const confidence = randomInt(88, 99);
-      
+
       assessmentsData.push({
         assessment: {
           userId: mrGood.id,
@@ -782,27 +805,31 @@ export async function seedRiskAssessments(
         },
       });
     }
-    
+
     // Create 6 allowed orders for test_buyer at beta_crafts
     for (let i = 0; i < 6; i++) {
       if (betaProducts.length === 0) continue;
-      
+
       const selectedProducts = betaProducts.slice(0, randomInt(1, 3));
       let totalAmount = 0;
-      const itemsData: Array<{ productId: number; quantity: number; priceAtTime: number }> = [];
-      
+      const itemsData: Array<{
+        productId: number;
+        quantity: number;
+        priceAtTime: number;
+      }> = [];
+
       for (const product of selectedProducts) {
         const quantity = randomInt(1, 2);
         const priceAtTime = product.price ?? 0;
         totalAmount += priceAtTime * quantity;
         itemsData.push({ productId: product.id, quantity, priceAtTime });
       }
-      
+
       totalAmount += cents(randomInt(5, 15)); // Add shipping
-      
+
       const createdDaysAgo = randomInt(10, 70);
       const createdAt = daysAgo(createdDaysAgo);
-      
+
       // Create order
       const [newOrder] = await db
         .insert(orders)
@@ -816,9 +843,9 @@ export async function seedRiskAssessments(
           updatedAt: createdAt,
         })
         .returning();
-      
-      const orderId = newOrder!.id;
-      
+
+      const orderId = newOrder.id;
+
       // Create order items
       for (const item of itemsData) {
         await db.insert(orderItems).values({
@@ -828,7 +855,7 @@ export async function seedRiskAssessments(
           priceAtTime: item.priceAtTime,
         });
       }
-      
+
       // Create order address
       if (mrGoodAddressId && mrGoodProfile) {
         await db.insert(orderAddresses).values({
@@ -844,12 +871,12 @@ export async function seedRiskAssessments(
           createdAt,
         });
       }
-      
+
       // Create risk assessment
       const riskScore = randomInt(5, 25);
-      const decision: "allow" = "allow";
+      const decision = "allow";
       const confidence = randomInt(90, 99);
-      
+
       assessmentsData.push({
         assessment: {
           userId: mrGood.id,
@@ -893,7 +920,7 @@ export async function seedRiskAssessments(
 
   // 3. Create mixed assessments for test users (excluding badaccount and mrgood)
   const testUsersWithoutSpecial = testUsers.filter(
-    (u) => u.username !== "badaccount" && u.username !== "MrGood",
+    (u) => u.username !== "badaccount" && u.username !== "Test123",
   );
 
   for (const testUser of testUsersWithoutSpecial) {
@@ -1111,16 +1138,21 @@ export async function seedRiskAssessments(
   }
 
   // Count by decision
-  const deniedCount = assessmentsData.filter((d) => d.assessment.decision === "deny").length;
-  const warnedCount = assessmentsData.filter((d) => d.assessment.decision === "warn").length;
-  const allowedCount = assessmentsData.filter((d) => d.assessment.decision === "allow").length;
+  const deniedCount = assessmentsData.filter(
+    (d) => d.assessment.decision === "deny",
+  ).length;
+  const warnedCount = assessmentsData.filter(
+    (d) => d.assessment.decision === "warn",
+  ).length;
+  const allowedCount = assessmentsData.filter(
+    (d) => d.assessment.decision === "allow",
+  ).length;
 
   console.log(`✅ Created ${assessmentsData.length} risk assessments`);
   console.log(`   - Denied: ${deniedCount}`);
   console.log(`   - Warnings: ${warnedCount}`);
   console.log(`   - Allowed: ${allowedCount}`);
   console.log(`   - With store links and order links`);
-  
+
   return assessmentsData.length;
 }
-

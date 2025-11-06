@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (env.GOOGLE_GENERATIVE_AI_API_KEY) {
+    if (!env.GOOGLE_GENERATIVE_AI_API_KEY) {
       return NextResponse.json(
         { error: "Google AI API key not configured" },
         { status: 500 },

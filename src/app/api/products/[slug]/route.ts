@@ -57,6 +57,7 @@ export async function GET(
           name: stores.name,
           slug: stores.slug,
           description: stores.description,
+          imageUrl: stores.imageUrl,
           createdAt: stores.createdAt,
         },
         category: {
@@ -445,6 +446,7 @@ export async function PUT(
           id: stores.id,
           name: stores.name,
           slug: stores.slug,
+          imageUrl: stores.imageUrl,
         },
         category: {
           id: categories.id,

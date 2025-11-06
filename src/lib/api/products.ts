@@ -34,6 +34,7 @@ export interface Product {
     name: string;
     slug: string;
     description?: string;
+    imageUrl?: string;
     createdAt?: Date;
     productCount?: number;
     averageRating?: number;

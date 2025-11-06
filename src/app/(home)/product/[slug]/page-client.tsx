@@ -55,7 +55,8 @@ function transform(product: Product) {
       id: product.store?.id ?? "unknown",
       name: product.store?.name ?? "Unknown Store",
       slug: product.store?.slug ?? "unknown-store",
-      logo: "/placeholder.svg",
+      logo:
+        (product.store?.imageUrl as string | undefined) ?? "/placeholder.svg",
       rating: product.store?.averageRating ?? 0,
       productCount: product.store?.productCount ?? 0,
       joinedDate:

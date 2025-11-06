@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
 import { zeroTrustVerifications } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
@@ -50,9 +50,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Parse existing payment data and merge with orderIds
-    let paymentData;
+    let paymentData: Record<string, unknown>;
     try {
-      paymentData = JSON.parse(verification.paymentData || '{}');
+      paymentData = JSON.parse(verification.paymentData ?? '{}') as Record<string, unknown>;
     } catch (error) {
       console.error('Failed to parse existing payment data:', error);
       paymentData = {};

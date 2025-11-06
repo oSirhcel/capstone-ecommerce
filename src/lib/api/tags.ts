@@ -47,7 +47,7 @@ export async function createTag(name: string): Promise<ApiResponse<Tag>> {
     }
 
     return { data: data as Tag };
-  } catch (error) {
+  } catch {
     return { error: "Network error occurred" };
   }
 }
@@ -72,7 +72,7 @@ export async function deleteTag(
     }
 
     return { data: data as { message: string } };
-  } catch (error) {
+  } catch {
     return { error: "Network error occurred" };
   }
 }

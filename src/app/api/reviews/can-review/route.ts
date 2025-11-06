@@ -1,14 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { db } from "@/server/db";
-import { orders, orderItems } from "@/server/db/schema";
-import { eq, and, inArray, or } from "drizzle-orm";
-
-type SessionUser = {
-  id: string;
-  email?: string | null;
-  name?: string | null;
-};
 
 // GET /api/reviews/can-review - Check if user can review a product
 export async function GET(request: NextRequest) {
@@ -25,7 +16,6 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const user = session.user as SessionUser;
     const { searchParams } = new URL(request.url);
     const productId = searchParams.get("productId");
 

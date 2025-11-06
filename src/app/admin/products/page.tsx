@@ -12,7 +12,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Search, Plus, Filter, Trash2, Package } from "lucide-react";
+import { Search, Plus, Filter, Package } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useProductsQuery } from "@/hooks/products/use-products-query";

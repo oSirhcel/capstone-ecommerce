@@ -78,7 +78,7 @@ export function ProductDraftCard({ draft, onApply }: ProductDraftCardProps) {
       <CardContent className="space-y-2">
         <ul className="bg-muted space-y-2 rounded-lg p-4">
           {allFields.map(({ key, label }) => {
-            const value = draft[key];
+            const value = draft[key as keyof ExtractedProduct];
             return (
               <li key={key} className="flex items-start gap-2">
                 <span className="text-muted-foreground mt-[3px] text-xs">

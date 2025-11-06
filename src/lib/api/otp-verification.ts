@@ -8,6 +8,7 @@ import { zeroTrustVerifications } from "@/server/db/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { generateOTP, sendOTPEmail } from "@/lib/smtp";
 import crypto from "crypto";
+import type { PaymentData } from "@/types/api-responses";
 import bcrypt from "bcryptjs";
 
 // OTP expires in 10 minutes
@@ -191,7 +192,7 @@ export async function createOTPVerification(params: {
 export async function verifyOTP(params: {
   token: string;
   otp: string;
-}): Promise<{ success: boolean; paymentData?: any; message?: string }> {
+}): Promise<{ success: boolean; paymentData?: PaymentData; message?: string }> {
   try {
     // Find verification record
     const [verification] = await db
@@ -253,7 +254,7 @@ export async function verifyOTP(params: {
       .where(eq(zeroTrustVerifications.token, params.token));
 
     // Parse and return payment data
-    const paymentData = JSON.parse(verification.paymentData);
+    const paymentData = JSON.parse(verification.paymentData) as PaymentData;
 
     return {
       success: true,
@@ -344,7 +345,7 @@ export async function resendOTP(token: string): Promise<{ success: boolean; mess
       .where(eq(zeroTrustVerifications.token, token));
 
     // Parse payment data to get transaction amount
-    const paymentData = JSON.parse(verification.paymentData);
+    const paymentData = JSON.parse(verification.paymentData) as PaymentData;
 
     // Send new OTP email
     await sendOTPEmail(verification.userEmail, newOtp, {
@@ -369,8 +370,7 @@ export async function resendOTP(token: string): Promise<{ success: boolean; mess
  */
 export async function cleanupExpiredVerifications(): Promise<number> {
   try {
-    const now = new Date();
-    const result = await db
+    await db
       .update(zeroTrustVerifications)
       .set({ status: 'expired' })
       .where(

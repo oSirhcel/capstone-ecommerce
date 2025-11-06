@@ -12,13 +12,16 @@ type SessionUser = {
 };
 
 const CancelOrderSchema = z.object({
-  reason: z.string().min(1, "Cancellation reason is required").max(500, "Reason is too long"),
+  reason: z
+    .string()
+    .min(1, "Cancellation reason is required")
+    .max(500, "Reason is too long"),
 });
 
 // PUT /api/orders/[id]/cancel - Cancel a pending order
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const session = await auth();
@@ -34,8 +37,8 @@ export async function PUT(
       return NextResponse.json({ error: "Invalid order ID" }, { status: 400 });
     }
 
-    const body = await request.json();
-    //const { reason } = CancelOrderSchema.parse(body);
+    // Validate request body (reason is stored but not currently used)
+    CancelOrderSchema.parse(await request.json());
 
     // Check if order exists and belongs to the user
     const [order] = await db
@@ -56,11 +59,11 @@ export async function PUT(
     // Check if order can be cancelled
     if (order.status !== "Pending") {
       return NextResponse.json(
-        { 
-          error: "Order cannot be cancelled", 
-          details: `Orders with status '${order.status}' cannot be cancelled. Only pending orders can be cancelled.` 
+        {
+          error: "Order cannot be cancelled",
+          details: `Orders with status '${order.status}' cannot be cancelled. Only pending orders can be cancelled.`,
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -96,7 +99,7 @@ export async function PUT(
 
           if (currentProduct) {
             const newStock = currentProduct.stock + item.quantity;
-            
+
             // Restore stock for the product
             await tx
               .update(products)
@@ -121,19 +124,19 @@ export async function PUT(
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: "Validation error", details: error.errors },
-        { status: 400 }
+        { error: "Validation error", details: z.treeifyError(error) },
+        { status: 400 },
       );
     }
 
     console.error("Error cancelling order:", error);
-    
+
     return NextResponse.json(
-      { 
+      {
         error: "Failed to cancel order. Please try again.",
-        details: error instanceof Error ? error.message : "Unknown error"
+        details: error instanceof Error ? error.message : "Unknown error",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

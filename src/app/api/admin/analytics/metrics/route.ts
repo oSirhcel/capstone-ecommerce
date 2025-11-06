@@ -169,12 +169,12 @@ export async function GET(request: NextRequest) {
 
     const currentOrders = Number(currentMetrics?.orderCount ?? 0);
     const previousOrders = Number(previousMetrics?.orderCount ?? 0);
-    const ordersChange =
-      previousOrders > 0
-        ? ((currentOrders - previousOrders) / previousOrders) * 100
-        : currentOrders > 0
-          ? 100
-          : 0;
+    // const ordersChange =
+    //   previousOrders > 0
+    //     ? ((currentOrders - previousOrders) / previousOrders) * 100
+    //     : currentOrders > 0
+    //       ? 100
+    //       : 0;
 
     const avgOrderValue =
       currentOrders > 0 ? currentRevenue / currentOrders : 0;

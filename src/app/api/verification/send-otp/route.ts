@@ -3,22 +3,29 @@
  * Send OTP code for transaction verification
  */
 
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { createOTPVerification } from "@/lib/api/otp-verification";
+
+interface SendOTPRequest {
+  paymentData: Record<string, unknown>;
+  riskScore: number;
+  riskFactors: Array<{ factor: string; impact: number; description: string }>;
+  transactionAmount?: number;
+}
 
 export async function POST(req: NextRequest) {
   try {
     const session = await auth();
 
-    if (!session || !session.user) {
+    if (!session?.user) {
       return NextResponse.json(
         { error: "Unauthorized. Please sign in." },
         { status: 401 }
       );
     }
 
-    const body = await req.json();
+    const body = (await req.json()) as SendOTPRequest;
     const { paymentData, riskScore, riskFactors, transactionAmount } = body;
 
     if (!paymentData || typeof riskScore !== 'number' || !Array.isArray(riskFactors)) {
@@ -40,7 +47,7 @@ export async function POST(req: NextRequest) {
     const { token, expiresAt } = await createOTPVerification({
       userId: session.user.id,
       userEmail,
-      userName: session.user.name || undefined,
+      userName: session.user.name ?? undefined,
       paymentData,
       riskScore,
       riskFactors,

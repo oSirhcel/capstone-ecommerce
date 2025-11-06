@@ -7,14 +7,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Clock,
-  ShoppingCart,
-  MessageSquare,
-  User,
-  CreditCard,
-} from "lucide-react";
-import { useCustomerDetail } from "@/contexts/customer-detail-context";
+import { Clock, type ShoppingCart } from "lucide-react";
 import {
   Empty,
   EmptyHeader,
@@ -23,6 +16,7 @@ import {
   EmptyDescription,
 } from "@/components/ui/empty";
 
+//TODO: Add actual timeline data
 // Mock timeline data - empty for now to show empty state
 const timelineEvents: {
   id: string;

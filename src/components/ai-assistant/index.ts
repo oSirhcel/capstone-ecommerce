@@ -1,4 +1,3 @@
-export { AIAssistantWidget } from "./ai-assistant-widget";
 export { ChatbotHeader } from "./chatbot-header";
 export { ChatbotBody } from "./chatbot-body";
 export { ChatInput } from "./chat-input";

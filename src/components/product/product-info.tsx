@@ -3,7 +3,6 @@
 import { useState } from "react";
 import {
   CheckIcon,
-  HeartIcon,
   MinusIcon,
   PlusIcon,
   Share2Icon,

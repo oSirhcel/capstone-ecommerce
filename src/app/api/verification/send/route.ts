@@ -13,7 +13,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { token } = await request.json();
+    const body = (await request.json()) as { token: string };
+    const { token } = body;
     
     if (!token) {
       return NextResponse.json({ error: 'Verification token required' }, { status: 400 });
@@ -25,8 +26,8 @@ export async function POST(request: NextRequest) {
       .from(zeroTrustVerifications)
       .where(
         and(
-          eq(zeroTrustVerifications.token, token),
-          eq(zeroTrustVerifications.userId, session.user.id as string),
+          eq(zeroTrustVerifications.token, String(token)),
+          eq(zeroTrustVerifications.userId, session.user.id),
           eq(zeroTrustVerifications.status, 'pending')
         )
       )
@@ -60,7 +61,7 @@ export async function POST(request: NextRequest) {
       .set({
         // Store the code temporarily (in production, you'd hash this)
         riskFactors: JSON.stringify({
-          ...JSON.parse(verification.riskFactors || '[]'),
+          ...JSON.parse(verification.riskFactors ?? '[]'),
           verificationCode
         }),
         emailSent: true,

@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { fetchProducts, type ProductsResponse } from "@/lib/api/products";
+import { fetchProducts } from "@/lib/api/products";
 
 export function useProductsQuery(params?: {
   page?: number;

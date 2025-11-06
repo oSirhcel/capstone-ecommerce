@@ -85,6 +85,7 @@ export async function POST(req: Request) {
     slug,
     description,
     ownerId: userId,
+    imageUrl: "",
   });
 
   return NextResponse.json({ id: newStoreId, slug }, { status: 201 });

@@ -48,7 +48,7 @@ function AIJustificationText({ text }: { text: string }) {
 
         // Handle numbered lists
         if (/^[\s]*\d+\.\s/.test(line)) {
-          const match = line.match(/^([\s]*\d+\.)\s(.*)$/);
+          const match = /^([\s]*\d+\.)\s(.*)$/.exec(line);
           if (match) {
             const [, number, content] = match;
             return (
@@ -259,7 +259,7 @@ export default function RiskAssessmentDetailPage() {
             </Button>
           </Link>
           <h1 className="text-2xl font-bold">Assessment #{data.id}</h1>
-          <Badge variant={variant as any}>{data.decision.toUpperCase()}</Badge>
+          <Badge variant={variant}>{data.decision.toUpperCase()}</Badge>
         </div>
         <Button onClick={() => regen.mutate()} disabled={regen.isPending}>
           {regen.isPending ? "Regenerating…" : "Regenerate Justification"}
@@ -288,7 +288,7 @@ export default function RiskAssessmentDetailPage() {
           </CardHeader>
           <CardContent>
             <div className="bg-muted/30 rounded-lg border p-4">
-              <AIJustificationText text={data.aiJustification || ""} />
+              <AIJustificationText text={data.aiJustification ?? ""} />
             </div>
           </CardContent>
         </Card>
@@ -308,7 +308,7 @@ export default function RiskAssessmentDetailPage() {
                       {[data.userName, data.userLastName]
                         .filter(Boolean)
                         .join(" ") ||
-                        data.username ||
+                        (data.username ?? "") ||
                         "Unknown"}
                     </span>
                     {data.userEmail && (

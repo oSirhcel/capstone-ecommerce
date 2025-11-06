@@ -86,8 +86,8 @@ export async function GET(_request: NextRequest) {
         return {
           id: item.productId.toString(),
           name: item.productName,
-          price: item.productPrice / 100, // Convert from cents
-          image: images[0]?.imageUrl || "/placeholder.svg",
+          price: item.productPrice! / 100, // Convert from cents
+          image: images[0]?.imageUrl ?? "/placeholder.svg",
           quantity: item.quantity,
           storeId: item.storeId,
           storeName: item.storeName,

@@ -3,23 +3,24 @@ import { auth } from "@/lib/auth";
 import { db } from "@/server/db";
 import { paymentTransactions } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
+import type { CreateTransactionRequest } from "@/types/api-responses";
 
 // POST /api/payments/create-transaction - Create payment transaction record
 export async function POST(request: NextRequest) {
   try {
     const session = await auth();
-    
+
     if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = await request.json();
+    const body = (await request.json()) as CreateTransactionRequest;
     const { paymentIntentId, orderId, amount, currency } = body;
 
     if (!paymentIntentId || !orderId || !amount) {
       return NextResponse.json(
-        { error: 'Payment intent ID, order ID, and amount are required' },
-        { status: 400 }
+        { error: "Payment intent ID, order ID, and amount are required" },
+        { status: 400 },
       );
     }
 
@@ -43,7 +44,7 @@ export async function POST(request: NextRequest) {
       }
       return NextResponse.json({
         success: true,
-        message: 'Payment transaction record already exists',
+        message: "Payment transaction record already exists",
       });
     }
 
@@ -51,27 +52,26 @@ export async function POST(request: NextRequest) {
     await db.insert(paymentTransactions).values({
       orderId: orderId,
       amount: Math.round(amount * 100), // Convert dollars to cents for database storage
-      currency: currency || 'aud',
-      status: 'completed', // Payment is already processed at this point
+      currency: currency ?? "aud",
+      status: "completed", // Payment is already processed at this point
       transactionId: paymentIntentId,
       gatewayResponse: JSON.stringify({
         paymentIntentId: paymentIntentId,
-        status: 'succeeded',
+        status: "succeeded",
         amount: amount, // Keep original amount in gateway response for reference
-        currency: currency || 'aud',
+        currency: currency ?? "aud",
       }),
     });
 
     return NextResponse.json({
       success: true,
-      message: 'Payment transaction record created',
+      message: "Payment transaction record created",
     });
-
   } catch (error) {
-    console.error('Payment transaction creation error:', error);
+    console.error("Payment transaction creation error:", error);
     return NextResponse.json(
-      { error: 'Failed to create payment transaction' },
-      { status: 500 }
+      { error: "Failed to create payment transaction" },
+      { status: 500 },
     );
   }
 }

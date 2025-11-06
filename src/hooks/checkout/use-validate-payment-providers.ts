@@ -6,9 +6,7 @@ interface PaymentProviderValidation {
   missingStores: Array<{ storeId: string; storeName: string }>;
 }
 
-export function useValidatePaymentProviders(
-  storeGroups: StoreGroup[],
-): {
+export function useValidatePaymentProviders(storeGroups: StoreGroup[]): {
   isValid: boolean;
   isLoading: boolean;
   error: Error | null;
@@ -60,8 +58,7 @@ export function useValidatePaymentProviders(
   return {
     isValid: data?.valid ?? false,
     isLoading,
-    error: error as Error | null,
+    error: error,
     missingStores: data?.missingStores ?? [],
   };
 }
-

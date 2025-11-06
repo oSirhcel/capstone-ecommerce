@@ -34,7 +34,7 @@ export function PaymentProviderCard() {
       // Refetch providers to get latest status
       await refetch();
       toast.success("Payment provider status refreshed");
-    } catch (error) {
+    } catch {
       toast.error("Failed to verify connection");
     } finally {
       setIsVerifying(false);

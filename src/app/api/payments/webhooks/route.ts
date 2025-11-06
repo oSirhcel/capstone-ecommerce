@@ -1,9 +1,13 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { db } from "@/server/db";
-import { paymentTransactions, orders, storePaymentProviders } from "@/server/db/schema";
+import {
+  paymentTransactions,
+  orders,
+  storePaymentProviders,
+} from "@/server/db/schema";
 import { eq } from "drizzle-orm";
-import { constructWebhookEvent, stripe } from "@/lib/stripe";
+import { constructWebhookEvent } from "@/lib/stripe";
 import type Stripe from "stripe";
 
 // POST /api/payments/webhooks - Handle Stripe webhook events

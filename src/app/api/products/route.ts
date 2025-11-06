@@ -46,15 +46,17 @@ export async function GET(request: NextRequest) {
     // Default to "Active" status if not specified (for public API)
     // Allow filtering by status or "all" for admin
     const statusFilter =
-      statusParam === "all" || !statusParam
+      statusParam === "all"
         ? undefined
-        : eq(products.status, statusParam as "Active" | "Draft" | "Archived");
+        : statusParam
+          ? eq(products.status, statusParam as "Active" | "Draft" | "Archived")
+          : eq(products.status, "Active"); // Default to Active when not provided
 
     const whereCondition = and(
-      // If statusParam is undefined (not provided), default to Active
+      // If statusParam is null/undefined (not provided), default to Active
       // If statusParam is "all", show all statuses (statusFilter is undefined)
       // Otherwise, filter by the specified status
-      statusParam === undefined ? eq(products.status, "Active") : statusFilter,
+      statusFilter,
       categoryId ? eq(products.categoryId, categoryId) : undefined,
       storeId ? eq(products.storeId, storeId) : undefined,
       search ? ilike(products.name, `%${search}%`) : undefined,
@@ -357,15 +359,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Insert product images if provided
-    if (images && images.length > 0) {
-      const imageRecords = images.map((imageUrl: string, index: number) => ({
-        productId: newProduct.id,
-        imageUrl,
-        altText: `${name} - Image ${index + 1}`,
-        isPrimary: index === 0, // First image is primary
-        displayOrder: index,
-      }));
+    // Insert product images if provided (filter out placeholder)
+    const validImages =
+      images?.filter((img) => img !== "/placeholder.svg") ?? [];
+    if (validImages.length > 0) {
+      const imageRecords = validImages.map(
+        (imageUrl: string, index: number) => ({
+          productId: newProduct.id,
+          imageUrl,
+          altText: `${name} - Image ${index + 1}`,
+          isPrimary: index === 0, // First image is primary
+          displayOrder: index,
+        }),
+      );
 
       await db.insert(productImages).values(imageRecords);
     }

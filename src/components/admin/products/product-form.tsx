@@ -65,6 +65,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useQuery } from "@tanstack/react-query";
 import { categoryNameToSlug } from "@/lib/utils/category-slug";
+import { toast } from "sonner";
 
 const productFormSchema = z
   .object({
@@ -276,11 +277,9 @@ export function ProductForm({
 
   // Sync form data to context so AI can access current form state
   useEffect(() => {
-    if (!isEditing) {
-      const formValues = form.getValues();
-      updateFormData(formValues as Record<string, unknown>);
-    }
-  }, [form, isEditing, updateFormData]);
+    const formValues = form.getValues();
+    updateFormData(formValues as Record<string, unknown>);
+  }, [form, updateFormData]);
 
   // Apply pending draft using batch update - Much cleaner!
   useEffect(() => {
@@ -296,7 +295,7 @@ export function ProductForm({
 
   // Apply pending field updates using batch update
   useEffect(() => {
-    if (pendingFieldUpdates && !isEditing) {
+    if (pendingFieldUpdates) {
       const affectedFields = FormIntegrationService.applyFieldUpdates(
         form,
         pendingFieldUpdates,
@@ -307,7 +306,6 @@ export function ProductForm({
   }, [
     pendingFieldUpdates,
     form,
-    isEditing,
     markFieldsAsFilled,
     setPendingFieldUpdates,
   ]);
@@ -365,8 +363,8 @@ export function ProductForm({
               (cat) => categoryNameToSlug(cat.name) === data.category,
             )?.id
           : undefined,
-      // Always use the images state as the source of truth
-      images: images,
+      // Always use the images state as the source of truth, filter out placeholder
+      images: images.filter((img) => img !== "/placeholder.svg"),
     };
 
     if (isEditing && productId) {
@@ -574,6 +572,7 @@ export function ProductForm({
                         }}
                         productName={form.watch("name")}
                         productDescription={form.watch("description")}
+                        productImages={images}
                       />
                     </div>
                   </CardHeader>
@@ -587,14 +586,21 @@ export function ProductForm({
                           }}
                           endpoint="imageUploader"
                           onClientUploadComplete={(res) => {
+                            const uploadedUrls = res.map((r) => r.ufsUrl);
                             const newImages = [
                               ...images,
-                              ...res.map((r) => r.ufsUrl),
-                            ];
+                              ...uploadedUrls,
+                            ].filter((img) => img !== "/placeholder.svg");
                             setImages(newImages);
                             form.setValue("images", newImages, {
                               shouldDirty: true,
                             });
+                          }}
+                          onUploadError={(error) => {
+                            console.error("Upload error:", error);
+                            toast.error(
+                              `Failed to upload image: ${error.message || "Unknown error"}`,
+                            );
                           }}
                         />
                       </div>
@@ -658,17 +664,24 @@ export function ProductForm({
                               }}
                               endpoint="imageUploader"
                               onClientUploadComplete={(res) => {
+                                const uploadedUrls = res.map((r) => r.ufsUrl);
                                 const newImages = [
                                   ...images,
-                                  ...res.map((r) => r.ufsUrl),
-                                ];
+                                  ...uploadedUrls,
+                                ].filter((img) => img !== "/placeholder.svg");
                                 setImages(newImages);
                                 form.setValue("images", newImages, {
                                   shouldDirty: true,
                                 });
                                 console.log(
                                   "Uploaded images:",
-                                  res.map((r) => r.ufsUrl),
+                                  uploadedUrls,
+                                );
+                              }}
+                              onUploadError={(error) => {
+                                console.error("Upload error:", error);
+                                toast.error(
+                                  `Failed to upload image: ${error.message || "Unknown error"}`,
                                 );
                               }}
                             />

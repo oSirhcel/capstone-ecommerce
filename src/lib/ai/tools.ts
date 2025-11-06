@@ -1,5 +1,6 @@
 import { tool } from "ai";
 import { z } from "zod";
+import { extractProductData } from "@/lib/ai/extractors/product-extractor";
 
 /**
  * Tool to create a product draft from natural language description
@@ -12,10 +13,13 @@ export const createProductDraftTool = tool({
       .string()
       .describe("The user's product description to extract data from"),
   }),
-  execute: async ({ description }) => ({
-    toolName: "create_product_draft",
-    description,
-  }),
+  execute: async ({ description }) => {
+    const result = await extractProductData(description);
+    if (!result.success) {
+      throw new Error("Failed to extract product data");
+    }
+    return result.data;
+  },
 });
 
 /**
@@ -42,66 +46,26 @@ export const navigateToPageTool = tool({
       .string()
       .describe("Brief explanation of why navigating to this page"),
   }),
-  execute: async ({ page, reason }) => ({
-    toolName: "navigate_to_page",
-    page,
-    reason,
-  }),
-});
-
-/**
- * Tool to get store overview with statistics
- */
-export const getStoreOverviewTool = tool({
-  description:
-    "Get an overview of the store including product count, revenue, active status, and other key metrics.",
-  inputSchema: z.object({
-    includeStats: z
-      .boolean()
-      .optional()
-      .describe("Whether to include detailed statistics"),
-  }),
-  execute: async ({ includeStats }) => ({
-    toolName: "get_store_overview",
-    includeStats: includeStats ?? true,
-  }),
-});
-
-/**
- * Tool to get recent orders
- */
-export const getRecentOrdersTool = tool({
-  description:
-    "Retrieve recent orders from the store. Use this to show order history or status.",
-  inputSchema: z.object({
-    limit: z
-      .number()
-      .optional()
-      .default(5)
-      .describe("Number of recent orders to retrieve (default 5)"),
-  }),
-  execute: async ({ limit }) => ({
-    toolName: "get_recent_orders",
-    limit: limit ?? 5,
-  }),
-});
-
-/**
- * Tool to get products summary
- */
-export const getProductsSummaryTool = tool({
-  description:
-    "Get a summary of store products including count and status breakdown.",
-  inputSchema: z.object({
-    includeList: z
-      .boolean()
-      .optional()
-      .describe("Whether to include a list of products"),
-  }),
-  execute: async ({ includeList }) => ({
-    toolName: "get_products_summary",
-    includeList: includeList ?? false,
-  }),
+  execute: async ({ page, reason }) => {
+    const pageMap: Record<string, string> = {
+      dashboard: "/admin",
+      products: "/admin/products",
+      "add-product": "/admin/products/add",
+      orders: "/admin/orders",
+      customers: "/admin/customers",
+      analytics: "/admin/analytics",
+      "settings-store": "/admin/settings/store",
+      "settings-shipping": "/admin/settings/shipping",
+      "settings-payments": "/admin/settings/payments",
+      "settings-tax": "/admin/settings/tax",
+      "risk-assessments": "/admin/risk-assessments",
+    };
+    const targetPage = pageMap[page] ?? "/admin";
+    return {
+      page: targetPage,
+      reason,
+    };
+  },
 });
 
 /**
@@ -116,10 +80,14 @@ export const getSetupStatusTool = tool({
       .optional()
       .describe("Whether to include detailed setup steps"),
   }),
-  execute: async ({ detailed }) => ({
-    toolName: "get_setup_status",
-    detailed: detailed ?? false,
-  }),
+  execute: async () => {
+    const { executeGetSetupStatus } = await import("@/lib/ai/tool-handlers");
+    const result = await executeGetSetupStatus();
+    if (!result.success) {
+      throw new Error(result.message);
+    }
+    return result.data;
+  },
 });
 
 /**
@@ -141,10 +109,16 @@ export const completeOnboardingStepTool = tool({
       ])
       .describe("The onboarding step that was completed"),
   }),
-  execute: async ({ stepKey }) => ({
-    toolName: "complete_onboarding_step",
-    stepKey,
-  }),
+  execute: async ({ stepKey }) => {
+    const { executeCompleteOnboardingStep } = await import(
+      "@/lib/ai/tool-handlers"
+    );
+    const result = await executeCompleteOnboardingStep(stepKey);
+    if (!result.success) {
+      throw new Error(result.message);
+    }
+    return result.data;
+  },
 });
 
 /**
@@ -166,25 +140,111 @@ export const updateProductFieldsTool = tool({
         "Current form data (optional, helps provide better context for updates)",
       ),
   }),
-  execute: async ({ instruction, currentFormData }) => ({
-    toolName: "update_product_fields",
-    instruction,
-    currentFormData: currentFormData ?? {},
-  }),
+  execute: async ({ instruction, currentFormData }) => {
+    const { extractFieldUpdates } = await import(
+      "@/lib/ai/extractors/field-update-extractor"
+    );
+    const result = await extractFieldUpdates(
+      instruction,
+      currentFormData ?? {},
+    );
+    return {
+      updates: result.updates,
+      reasoning: result.reasoning,
+    };
+  },
 });
 
 /**
- * All available tools for the chatbot
+ * Create tools with storeId context
  */
-export const chatbotTools = {
-  create_product_draft: createProductDraftTool,
-  navigate_to_page: navigateToPageTool,
-  get_store_overview: getStoreOverviewTool,
-  get_recent_orders: getRecentOrdersTool,
-  get_products_summary: getProductsSummaryTool,
-  get_setup_status: getSetupStatusTool,
-  complete_onboarding_step: completeOnboardingStepTool,
-  update_product_fields: updateProductFieldsTool,
-};
+export function createChatbotTools(storeId?: string) {
+  const getStoreOverviewToolWithContext = tool({
+    description:
+      "Get an overview of the store including product count, revenue, active status, and other key metrics.",
+    inputSchema: z.object({
+      includeStats: z
+        .boolean()
+        .optional()
+        .describe("Whether to include detailed statistics"),
+    }),
+    execute: async () => {
+      if (!storeId) {
+        throw new Error("Store ID is required");
+      }
+      const { executeGetStoreOverview } = await import(
+        "@/lib/ai/tool-handlers"
+      );
+      const result = await executeGetStoreOverview(storeId);
+      if (!result.success) {
+        throw new Error(result.message);
+      }
+      return result.data;
+    },
+  });
 
-export type AvailableTools = typeof chatbotTools;
+  const getRecentOrdersToolWithContext = tool({
+    description:
+      "Retrieve recent orders from the store. Use this to show order history or status.",
+    inputSchema: z.object({
+      limit: z
+        .number()
+        .optional()
+        .default(5)
+        .describe("Number of recent orders to retrieve (default 5)"),
+    }),
+    execute: async ({ limit }) => {
+      if (!storeId) {
+        throw new Error("Store ID is required");
+      }
+      const { executeGetRecentOrders } = await import("@/lib/ai/tool-handlers");
+      const result = await executeGetRecentOrders(storeId, limit);
+      if (!result.success) {
+        throw new Error(result.message);
+      }
+      return result.data;
+    },
+  });
+
+  const getProductsSummaryToolWithContext = tool({
+    description:
+      "Get a summary of store products including count and status breakdown.",
+    inputSchema: z.object({
+      includeList: z
+        .boolean()
+        .optional()
+        .describe("Whether to include a list of products"),
+    }),
+    execute: async () => {
+      if (!storeId) {
+        throw new Error("Store ID is required");
+      }
+      const { executeGetProductsSummary } = await import(
+        "@/lib/ai/tool-handlers"
+      );
+      const result = await executeGetProductsSummary(storeId);
+      if (!result.success) {
+        throw new Error(result.message);
+      }
+      return result.data;
+    },
+  });
+
+  return {
+    create_product_draft: createProductDraftTool,
+    navigate_to_page: navigateToPageTool,
+    get_store_overview: getStoreOverviewToolWithContext,
+    get_recent_orders: getRecentOrdersToolWithContext,
+    get_products_summary: getProductsSummaryToolWithContext,
+    get_setup_status: getSetupStatusTool,
+    complete_onboarding_step: completeOnboardingStepTool,
+    update_product_fields: updateProductFieldsTool,
+  };
+}
+
+/**
+ * All available tools for the chatbot (default, without storeId context)
+ */
+export const chatbotTools = createChatbotTools();
+
+export type AvailableTools = ReturnType<typeof createChatbotTools>;

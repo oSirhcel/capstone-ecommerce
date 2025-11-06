@@ -393,16 +393,17 @@ export async function PUT(
       }
     }
 
-    // Update images if provided
+    // Update images if provided (filter out placeholder)
     if (body.images !== undefined) {
       // Delete existing images
       await db
         .delete(productImages)
         .where(eq(productImages.productId, productId));
 
-      // Insert new images
-      if (body.images.length > 0) {
-        const imageRecords = body.images.map(
+      // Filter out placeholder and insert new images
+      const validImages = body.images.filter((img) => img !== "/placeholder.svg");
+      if (validImages.length > 0) {
+        const imageRecords = validImages.map(
           (imageUrl: string, index: number) => ({
             productId,
             imageUrl,

@@ -352,6 +352,6 @@ export const transformProductToCardProps = (
     rating: product.rating, // Use actual rating from reviews
     reviewCount: product.reviewCount, // Include review count
     store: product.store.name,
-    category: product.category!.name,
+    category: product.category?.name ?? "Uncategorized",
   };
 };
